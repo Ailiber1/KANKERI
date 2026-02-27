@@ -2926,7 +2926,7 @@ function createPlayerController(g) {
   // Mouse (pointer lock)
   const canvas = g.renderer.domElement;
   canvas.addEventListener('click', () => {
-    if (!ctrl.isPointerLocked && g.gamePhase === 'seek') {
+    if (!ctrl.isPointerLocked && g.gamePhase !== 'result' && g.gamePhase !== 'placement') {
       canvas.requestPointerLock();
     }
   });
