@@ -4939,32 +4939,31 @@ function gameLoop(timestamp) {
 
   if (G.paused) return;
 
-  // Update systems
-  try {
-    updatePlayer(G, dt);
-    updateAllCpuAllies(G, dt);
-    updateCamera(G, dt);
-    updateCanPhysics(G, dt);
-    updateCanEffects(G, dt);
-    updateSwings(G, dt);
-    updateDayNight(G, dt);
-    updateGamePhases(G, dt);
-    updateHUD(G);
-  } catch(e) {
-    console.error('gameLoop error:', e);
-    // Show error on screen for debugging
-    if (!G._errorShown) {
-      G._errorShown = true;
-      showNotification('ERROR: ' + e.message);
+  // Update systems (each isolated so one failure doesn't block others)
+  const updates = [
+    ['updatePlayer', () => updatePlayer(G, dt)],
+    ['updateAllCpuAllies', () => updateAllCpuAllies(G, dt)],
+    ['updateCamera', () => updateCamera(G, dt)],
+    ['updateCanPhysics', () => updateCanPhysics(G, dt)],
+    ['updateCanEffects', () => updateCanEffects(G, dt)],
+    ['updateSwings', () => updateSwings(G, dt)],
+    ['updateDayNight', () => updateDayNight(G, dt)],
+    ['updateGamePhases', () => updateGamePhases(G, dt)],
+    ['updateHUD', () => updateHUD(G)]
+  ];
+  for (const [name, fn] of updates) {
+    try { fn(); } catch(e) {
+      console.error(name + ' error:', e);
+      if (!G._errorShown) {
+        G._errorShown = true;
+        const errEl = document.getElementById('hud-stage-name');
+        if (errEl) errEl.textContent = 'ERR: ' + name + ': ' + e.message;
+      }
     }
   }
 
-  // Render (always execute even if update fails)
-  try {
-    G.renderer.render(G.scene, G.camera);
-  } catch(e2) {
-    console.error('render error:', e2);
-  }
+  // Render
+  try { G.renderer.render(G.scene, G.camera); } catch(e2) { console.error('render error:', e2); }
 }
 
 // --- GAME INIT & CLEANUP ---
