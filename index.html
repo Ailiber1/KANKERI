@@ -207,7 +207,7 @@ html, body {
   font-size: clamp(36px, 10vw, 96px);
   line-height: 1;
   letter-spacing: 6px;
-  background: linear-gradient(to bottom, #f0dde4 0%, #e8c0cc 30%, #d4899e 65%, #c06080 100%);
+  background: linear-gradient(to bottom, #ffffff 0%, #ffe0e8 50%, #f0b8c8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -277,19 +277,19 @@ html, body {
 }
 .neon-input {
   width: 100%; padding: 10px 14px;
-  background: rgba(0,0,0,0.5);
-  border: 1px solid var(--neon-pink-dim);
-  color: var(--text-primary);
+  background: rgba(0,20,10,0.6);
+  border: 1px solid #00aa2a;
+  color: #00ff41;
   font-family: 'Share Tech Mono', monospace;
   font-size: 15px;
   outline: none;
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 .neon-input:focus {
-  border-color: var(--neon-pink);
-  box-shadow: 0 0 12px var(--neon-pink-glow), inset 0 0 8px rgba(255,51,102,0.1);
+  border-color: #00ff41;
+  box-shadow: 0 0 8px rgba(0,255,65,0.6), inset 0 0 8px rgba(0,255,65,0.05);
 }
-.neon-input::placeholder { color: var(--text-dim); }
+.neon-input::placeholder { color: rgba(0,255,65,0.35); }
 .input-error-msg {
   font-size: 11px; color: var(--neon-red);
   min-height: 16px; margin-top: 4px;
