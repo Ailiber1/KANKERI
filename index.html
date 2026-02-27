@@ -3475,8 +3475,8 @@ function updatePlayer(g, dt) {
 
   const canPeek = ctrl.nearWall && !ctrl.isDashing && (g.gamePhase === 'seek' || g.gamePhase === 'hide');
   if (canPeek && (keys['KeyQ'] || keys['KeyE'])) {
-    // Auto-detect peek direction: lean AWAY from wall to peek around its edge
-    ctrl.isPeeking = ctrl._wallSide === 'right' ? 'left' : 'right';
+    // Auto-detect peek direction: lean TOWARD the wall to peek around its edge
+    ctrl.isPeeking = ctrl._wallSide === 'right' ? 'right' : 'left';
   } else {
     ctrl.isPeeking = 'none';
   }
