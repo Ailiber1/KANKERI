@@ -2,1289 +2,1529 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KANKERI - 棒人間キャラクター プレビュー</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>KANKERI — Run. Hide. Kick.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Share+Tech+Mono&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-    background: #0a0a0a;
-    overflow: hidden;
-    font-family: 'Share Tech Mono', monospace;
-    color: #fff;
-}
-canvas { display: block; }
-
-#ui-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    pointer-events: none;
-    z-index: 10;
-    padding: 20px;
-}
-
-#title {
-    text-align: center;
-    font-family: 'Cinzel Decorative', serif;
-    font-size: 28px;
-    color: #ff3366;
-    text-shadow: 0 0 20px #ff3366, 0 0 40px #ff336666;
-    letter-spacing: 4px;
-    margin-bottom: 8px;
+/* ============================================================
+   SECTION: CSS VARIABLES & RESET
+   ============================================================ */
+:root {
+  --neon-pink: #ff3366;
+  --neon-pink-glow: rgba(255, 51, 102, 0.6);
+  --neon-pink-dim: rgba(255, 51, 102, 0.3);
+  --neon-cyan: #00e5ff;
+  --neon-cyan-glow: rgba(0, 229, 255, 0.5);
+  --neon-green: #00ff41;
+  --neon-red: #ff0040;
+  --neon-yellow: #ffd700;
+  --bg-dark: #0a0a0f;
+  --bg-panel: rgba(10, 10, 20, 0.85);
+  --bg-overlay: rgba(0, 0, 0, 0.85);
+  --border-glow: var(--neon-pink);
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-dim: #666666;
 }
 
-#subtitle {
-    text-align: center;
-    font-size: 13px;
-    color: #888;
-    letter-spacing: 2px;
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: 'Share Tech Mono', 'Noto Sans JP', monospace;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-#controls-panel {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.8);
-    border: 1px solid #ff336644;
-    border-radius: 8px;
-    padding: 16px 24px;
-    pointer-events: auto;
-    z-index: 10;
-    display: flex;
-    gap: 16px;
-    align-items: center;
+/* ============================================================
+   SECTION: SCREEN MANAGEMENT
+   ============================================================ */
+.screen {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
+}
+.screen.active { display: flex; }
+
+/* ============================================================
+   SECTION: SPLASH SCREEN
+   ============================================================ */
+#splash-screen {
+  z-index: 999;
+  background: #000;
+}
+#splash-quote {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: clamp(16px, 4vw, 22px);
+  color: var(--neon-pink);
+  text-align: center;
+  opacity: 0;
+  line-height: 1.8;
+  letter-spacing: 2px;
+  text-shadow: 0 0 15px var(--neon-pink-glow);
+  padding: 0 20px;
+}
+#splash-title {
+  font-family: 'Cinzel Decorative', serif;
+  font-weight: 900;
+  font-size: clamp(40px, 12vw, 100px);
+  color: var(--neon-pink);
+  opacity: 0;
+  letter-spacing: 8px;
+  text-shadow:
+    0 0 10px var(--neon-pink),
+    0 0 30px var(--neon-pink-glow),
+    0 0 60px rgba(255,51,102,0.4),
+    0 0 100px rgba(255,51,102,0.2);
+  position: relative;
 }
 
-.ctrl-btn {
-    background: transparent;
-    border: 1px solid #ff336688;
-    color: #ff3366;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 13px;
-    transition: all 0.2s;
+/* Glitch effect */
+@keyframes glitch1 {
+  0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+  20% { clip-path: inset(20% 0 60% 0); transform: translate(-4px, 2px); }
+  40% { clip-path: inset(50% 0 20% 0); transform: translate(4px, -2px); }
+  60% { clip-path: inset(10% 0 70% 0); transform: translate(-2px, 1px); }
+  80% { clip-path: inset(60% 0 10% 0); transform: translate(3px, -1px); }
 }
-.ctrl-btn:hover {
-    background: #ff336622;
-    border-color: #ff3366;
-    box-shadow: 0 0 10px #ff336644;
+@keyframes glitch2 {
+  0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+  20% { clip-path: inset(60% 0 10% 0); transform: translate(3px, -1px); }
+  40% { clip-path: inset(10% 0 50% 0); transform: translate(-3px, 2px); }
+  60% { clip-path: inset(40% 0 30% 0); transform: translate(2px, -2px); }
+  80% { clip-path: inset(20% 0 60% 0); transform: translate(-4px, 1px); }
 }
-.ctrl-btn.active {
-    background: #ff336633;
-    border-color: #ff3366;
-    color: #fff;
+.glitch-active {
+  animation: glitch1 0.1s linear infinite;
 }
-
-#anim-label {
-    color: #666;
-    font-size: 12px;
+.glitch-active::before,
+.glitch-active::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
 }
-
-#info-panel {
-    position: fixed;
-    top: 80px;
-    right: 20px;
-    background: rgba(0,0,0,0.8);
-    border: 1px solid #333;
-    border-radius: 8px;
-    padding: 16px;
-    z-index: 10;
-    font-size: 12px;
-    line-height: 1.8;
-    color: #aaa;
-    max-width: 220px;
+.glitch-active::before {
+  color: var(--neon-cyan);
+  animation: glitch2 0.12s linear infinite;
+  opacity: 0.7;
+}
+.glitch-active::after {
+  color: var(--neon-yellow);
+  animation: glitch1 0.08s linear infinite reverse;
+  opacity: 0.5;
 }
 
-.info-title {
-    color: #ff3366;
-    font-size: 14px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid #333;
-    padding-bottom: 4px;
+/* ============================================================
+   SECTION: TITLE SCREEN
+   ============================================================ */
+#title-screen {
+  z-index: 200;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 0;
 }
 
-.runner-color { color: #4488ff; }
-.oni-color { color: #cc0000; }
-.captured-color { color: #666666; }
+/* Matrix Rain */
+#matrix-bg {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.matrix-col {
+  position: absolute; top: -100%;
+  width: 22px; font-size: 16px; line-height: 1.2;
+  white-space: pre;
+  color: var(--neon-pink);
+  opacity: 0.45;
+  text-shadow: 0 0 10px var(--neon-pink-glow), 0 0 20px rgba(255,51,102,0.3);
+  animation: matrixFall linear infinite;
+  writing-mode: vertical-rl;
+}
+@keyframes matrixFall {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(200%); }
+}
+.matrix-col-pulse { animation: matrixFall linear infinite, pinkPulse 2s ease-in-out infinite alternate; }
+.matrix-col-flash { animation: matrixFall linear infinite, pinkFlash 4s ease-in-out infinite; }
+@keyframes pinkPulse { 0% { opacity: 0.25; } 100% { opacity: 0.6; } }
+@keyframes pinkFlash { 0%, 93% { opacity: 0.4; } 96% { opacity: 1.0; } 100% { opacity: 0.4; } }
 
-@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Share+Tech+Mono&display=swap');
+/* Overlays */
+#pink-glow {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(255,51,102,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 80%, rgba(180,20,60,0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(5,0,0,0.4) 100%);
+  pointer-events: none; z-index: 1;
+}
+.scanlines {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: repeating-linear-gradient(to bottom, transparent, transparent 2px, rgba(255,51,102,0.04) 2px, rgba(255,51,102,0.04) 3px);
+  opacity: 0.5; pointer-events: none; z-index: 100;
+}
+.vignette {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%);
+  pointer-events: none; z-index: 99;
+}
+#fog-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at 50% 100%, rgba(255,51,102,0.04) 0%, transparent 70%);
+  pointer-events: none; z-index: 5; opacity: 0.6;
+}
+
+/* Title Logo */
+#title-logo {
+  z-index: 10; text-align: center; margin-top: 30px;
+  position: relative;
+}
+#title-logo h1 {
+  font-family: 'Cinzel Decorative', serif;
+  font-weight: 900;
+  font-size: clamp(36px, 10vw, 96px);
+  line-height: 1;
+  letter-spacing: 6px;
+  color: var(--neon-pink);
+  text-shadow:
+    0 0 10px var(--neon-pink),
+    0 0 30px var(--neon-pink-glow),
+    0 0 60px rgba(255,51,102,0.4),
+    0 0 100px rgba(255,51,102,0.2);
+  text-align: center;
+  animation: titlePulse 3s ease-in-out infinite alternate;
+}
+@keyframes titlePulse { 0% { filter: brightness(1.0); } 100% { filter: brightness(1.2); } }
+#title-logo .subtitle {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(11px, 2.5vw, 16px);
+  color: var(--text-secondary);
+  letter-spacing: 4px;
+  margin-top: 6px;
+}
+
+/* Chase Container */
+#chase-container {
+  width: min(440px, 70%);
+  height: 48px;
+  position: relative;
+  overflow: hidden;
+  margin: 14px auto;
+  z-index: 10;
+}
+#chase-canvas {
+  width: 100%; height: 100%;
+}
+
+/* ============================================================
+   SECTION: UI PANEL & COMPONENTS
+   ============================================================ */
+.ui-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--neon-pink-dim);
+  padding: 24px 28px;
+  position: relative;
+  z-index: 10;
+  width: min(420px, 90%);
+  margin: 10px auto;
+}
+.ui-panel::before,
+.ui-panel::after {
+  content: ''; position: absolute;
+  width: 14px; height: 14px;
+  border-color: var(--neon-pink);
+  border-style: solid;
+}
+.ui-panel::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+.ui-panel::after  { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
+.corner-bl, .corner-br {
+  position: absolute; width: 14px; height: 14px;
+  border-color: var(--neon-pink);
+  border-style: solid;
+}
+.corner-bl { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
+.corner-br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+/* Input */
+.input-label {
+  font-size: 11px; color: var(--text-secondary);
+  letter-spacing: 3px; margin-bottom: 6px;
+}
+.neon-input {
+  width: 100%; padding: 10px 14px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--neon-pink-dim);
+  color: var(--text-primary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.neon-input:focus {
+  border-color: var(--neon-pink);
+  box-shadow: 0 0 12px var(--neon-pink-glow), inset 0 0 8px rgba(255,51,102,0.1);
+}
+.neon-input::placeholder { color: var(--text-dim); }
+.input-error-msg {
+  font-size: 11px; color: var(--neon-red);
+  min-height: 16px; margin-top: 4px;
+}
+
+/* Buttons */
+.btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.btn-group-secondary { margin-top: 10px; }
+
+.btn {
+  font-family: 'Share Tech Mono', 'Noto Sans JP', monospace;
+  background: transparent;
+  padding: 12px 20px;
+  font-size: 14px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  width: 100%;
+}
+.btn::before {
+  content: ''; position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 0;
+  transition: height 0.3s ease;
+  z-index: -1;
+}
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: translateY(0); }
+
+.btn-neon {
+  border: 1px solid var(--neon-pink);
+  color: var(--neon-pink);
+}
+.btn-neon::before { background: var(--neon-pink-dim); }
+.btn-neon:hover {
+  background: var(--neon-pink-dim);
+  box-shadow: 0 0 20px var(--neon-pink-glow), inset 0 0 20px var(--neon-pink-dim);
+}
+.btn-neon:hover::before { height: 100%; }
+
+.btn-thin {
+  border: 1px solid rgba(255,51,102,0.3);
+  color: rgba(255,51,102,0.7);
+}
+.btn-thin:hover {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+  box-shadow: 0 0 10px var(--neon-pink-dim);
+}
+
+.btn-gold {
+  border: 1px solid var(--neon-yellow);
+  color: var(--neon-yellow);
+}
+.btn-gold::before { background: rgba(255,215,0,0.15); }
+.btn-gold:hover {
+  background: rgba(255,215,0,0.15);
+  box-shadow: 0 0 20px rgba(255,215,0,0.3), inset 0 0 20px rgba(255,215,0,0.1);
+}
+.btn-gold:hover::before { height: 100%; }
+
+/* Panel Footer */
+.panel-footer {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid rgba(255,51,102,0.15);
+}
+.lang-btn {
+  background: transparent; border: 1px solid transparent;
+  color: var(--text-dim); font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px; padding: 4px 10px; cursor: pointer;
+  transition: all 0.3s;
+}
+.lang-btn.active {
+  color: var(--neon-pink); border-color: var(--neon-pink-dim);
+}
+.lang-btn:hover { color: var(--neon-pink); }
+.footer-divider { color: var(--text-dim); font-size: 14px; }
+.bgm-btn {
+  background: transparent; border: 1px solid transparent;
+  font-size: 13px; padding: 4px 10px; cursor: pointer;
+  transition: all 0.3s; font-family: 'Share Tech Mono', monospace;
+}
+.bgm-btn.bgm-on { color: var(--neon-pink); border-color: var(--neon-pink-dim); }
+.bgm-btn.bgm-off { color: var(--text-dim); text-decoration: line-through; }
+
+/* ============================================================
+   SECTION: MODALS
+   ============================================================ */
+.modal-overlay {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: var(--bg-overlay);
+  z-index: 250;
+  display: none;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.active { display: flex; }
+.modal-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--neon-pink);
+  box-shadow: 0 0 30px var(--neon-pink-glow);
+  padding: 30px;
+  max-width: 500px; width: 90%;
+  position: relative;
+  max-height: 80vh; overflow-y: auto;
+}
+.modal-box::before, .modal-box::after {
+  content: ''; position: absolute;
+  width: 14px; height: 14px;
+  border-color: var(--neon-pink); border-style: solid;
+}
+.modal-box::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+.modal-box::after  { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
+.modal-title {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: clamp(18px, 4vw, 24px);
+  color: var(--neon-pink);
+  text-shadow: 0 0 15px var(--neon-pink-glow);
+  text-align: center; margin-bottom: 20px;
+  letter-spacing: 3px;
+}
+.modal-close {
+  position: absolute; top: 10px; right: 14px;
+  background: transparent; border: none;
+  color: var(--text-dim); font-size: 24px;
+  cursor: pointer; transition: color 0.3s;
+}
+.modal-close:hover { color: var(--neon-pink); }
+
+/* Settings labels */
+.setting-label {
+  font-size: 12px; color: var(--text-secondary);
+  letter-spacing: 2px; margin: 14px 0 8px;
+}
+.setting-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.setting-btn {
+  background: transparent;
+  border: 1px solid var(--neon-pink-dim);
+  color: var(--text-secondary);
+  font-family: 'Share Tech Mono', 'Noto Sans JP', monospace;
+  font-size: 13px; padding: 8px 16px;
+  cursor: pointer; transition: all 0.3s;
+  flex: 1; text-align: center; min-width: 60px;
+}
+.setting-btn.active {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+  background: var(--neon-pink-dim);
+  box-shadow: 0 0 8px var(--neon-pink-glow);
+}
+.setting-btn:hover:not(.active) {
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+}
+.setting-note {
+  font-size: 11px; color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* Select dropdown */
+.neon-select {
+  width: 100%; padding: 10px 14px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--neon-pink-dim);
+  color: var(--text-primary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px; outline: none;
+  cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23ff3366' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+.neon-select:focus { border-color: var(--neon-pink); box-shadow: 0 0 10px var(--neon-pink-glow); }
+.neon-select option { background: #0a0a0f; color: #fff; }
+
+/* Rules content */
+.rules-content {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 13px; line-height: 1.9;
+  color: var(--text-secondary);
+}
+.rules-content h3 {
+  color: var(--neon-pink); font-size: 15px;
+  margin: 16px 0 8px; letter-spacing: 1px;
+}
+.rules-content .rule-step {
+  display: flex; gap: 10px; margin: 6px 0;
+}
+.rules-content .step-num {
+  color: var(--neon-cyan); font-family: 'Share Tech Mono', monospace;
+  font-size: 16px; font-weight: bold; min-width: 24px;
+}
+
+/* Notification toast */
+.notification {
+  position: fixed; top: 20px; left: 50%;
+  transform: translateX(-50%) translateY(-100px);
+  background: var(--bg-panel);
+  border: 1px solid var(--neon-pink);
+  padding: 12px 24px;
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--neon-pink);
+  z-index: 300;
+  animation: slideDown 0.3s ease forwards;
+  box-shadow: 0 0 15px var(--neon-pink-glow);
+  font-size: 13px;
+}
+@keyframes slideDown { to { transform: translateX(-50%) translateY(0); } }
+@keyframes slideUp { from { transform: translateX(-50%) translateY(0); } to { transform: translateX(-50%) translateY(-100px); } }
+
+/* Loading screen */
+#loading-screen {
+  z-index: 300;
+  background: var(--bg-dark);
+}
+.loading-can {
+  width: 30px; height: 45px;
+  border: 2px solid var(--neon-cyan);
+  border-radius: 4px;
+  animation: canSpin 1.5s linear infinite;
+  box-shadow: 0 0 15px var(--neon-cyan-glow);
+  margin-bottom: 20px;
+}
+@keyframes canSpin { to { transform: rotate(360deg); } }
+.loading-text {
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--text-secondary);
+  font-size: 14px; letter-spacing: 3px;
+}
+.loading-bar {
+  width: min(300px, 60%); height: 3px;
+  background: rgba(255,255,255,0.1);
+  margin-top: 16px; overflow: hidden;
+  border-radius: 2px;
+}
+.loading-bar-fill {
+  width: 0%; height: 100%;
+  background: linear-gradient(90deg, var(--neon-pink), var(--neon-cyan));
+  transition: width 0.3s ease;
+}
+
+/* ============================================================
+   SECTION: RESPONSIVE
+   ============================================================ */
+@media (max-width: 480px) {
+  .ui-panel { padding: 18px 16px; }
+  .btn { padding: 11px 14px; font-size: 13px; }
+  .setting-btn { padding: 7px 10px; font-size: 12px; }
+  .modal-box { padding: 20px; }
+  #title-logo h1 { letter-spacing: 3px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .mobile-only { display: none !important; }
+}
+@media (hover: none) and (pointer: coarse) {
+  .pc-only { display: none !important; }
+}
+
+/* Scrollbar for modals */
+.modal-box::-webkit-scrollbar { width: 4px; }
+.modal-box::-webkit-scrollbar-track { background: transparent; }
+.modal-box::-webkit-scrollbar-thumb { background: var(--neon-pink-dim); border-radius: 2px; }
+#title-screen::-webkit-scrollbar { width: 0; }
 </style>
 </head>
 <body>
 
-<div id="ui-overlay">
-    <div id="title">KANKERI</div>
-    <div id="subtitle">棒人間キャラクター プレビュー</div>
+<!-- ============================================================
+     SECTION: SPLASH SCREEN
+     ============================================================ -->
+<div id="splash-screen" class="screen active">
+  <div id="splash-quote">缶ひとつ蹴れば、全員救える。</div>
+  <div id="splash-title" data-text="KANKERI">KANKERI</div>
 </div>
 
-<div id="info-panel">
-    <div class="info-title">キャラクター情報</div>
-    <span class="runner-color">● ランナー（子ども）</span><br>
-    身長: 1.2m / 頭大きめ<br>
-    色: #4488ff<br><br>
-    <span class="oni-color">● 鬼（大人）</span><br>
-    身長: 1.9m / ツノ+光る目<br>
-    色: #aa0000（濃い赤）<br><br>
-    <span class="captured-color">● 捕獲済み</span><br>
-    色: #666666<br><br>
-    <div style="color:#555; border-top:1px solid #333; padding-top:8px; margin-top:4px;">
-    マウスドラッグ: 回転<br>
-    ホイール: ズーム
+<!-- ============================================================
+     SECTION: TITLE SCREEN
+     ============================================================ -->
+<div id="title-screen" class="screen">
+  <div id="matrix-bg"></div>
+  <div id="pink-glow"></div>
+  <div id="fog-overlay"></div>
+
+  <div id="title-logo">
+    <h1>KANKERI</h1>
+    <div class="subtitle">Run. Hide. Kick.</div>
+  </div>
+
+  <div id="chase-container">
+    <canvas id="chase-canvas"></canvas>
+  </div>
+
+  <div class="ui-panel">
+    <div class="corner-bl"></div>
+    <div class="corner-br"></div>
+
+    <div class="input-label" data-i18n="USER_NAME">USER NAME</div>
+    <input type="text" id="username-input" class="neon-input"
+           placeholder="名前を入力..." maxlength="16" autocomplete="off"
+           data-i18n-placeholder="NAME_PLACEHOLDER">
+    <div id="username-error" class="input-error-msg"></div>
+
+    <div class="btn-group">
+      <button class="btn btn-neon" id="btn-register" data-i18n="BTN_REGISTER">登録してゲームを始める</button>
+      <button class="btn btn-thin" id="btn-guest" data-i18n="BTN_GUEST">▶ 登録しないでゲームを始める</button>
     </div>
+
+    <div class="btn-group btn-group-secondary">
+      <button class="btn btn-neon" id="btn-multi" data-i18n="BTN_MULTI">マルチプレイ（最大4人）</button>
+      <button class="btn btn-gold" id="btn-score" data-i18n="BTN_SCORE">🏆 スコアアタック</button>
+    </div>
+
+    <div class="btn-group btn-group-secondary">
+      <button class="btn btn-thin" id="btn-rules" data-i18n="BTN_RULES">ルール説明を見る</button>
+      <button class="btn btn-thin" id="btn-ranking" data-i18n="BTN_RANKING">ランキングを見る</button>
+    </div>
+
+    <div class="panel-footer">
+      <button class="lang-btn active" id="lang-ja">日本語</button>
+      <button class="lang-btn" id="lang-en">English</button>
+      <span class="footer-divider">|</span>
+      <button class="bgm-btn bgm-on" id="bgm-toggle">🔊 BGM</button>
+    </div>
+  </div>
 </div>
 
-<div id="controls-panel">
-    <span id="anim-label">アニメーション:</span>
-    <button class="ctrl-btn active" data-anim="idle">待機</button>
-    <button class="ctrl-btn" data-anim="walk">歩行</button>
-    <button class="ctrl-btn" data-anim="run">走行</button>
-    <button class="ctrl-btn" data-anim="crouch">しゃがみ</button>
-    <button class="ctrl-btn" data-anim="peek">覗き</button>
-    <button class="ctrl-btn" data-anim="kick">缶蹴り</button>
-    <button class="ctrl-btn" data-anim="hit">叩く</button>
-    <button class="ctrl-btn" data-anim="captured">捕獲</button>
-    <button class="ctrl-btn" data-anim="chase">鬼追跡</button>
+<!-- ============================================================
+     SECTION: STORY SETTINGS MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="story-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('story-modal')">&times;</button>
+    <div class="corner-bl"></div>
+    <div class="corner-br"></div>
+    <div class="modal-title" data-i18n="STORY_TITLE">STORY MODE</div>
+
+    <div class="setting-label" data-i18n="SELECT_STAGE">● ステージ</div>
+    <select class="neon-select" id="story-stage-select">
+      <option value="1">Stage 1 — 児童公園</option>
+      <option value="2" disabled>Stage 2 — 雨上がりの神社 🔒</option>
+      <option value="3" disabled>Stage 3 — ネオン商店街の裏路地 🔒</option>
+      <option value="4" disabled>Stage 4 — 廃校の校庭 🔒</option>
+      <option value="5" disabled>Stage 5 — 団地 🔒</option>
+    </select>
+
+    <div class="setting-label" data-i18n="CPU_COUNT">● 味方CPU人数</div>
+    <div class="setting-row" id="cpu-count-row">
+      <button class="setting-btn active" data-val="0">0人</button>
+      <button class="setting-btn" data-val="1">1人</button>
+      <button class="setting-btn" data-val="2">2人</button>
+      <button class="setting-btn" data-val="3">3人</button>
+    </div>
+    <div class="setting-note" data-i18n="CPU_NOTE">※ 0人 = 自分1人で挑戦</div>
+
+    <div class="setting-label" data-i18n="CPU_LEVEL">● CPUレベル</div>
+    <div class="setting-row" id="cpu-level-row">
+      <button class="setting-btn" data-val="weak" data-i18n="LEVEL_WEAK">弱</button>
+      <button class="setting-btn active" data-val="normal" data-i18n="LEVEL_NORMAL">中</button>
+      <button class="setting-btn" data-val="strong" data-i18n="LEVEL_STRONG">強</button>
+    </div>
+
+    <div class="btn-group" style="margin-top:20px">
+      <button class="btn btn-neon" id="btn-story-start" data-i18n="BTN_START">ゲーム開始</button>
+    </div>
+  </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<!-- ============================================================
+     SECTION: SCORE ATTACK SETTINGS MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="score-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('score-modal')">&times;</button>
+    <div class="corner-bl"></div>
+    <div class="corner-br"></div>
+    <div class="modal-title" data-i18n="SCORE_TITLE">SCORE ATTACK</div>
+
+    <div class="setting-label" data-i18n="SA_STAGE">● ステージ</div>
+    <div style="color:var(--neon-cyan);font-size:14px;padding:10px;border:1px solid var(--neon-cyan-glow);background:rgba(0,229,255,0.05)">
+      古刹の大屋敷 <span style="color:var(--text-dim);font-size:11px">（固定）</span>
+    </div>
+    <div class="setting-note" data-i18n="SA_NOTE">捕まるまで生き残れ。生存時間がスコアになる。</div>
+
+    <div class="btn-group" style="margin-top:20px">
+      <button class="btn btn-gold" id="btn-score-start" data-i18n="BTN_START">ゲーム開始</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION: RULES MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="rules-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('rules-modal')">&times;</button>
+    <div class="corner-bl"></div>
+    <div class="corner-br"></div>
+    <div class="modal-title" data-i18n="RULES_TITLE">RULES</div>
+    <div class="rules-content" id="rules-content">
+      <h3 data-i18n="RULES_H1">缶蹴りの流れ</h3>
+      <div class="rule-step"><span class="step-num">1</span><span data-i18n="RULE_1">缶を蹴って鬼を遠ざける（タイミングゲージで飛距離が決まる）</span></div>
+      <div class="rule-step"><span class="step-num">2</span><span data-i18n="RULE_2">鬼が缶を拾いに行く間に隠れる</span></div>
+      <div class="rule-step"><span class="step-num">3</span><span data-i18n="RULE_3">鬼がフィールドを探索。見つかったら捕獲される</span></div>
+      <div class="rule-step"><span class="step-num">4</span><span data-i18n="RULE_4">味方が缶を蹴れば捕獲された仲間を全員解放！</span></div>
+
+      <h3 data-i18n="RULES_H2">操作</h3>
+      <div class="rule-step"><span class="step-num">W</span><span data-i18n="RULE_MOVE">移動（WASD / 左スティック）</span></div>
+      <div class="rule-step"><span class="step-num">⇧</span><span data-i18n="RULE_DASH">Shift = ダッシュ（スタミナ消費）</span></div>
+      <div class="rule-step"><span class="step-num">C</span><span data-i18n="RULE_CROUCH">C = しゃがみ（足音を消す）</span></div>
+      <div class="rule-step"><span class="step-num">Q</span><span data-i18n="RULE_PEEK">Q = 壁から覗く（安全に偵察）</span></div>
+      <div class="rule-step"><span class="step-num">F</span><span data-i18n="RULE_KICK">F = 缶を蹴る（缶の近くで）</span></div>
+
+      <h3 data-i18n="RULES_H3">コツ</h3>
+      <div class="rule-step"><span class="step-num">💡</span><span data-i18n="RULE_TIP1">砂利の上は足音が大きい。しゃがんで移動しよう</span></div>
+      <div class="rule-step"><span class="step-num">💡</span><span data-i18n="RULE_TIP2">物を叩いて鬼の注意を逸らせる（陽動）</span></div>
+      <div class="rule-step"><span class="step-num">💡</span><span data-i18n="RULE_TIP3">心拍が速くなったら鬼が近い。隠れろ！</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION: RANKING MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="ranking-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('ranking-modal')">&times;</button>
+    <div class="corner-bl"></div>
+    <div class="corner-br"></div>
+    <div class="modal-title" data-i18n="RANKING_TITLE">RANKING</div>
+    <div id="ranking-list" style="text-align:center;color:var(--text-dim);padding:30px 0;font-size:13px" data-i18n="RANKING_EMPTY">
+      まだ記録がありません
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION: LOADING SCREEN
+     ============================================================ -->
+<div id="loading-screen" class="screen">
+  <div class="loading-can"></div>
+  <div class="loading-text">LOADING...</div>
+  <div class="loading-bar"><div class="loading-bar-fill" id="loading-fill"></div></div>
+</div>
+
+<!-- Overlays (always present) -->
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<!-- ============================================================
+     SECTION: JAVASCRIPT
+     ============================================================ -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
 // ============================================================
-//  KANKERI 棒人間キャラクター プレビュー
+// SECTION: CONSTANTS
 // ============================================================
-
-// --- シーン初期化 ---
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a0a);
-scene.fog = new THREE.FogExp2(0x0a0a0a, 0.04);
-
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 2.0, 6);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-document.body.appendChild(renderer.domElement);
-
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.0, 0);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.minDistance = 2;
-controls.maxDistance = 15;
-controls.maxPolarAngle = Math.PI * 0.85;
-controls.update();
-
-// --- ライティング ---
-const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.6);
-scene.add(ambientLight);
-
-// メイン照明（街灯風）
-const mainLight = new THREE.SpotLight(0xffeedd, 1.5, 20, Math.PI * 0.3, 0.5, 1.5);
-mainLight.position.set(0, 8, 0);
-mainLight.castShadow = true;
-mainLight.shadow.mapSize.set(2048, 2048);
-mainLight.shadow.camera.near = 1;
-mainLight.shadow.camera.far = 20;
-scene.add(mainLight);
-
-// 環境リム
-const rimLight = new THREE.DirectionalLight(0x4488ff, 0.3);
-rimLight.position.set(-5, 3, -3);
-scene.add(rimLight);
-
-const rimLight2 = new THREE.DirectionalLight(0xff3366, 0.2);
-rimLight2.position.set(5, 3, -3);
-scene.add(rimLight2);
-
-// 地面のバウンスライト
-const bounceLight = new THREE.HemisphereLight(0x0a0a2e, 0x1a0a0a, 0.3);
-scene.add(bounceLight);
-
-// --- 地面 ---
-const groundGeo = new THREE.PlaneGeometry(30, 30);
-const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x1a1a1a,
-    roughness: 0.9,
-    metalness: 0.1
-});
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
-
-// グリッドヘルパー（薄く）
-const grid = new THREE.GridHelper(20, 40, 0x222222, 0x181818);
-grid.position.y = 0.005;
-scene.add(grid);
-
-// --- 缶（中央に配置 — 仕様書準拠: シアン #00e5ff ネオン） ---
-function createCan() {
-    const canGroup = new THREE.Group();
-
-    // 缶本体（明るい緑色）
-    const canGeo = new THREE.CylinderGeometry(0.08, 0.075, 0.22, 24);
-    const canMat = new THREE.MeshStandardMaterial({
-        color: 0x22cc44,
-        roughness: 0.25,
-        metalness: 0.6,
-        emissive: 0x22cc44,
-        emissiveIntensity: 0.5
-    });
-    const canMesh = new THREE.Mesh(canGeo, canMat);
-    canMesh.position.y = 0.11;
-    canMesh.castShadow = true;
-    canGroup.add(canMesh);
-
-    // 缶の上蓋（シルバー）
-    const lidGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.01, 24);
-    const lidMat = new THREE.MeshStandardMaterial({
-        color: 0xcccccc,
-        roughness: 0.15,
-        metalness: 0.95,
-        emissive: 0x44dd66,
-        emissiveIntensity: 0.2
-    });
-    const lid = new THREE.Mesh(lidGeo, lidMat);
-    lid.position.y = 0.22;
-    canGroup.add(lid);
-
-    // --- ネオンリング1（シアン・メインリング） ---
-    const ring1Geo = new THREE.TorusGeometry(0.28, 0.012, 8, 48);
-    const ring1Mat = new THREE.MeshBasicMaterial({
-        color: 0x00e5ff,
-        transparent: true,
-        opacity: 0.7
-    });
-    const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
-    ring1.rotation.x = Math.PI / 2;
-    ring1.position.y = 0.08;
-    canGroup.add(ring1);
-
-    // --- ネオンリング2（ピンク・サブリング — パッケージの虹色演出） ---
-    const ring2Geo = new THREE.TorusGeometry(0.35, 0.008, 8, 48);
-    const ring2Mat = new THREE.MeshBasicMaterial({
-        color: 0xff3366,
-        transparent: true,
-        opacity: 0.45
-    });
-    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
-    ring2.rotation.x = Math.PI / 2;
-    ring2.position.y = 0.12;
-    canGroup.add(ring2);
-
-    // --- ネオンリング3（黄色・アクセントリング） ---
-    const ring3Geo = new THREE.TorusGeometry(0.22, 0.006, 8, 48);
-    const ring3Mat = new THREE.MeshBasicMaterial({
-        color: 0xffcc00,
-        transparent: true,
-        opacity: 0.35
-    });
-    const ring3 = new THREE.Mesh(ring3Geo, ring3Mat);
-    ring3.rotation.x = Math.PI / 2;
-    ring3.position.y = 0.15;
-    canGroup.add(ring3);
-
-    // --- 地面の光の輪（シアン） ---
-    const groundRingGeo = new THREE.RingGeometry(0.3, 0.45, 48);
-    const groundRingMat = new THREE.MeshBasicMaterial({
-        color: 0x00e5ff,
-        transparent: true,
-        opacity: 0.2,
-        side: THREE.DoubleSide
-    });
-    const groundRing = new THREE.Mesh(groundRingGeo, groundRingMat);
-    groundRing.rotation.x = -Math.PI / 2;
-    groundRing.position.y = 0.005;
-    canGroup.add(groundRing);
-
-    // --- メインポイントライト（シアン） ---
-    const canLight = new THREE.PointLight(0x00e5ff, 1.0, 4);
-    canLight.position.y = 0.3;
-    canGroup.add(canLight);
-
-    // --- 上方向へのスポットライト風（ビーム演出） ---
-    const beamLight = new THREE.PointLight(0x00e5ff, 0.4, 2);
-    beamLight.position.y = 0.6;
-    canGroup.add(beamLight);
-
-    // ユーザーデータに参照を保存（アニメーション用）
-    canGroup.userData = {
-        ring1, ring2, ring3, groundRing,
-        ring1Mat, ring2Mat, ring3Mat, groundRingMat,
-        canLight, beamLight, canMat
-    };
-
-    return canGroup;
-}
-
-const can = createCan();
-scene.add(can);
-
-// --- 壁（覗きアニメーション用） ---
-const wallGroup = new THREE.Group();
-wallGroup.visible = false; // 覗きモード時のみ表示
-
-const wallMat = new THREE.MeshStandardMaterial({
-    color: 0x3a3a3a,
-    roughness: 0.85,
-    metalness: 0.1
-});
-
-// 左壁（カメラとランナーの間に配置して体を隠す）
-// カメラ(0,2,6)から見て、ランナーの体を遮る幅広い壁
-const wallGeoL = new THREE.BoxGeometry(2.2, 2.5, 0.35);
-const wallL = new THREE.Mesh(wallGeoL, wallMat);
-wallL.position.set(-2.1, 1.25, 0.8);
-wallL.castShadow = true;
-wallL.receiveShadow = true;
-wallGroup.add(wallL);
-
-// 左壁の奥行き壁（L字コーナー: ランナーが隠れる空間を作る）
-const wallGeoLD = new THREE.BoxGeometry(0.3, 2.5, 2.0);
-const wallLD = new THREE.Mesh(wallGeoLD, wallMat);
-wallLD.position.set(-3.05, 1.25, -0.2);
-wallLD.castShadow = true;
-wallLD.receiveShadow = true;
-wallGroup.add(wallLD);
-
-// 右壁（左壁のミラー）
-const wallR = new THREE.Mesh(wallGeoL, wallMat);
-wallR.position.set(2.1, 1.25, 0.8);
-wallR.castShadow = true;
-wallR.receiveShadow = true;
-wallGroup.add(wallR);
-
-const wallRD = new THREE.Mesh(wallGeoLD, wallMat);
-wallRD.position.set(3.05, 1.25, -0.2);
-wallRD.castShadow = true;
-wallRD.receiveShadow = true;
-wallGroup.add(wallRD);
-
-// 壁のエッジライン（覗く端を強調）
-const edgeGeo = new THREE.BoxGeometry(0.02, 2.5, 0.02);
-const edgeMat = new THREE.MeshBasicMaterial({ color: 0x666666 });
-const edgeL = new THREE.Mesh(edgeGeo, edgeMat);
-edgeL.position.set(-1.0, 1.25, 0.975);
-wallGroup.add(edgeL);
-const edgeR = new THREE.Mesh(edgeGeo, edgeMat);
-edgeR.position.set(1.0, 1.25, 0.975);
-wallGroup.add(edgeR);
-
-scene.add(wallGroup);
-
-// ============================================================
-//  棒人間ファクトリー
-// ============================================================
-
-function createStickFigure(config) {
-    const {
-        color = 0x4488ff,
-        emissiveIntensity = 0.3,
-        headRadius = 0.15,
-        torsoLength = 0.5,
-        torsoRadius = 0.06,
-        upperArmLength = 0.28,
-        lowerArmLength = 0.25,
-        armRadius = 0.03,
-        upperLegLength = 0.30,
-        lowerLegLength = 0.30,
-        legRadius = 0.04,
-        isChild = false,
-        isOni = false
-    } = config;
-
-    const mat = new THREE.MeshStandardMaterial({
-        color: color,
-        emissive: color,
-        emissiveIntensity: emissiveIntensity,
-        roughness: isOni ? 0.4 : 0.7,
-        metalness: isOni ? 0.3 : 0.1
-    });
-
-    const figure = new THREE.Group();
-    figure.userData = {
-        color, mat, config,
-        joints: {},
-        isOni: isOni
-    };
-
-    // --- 頭 ---
-    const headGeo = new THREE.SphereGeometry(headRadius, 16, 16);
-    const head = new THREE.Mesh(headGeo, mat);
-
-    // 子どもは目を追加（かわいさ演出）
-    if (isChild) {
-        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        const pupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-
-        // 左目
-        const leftEyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), eyeMat);
-        leftEyeWhite.position.set(-0.05, 0.03, headRadius * 0.85);
-        head.add(leftEyeWhite);
-        const leftPupil = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), pupilMat);
-        leftPupil.position.set(0, 0, 0.02);
-        leftEyeWhite.add(leftPupil);
-
-        // 右目
-        const rightEyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), eyeMat);
-        rightEyeWhite.position.set(0.05, 0.03, headRadius * 0.85);
-        head.add(rightEyeWhite);
-        const rightPupil = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), pupilMat);
-        rightPupil.position.set(0, 0, 0.02);
-        rightEyeWhite.add(rightPupil);
-    }
-
-    // ★ 鬼の顔パーツ（威圧感MAX）
-    if (isOni) {
-        // --- 光る黄色い目（大きく、ギラッと光る） ---
-        const oniEyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-
-        // 左目（つり目・横長楕円）
-        const leftEyeOuter = new THREE.Mesh(
-            new THREE.SphereGeometry(0.045, 12, 12),
-            new THREE.MeshBasicMaterial({ color: 0xff4400 })
-        );
-        leftEyeOuter.scale.set(1.3, 0.7, 0.6);
-        leftEyeOuter.position.set(-0.06, 0.035, headRadius * 0.82);
-        leftEyeOuter.rotation.z = 0.25; // つり目
-        head.add(leftEyeOuter);
-
-        const leftPupil = new THREE.Mesh(
-            new THREE.SphereGeometry(0.03, 10, 10), oniEyeGlowMat
-        );
-        leftPupil.position.set(0, 0, 0.015);
-        leftEyeOuter.add(leftPupil);
-
-        // 右目
-        const rightEyeOuter = new THREE.Mesh(
-            new THREE.SphereGeometry(0.045, 12, 12),
-            new THREE.MeshBasicMaterial({ color: 0xff4400 })
-        );
-        rightEyeOuter.scale.set(1.3, 0.7, 0.6);
-        rightEyeOuter.position.set(0.06, 0.035, headRadius * 0.82);
-        rightEyeOuter.rotation.z = -0.25; // つり目
-        head.add(rightEyeOuter);
-
-        const rightPupil = new THREE.Mesh(
-            new THREE.SphereGeometry(0.03, 10, 10), oniEyeGlowMat
-        );
-        rightPupil.position.set(0, 0, 0.015);
-        rightEyeOuter.add(rightPupil);
-
-        // 目の光源（目が実際に光っている演出）
-        const eyeLight = new THREE.PointLight(0xffcc00, 0.6, 1.5);
-        eyeLight.position.set(0, 0.04, headRadius * 0.9);
-        head.add(eyeLight);
-        figure.userData.eyeLight = eyeLight;
-
-        // --- ツノ（2本） ---
-        const hornMat = new THREE.MeshStandardMaterial({
-            color: 0x440000,
-            emissive: 0x660000,
-            emissiveIntensity: 0.4,
-            roughness: 0.3,
-            metalness: 0.5
-        });
-
-        // 左ツノ
-        const leftHornGeo = new THREE.ConeGeometry(0.035, 0.18, 8);
-        const leftHorn = new THREE.Mesh(leftHornGeo, hornMat);
-        leftHorn.position.set(-0.08, headRadius * 0.75, 0);
-        leftHorn.rotation.z = 0.3;  // 外側に少し傾ける
-        leftHorn.castShadow = true;
-        head.add(leftHorn);
-
-        // 右ツノ
-        const rightHornGeo = new THREE.ConeGeometry(0.035, 0.18, 8);
-        const rightHorn = new THREE.Mesh(rightHornGeo, hornMat);
-        rightHorn.position.set(0.08, headRadius * 0.75, 0);
-        rightHorn.rotation.z = -0.3;
-        rightHorn.castShadow = true;
-        head.add(rightHorn);
-
-        // --- 口（歪んだ笑み） ---
-        const mouthMat = new THREE.MeshBasicMaterial({ color: 0x110000 });
-        const mouthGeo = new THREE.TorusGeometry(0.04, 0.008, 8, 12, Math.PI);
-        const mouth = new THREE.Mesh(mouthGeo, mouthMat);
-        mouth.position.set(0, -0.04, headRadius * 0.9);
-        mouth.rotation.x = Math.PI; // 笑み（上弧）
-        head.add(mouth);
-
-        // --- 赤いオーラ（頭上の光） ---
-        const auraLight = new THREE.PointLight(0xff0000, 0.8, 3);
-        auraLight.position.set(0, headRadius + 0.3, 0);
-        head.add(auraLight);
-        figure.userData.auraLight = auraLight;
-    }
-
-    head.castShadow = true;
-
-    // --- 首ピボット ---
-    const neckPivot = new THREE.Object3D();
-    neckPivot.position.y = torsoLength / 2;
-    head.position.y = headRadius * 0.8;
-    neckPivot.add(head);
-
-    // --- 胴体 ---
-    // 子どもは丸みのある体型、鬼はがっしり逆三角形
-    const torsoTopR = isOni ? torsoRadius * 1.15 : torsoRadius;
-    const torsoBotR = isOni ? torsoRadius * 0.85 : (isChild ? torsoRadius * 1.05 : torsoRadius * 0.9);
-    const torsoGeo = new THREE.CylinderGeometry(torsoTopR, torsoBotR, torsoLength, 12);
-    const torso = new THREE.Mesh(torsoGeo, mat);
-    torso.castShadow = true;
-    torso.add(neckPivot);
-
-    // --- 腕 ---
-    function createArm(side) {
-        const shoulderPivot = new THREE.Object3D();
-        shoulderPivot.position.set(side * (torsoRadius + armRadius + 0.01), torsoLength / 2 - 0.05, 0);
-
-        const upperArmGeo = new THREE.CylinderGeometry(armRadius, armRadius * 0.88, upperArmLength, 10);
-        const upperArm = new THREE.Mesh(upperArmGeo, mat);
-        upperArm.position.y = -upperArmLength / 2;
-        upperArm.castShadow = true;
-        shoulderPivot.add(upperArm);
-
-        const elbowPivot = new THREE.Object3D();
-        elbowPivot.position.y = -upperArmLength / 2;
-        upperArm.add(elbowPivot);
-
-        const lowerArmGeo = new THREE.CylinderGeometry(armRadius * 0.88, armRadius * 0.75, lowerArmLength, 10);
-        const lowerArm = new THREE.Mesh(lowerArmGeo, mat);
-        lowerArm.position.y = -lowerArmLength / 2;
-        lowerArm.castShadow = true;
-        elbowPivot.add(lowerArm);
-
-        // 子どもの場合、手を丸く
-        if (isChild) {
-            const hand = new THREE.Mesh(new THREE.SphereGeometry(armRadius * 1.2, 8, 8), mat);
-            hand.position.y = -lowerArmLength / 2;
-            lowerArm.add(hand);
-        }
-
-        return { shoulderPivot, upperArm, elbowPivot, lowerArm };
-    }
-
-    const leftArm = createArm(-1);
-    const rightArm = createArm(1);
-    torso.add(leftArm.shoulderPivot);
-    torso.add(rightArm.shoulderPivot);
-
-    // --- 脚 ---
-    function createLeg(side) {
-        const hipPivot = new THREE.Object3D();
-        hipPivot.position.set(side * (torsoRadius * 0.5), -torsoLength / 2, 0);
-
-        const upperLegGeo = new THREE.CylinderGeometry(legRadius * 1.1, legRadius * 0.9, upperLegLength, 10);
-        const upperLeg = new THREE.Mesh(upperLegGeo, mat);
-        upperLeg.position.y = -upperLegLength / 2;
-        upperLeg.castShadow = true;
-        hipPivot.add(upperLeg);
-
-        const kneePivot = new THREE.Object3D();
-        kneePivot.position.y = -upperLegLength / 2;
-        upperLeg.add(kneePivot);
-
-        const lowerLegGeo = new THREE.CylinderGeometry(legRadius * 0.9, legRadius * 0.7, lowerLegLength, 10);
-        const lowerLeg = new THREE.Mesh(lowerLegGeo, mat);
-        lowerLeg.position.y = -lowerLegLength / 2;
-        lowerLeg.castShadow = true;
-        kneePivot.add(lowerLeg);
-
-        // 足
-        const footGeo = new THREE.BoxGeometry(legRadius * 2.5, 0.04, isChild ? 0.1 : 0.14);
-        const foot = new THREE.Mesh(footGeo, mat);
-        foot.position.set(0, -lowerLegLength / 2, isChild ? 0.03 : 0.04);
-        foot.castShadow = true;
-        lowerLeg.add(foot);
-
-        return { hipPivot, upperLeg, kneePivot, lowerLeg, foot };
-    }
-
-    const leftLeg = createLeg(-1);
-    const rightLeg = createLeg(1);
-    torso.add(leftLeg.hipPivot);
-    torso.add(rightLeg.hipPivot);
-
-    // --- 全体の高さ調整 ---
-    const totalHeight = torsoLength + upperLegLength + lowerLegLength + 0.04;
-    torso.position.y = totalHeight - torsoLength / 2 + 0.02;
-    figure.add(torso);
-
-    // 関節参照を保存
-    figure.userData.joints = {
-        head, neckPivot, torso,
-        leftShoulder: leftArm.shoulderPivot,
-        leftElbow: leftArm.elbowPivot,
-        leftUpperArm: leftArm.upperArm,
-        leftLowerArm: leftArm.lowerArm,
-        rightShoulder: rightArm.shoulderPivot,
-        rightElbow: rightArm.elbowPivot,
-        rightUpperArm: rightArm.upperArm,
-        rightLowerArm: rightArm.lowerArm,
-        leftHip: leftLeg.hipPivot,
-        leftKnee: leftLeg.kneePivot,
-        leftUpperLeg: leftLeg.upperLeg,
-        leftLowerLeg: leftLeg.lowerLeg,
-        rightHip: rightLeg.hipPivot,
-        rightKnee: rightLeg.kneePivot,
-        rightUpperLeg: rightLeg.upperLeg,
-        rightLowerLeg: rightLeg.lowerLeg
-    };
-
-    figure.userData.baseY = torso.position.y;
-
-    return figure;
-}
-
-// ============================================================
-//  キャラクター生成
-// ============================================================
-
-// ランナー（子ども体型）
-const runner = createStickFigure({
-    color: 0x4488ff,
-    emissiveIntensity: 0.3,
-    headRadius: 0.17,       // 大きめの頭
-    torsoLength: 0.34,      // 短い胴体
-    torsoRadius: 0.10,      // ★太め（肉付き）
-    upperArmLength: 0.18,   // 短い腕
-    lowerArmLength: 0.16,
-    armRadius: 0.045,       // ★太め
-    upperLegLength: 0.22,   // 短い脚
-    lowerLegLength: 0.22,
-    legRadius: 0.055,       // ★太め
-    isChild: true
-});
-runner.position.set(-1.5, 0, 0);
-scene.add(runner);
-
-// ランナー2（子ども・右側 — 少し小さめ）
-const runner2 = createStickFigure({
-    color: 0x4488ff,
-    emissiveIntensity: 0.3,
-    headRadius: 0.16,
-    torsoLength: 0.30,
-    torsoRadius: 0.09,      // ★太め
-    upperArmLength: 0.16,
-    lowerArmLength: 0.14,
-    armRadius: 0.04,        // ★太め
-    upperLegLength: 0.20,
-    lowerLegLength: 0.20,
-    legRadius: 0.05,        // ★太め
-    isChild: true
-});
-runner2.position.set(1.5, 0, 0);
-scene.add(runner2);
-
-// 鬼（大人体型 — 威圧感を出す）
-const oni = createStickFigure({
-    color: 0xaa0000,         // 濃い赤
-    emissiveIntensity: 0.7,
-    headRadius: 0.19,        // やや大きい頭
-    torsoLength: 0.50,       // 胴体（少し短く）
-    torsoRadius: 0.13,       // ★かなり太め（ガッシリ）
-    upperArmLength: 0.28,    // 腕（少し短く）
-    lowerArmLength: 0.25,
-    armRadius: 0.055,        // ★太い腕
-    upperLegLength: 0.32,    // 脚（少し短く）
-    lowerLegLength: 0.30,
-    legRadius: 0.065,        // ★太い脚
-    isChild: false,
-    isOni: true
-});
-oni.position.set(0, 0, -1.8);
-scene.add(oni);
-
-// --- 鬼のオーラパーティクル ---
-const oniParticles = [];
-const particleGeo = new THREE.SphereGeometry(0.03, 6, 6);
-for (let i = 0; i < 20; i++) {
-    const pMat = new THREE.MeshBasicMaterial({
-        color: 0xff2200,
-        transparent: true,
-        opacity: 0.5
-    });
-    const p = new THREE.Mesh(particleGeo, pMat);
-    p.userData.angle = Math.random() * Math.PI * 2;
-    p.userData.speed = 0.5 + Math.random() * 1.5;
-    p.userData.radius = 0.3 + Math.random() * 0.4;
-    p.userData.ySpeed = 0.5 + Math.random() * 1.0;
-    p.userData.yOffset = Math.random() * 2.0;
-    p.userData.baseOpacity = 0.2 + Math.random() * 0.4;
-    p.userData.mat = pMat;
-    oni.add(p);
-    oniParticles.push(p);
-}
-
-// 捕獲されたランナー
-const captured = createStickFigure({
-    color: 0x666666,
-    emissiveIntensity: 0.05,
-    headRadius: 0.16,
-    torsoLength: 0.32,
-    torsoRadius: 0.09,      // ★太め
-    upperArmLength: 0.17,
-    lowerArmLength: 0.15,
-    armRadius: 0.042,       // ★太め
-    upperLegLength: 0.21,
-    lowerLegLength: 0.21,
-    legRadius: 0.052,       // ★太め
-    isChild: true
-});
-captured.position.set(0.4, 0, 0.8);
-scene.add(captured);
-
-// --- 名前表示（Canvas2D → Sprite） ---
-function createNameSprite(name, color = '#ffffff') {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-
-    ctx.font = 'bold 28px "Share Tech Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // 黒縁取り
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 4;
-    ctx.strokeText(name, 128, 32);
-
-    // テキスト
-    ctx.fillStyle = color;
-    ctx.fillText(name, 128, 32);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMat = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthTest: false
-    });
-    const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(1.0, 0.25, 1);
-
-    return sprite;
-}
-
-// 名前をキャラに追加
-function addNameToFigure(figure, name, color, offsetY) {
-    const sprite = createNameSprite(name, color);
-    sprite.position.y = offsetY;
-    figure.userData.joints.torso.add(sprite);
-}
-
-// ランナーの名前（高さ = 頭の上）
-addNameToFigure(runner, 'プレイヤー1', '#4488ff', runner.userData.joints.neckPivot.position.y + 0.45);
-addNameToFigure(runner2, 'プレイヤー2', '#4488ff', runner2.userData.joints.neckPivot.position.y + 0.42);
-addNameToFigure(oni, '鬼', '#ff4444', oni.userData.joints.neckPivot.position.y + 0.55);
-addNameToFigure(captured, 'プレイヤー3', '#666666', captured.userData.joints.neckPivot.position.y + 0.42);
-
-// 自分キャラのマーカー ▼
-function addSelfMarker(figure, offsetY) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    ctx.font = 'bold 40px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ff3366';
-    ctx.fillText('▼', 32, 32);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
-    const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(0.3, 0.3, 1);
-    sprite.position.y = offsetY + 0.25;
-    figure.userData.joints.torso.add(sprite);
-}
-addSelfMarker(runner, runner.userData.joints.neckPivot.position.y + 0.45);
-
-// ============================================================
-//  アニメーションシステム
-// ============================================================
-
-let currentAnim = 'idle';
-const clock = new THREE.Clock();
-
-function resetPose(figure) {
-    const j = figure.userData.joints;
-    j.neckPivot.rotation.set(0, 0, 0);
-    j.torso.rotation.x = 0;
-    j.torso.rotation.z = 0;
-    j.torso.position.y = figure.userData.baseY;
-    j.leftShoulder.rotation.set(0, 0, 0);
-    j.rightShoulder.rotation.set(0, 0, 0);
-    j.leftElbow.rotation.set(0, 0, 0);
-    j.rightElbow.rotation.set(0, 0, 0);
-    j.leftHip.rotation.set(0, 0, 0);
-    j.rightHip.rotation.set(0, 0, 0);
-    j.leftKnee.rotation.set(0, 0, 0);
-    j.rightKnee.rotation.set(0, 0, 0);
-}
-
-function animateIdle(figure, t) {
-    const j = figure.userData.joints;
-    // ゆるいバウンス
-    const bounce = Math.sin(t * Math.PI) * 0.015;
-    j.torso.position.y = figure.userData.baseY + bounce;
-    // 微妙な腕揺れ
-    j.leftShoulder.rotation.x = Math.sin(t * Math.PI * 0.7) * 0.05;
-    j.rightShoulder.rotation.x = Math.sin(t * Math.PI * 0.7 + 0.5) * 0.05;
-    // 子どもは少し首を傾ける
-    if (figure.userData.config.isChild) {
-        j.neckPivot.rotation.z = Math.sin(t * Math.PI * 0.3) * 0.06;
-    }
-}
-
-function animateWalk(figure, t, speed) {
-    const j = figure.userData.joints;
-    const cycle = t * speed;
-    const legSwing = 0.35;  // ±20度
-    const armSwing = 0.26;  // ±15度
-
-    // 脚
-    j.leftHip.rotation.x = Math.sin(cycle) * legSwing;
-    j.rightHip.rotation.x = Math.sin(cycle + Math.PI) * legSwing;
-
-    // 膝（後ろに行く時に曲げる）
-    j.leftKnee.rotation.x = Math.max(0, -Math.sin(cycle)) * 0.5;
-    j.rightKnee.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 0.5;
-
-    // 腕（脚と逆位相）
-    j.leftShoulder.rotation.x = Math.sin(cycle + Math.PI) * armSwing;
-    j.rightShoulder.rotation.x = Math.sin(cycle) * armSwing;
-
-    // バウンス
-    j.torso.position.y = figure.userData.baseY + Math.abs(Math.sin(cycle)) * 0.02;
-}
-
-function animateRun(figure, t, speed) {
-    const j = figure.userData.joints;
-    const cycle = t * speed;
-    const legSwing = 0.6;   // ±35度
-    const armSwing = 0.52;  // ±30度
-
-    // 前傾
-    j.torso.rotation.x = 0.17; // 10度
-
-    // 脚 — 大きく振る
-    j.leftHip.rotation.x = Math.sin(cycle) * legSwing;
-    j.rightHip.rotation.x = Math.sin(cycle + Math.PI) * legSwing;
-
-    // 膝 — 大きく曲げる
-    j.leftKnee.rotation.x = Math.max(0, -Math.sin(cycle)) * 0.9;
-    j.rightKnee.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 0.9;
-
-    // 腕 — 大きく振る + 肘を曲げる
-    j.leftShoulder.rotation.x = Math.sin(cycle + Math.PI) * armSwing;
-    j.rightShoulder.rotation.x = Math.sin(cycle) * armSwing;
-    j.leftElbow.rotation.x = -0.8;
-    j.rightElbow.rotation.x = -0.8;
-
-    // バウンス（走行は大きめ）
-    j.torso.position.y = figure.userData.baseY + Math.abs(Math.sin(cycle)) * 0.04;
-}
-
-function animateCrouch(figure, t) {
-    const j = figure.userData.joints;
-    // 膝を曲げて低い姿勢
-    j.leftHip.rotation.x = -0.8;
-    j.rightHip.rotation.x = -0.8;
-    j.leftKnee.rotation.x = 1.4;
-    j.rightKnee.rotation.x = 1.4;
-    j.torso.position.y = figure.userData.baseY - 0.35;
-    j.torso.rotation.x = 0.2;
-
-    // 腕を体に寄せる
-    j.leftShoulder.rotation.x = -0.3;
-    j.leftShoulder.rotation.z = 0.2;
-    j.rightShoulder.rotation.x = -0.3;
-    j.rightShoulder.rotation.z = -0.2;
-    j.leftElbow.rotation.x = -0.6;
-    j.rightElbow.rotation.x = -0.6;
-
-    // 微妙な呼吸
-    j.torso.position.y += Math.sin(t * Math.PI) * 0.008;
-}
-
-function animatePeek(figure, t, side) {
-    // side: 1 = 壁の右端から覗く（左壁用）, -1 = 壁の左端から覗く（右壁用）
-    const j = figure.userData.joints;
-    const peekCycle = (Math.sin(t * Math.PI * 0.5) + 1) / 2; // 0→1→0 ゆっくり
-
-    // 体全体を大きく傾けて頭だけ壁の端から出す
-    j.torso.rotation.z = side * peekCycle * 0.55;
-
-    // 頭をさらに傾けて壁の先を覗き込む
-    j.neckPivot.rotation.z = side * peekCycle * 0.35;
-    j.neckPivot.rotation.x = -0.2 * peekCycle; // 前に出す
-
-    // 壁側の手を壁につける（支え）
-    if (side > 0) {
-        // 左壁から右を覗く → 左手で壁を支える
-        j.leftShoulder.rotation.x = -0.5;
-        j.leftShoulder.rotation.z = 0.8 * peekCycle;
-        j.leftElbow.rotation.x = -1.0 * peekCycle;
-        j.rightShoulder.rotation.x = 0.05;
-        j.rightShoulder.rotation.z = -0.1;
-    } else {
-        // 右壁から左を覗く → 右手で壁を支える
-        j.rightShoulder.rotation.x = -0.5;
-        j.rightShoulder.rotation.z = -0.8 * peekCycle;
-        j.rightElbow.rotation.x = -1.0 * peekCycle;
-        j.leftShoulder.rotation.x = 0.05;
-        j.leftShoulder.rotation.z = 0.1;
-    }
-
-    // 脚を踏ん張る（体を傾けても踏ん張っている感じ）
-    j.leftHip.rotation.x = -0.15;
-    j.rightHip.rotation.x = -0.15;
-    j.leftKnee.rotation.x = 0.25;
-    j.rightKnee.rotation.x = 0.25;
-
-    // 少し腰を落とす（こっそり感）
-    j.torso.position.y = figure.userData.baseY - 0.08;
-}
-
-function animateKick(figure, t) {
-    const j = figure.userData.joints;
-    const kickCycle = (t * 0.9) % 1.0;
-
-    if (kickCycle < 0.3) {
-        // ★ 脚を後ろに引く（ため）
-        const p = kickCycle / 0.3;
-        j.rightHip.rotation.x = 1.2 * p;           // 脚を後ろへ引く
-        j.rightKnee.rotation.x = 1.4 * p;          // 膝を深く曲げる
-        j.torso.rotation.x = 0.2 * p;              // 体を少し前傾
-        j.torso.position.y = figure.userData.baseY - 0.06 * p;
-        // 腕を振りかぶる
-        j.leftShoulder.rotation.x = -0.7 * p;
-        j.leftElbow.rotation.x = -0.4 * p;
-        j.rightShoulder.rotation.x = 0.6 * p;
-        j.rightElbow.rotation.x = -0.6 * p;
-        // 軸足で踏ん張る
-        j.leftHip.rotation.x = 0.15 * p;
-        j.leftKnee.rotation.x = 0.3 * p;
-    } else if (kickCycle < 0.45) {
-        // ★ 一気に前へ蹴り出す！
-        const p = (kickCycle - 0.3) / 0.15;
-        j.rightHip.rotation.x = 1.2 - 2.8 * p;    // 後ろ→前に大振り
-        j.rightKnee.rotation.x = 1.4 * (1 - p * 0.85);
-        j.torso.rotation.x = 0.2 - 0.5 * p;       // 体を後ろに反らす（反動）
-        j.torso.position.y = figure.userData.baseY - 0.06 + 0.1 * p;
-        // 腕を逆に振る（反動）
-        j.leftShoulder.rotation.x = -0.7 + 1.4 * p;
-        j.leftElbow.rotation.x = -0.4;
-        j.rightShoulder.rotation.x = 0.6 - 1.2 * p;
-        j.rightElbow.rotation.x = -0.6 + 0.3 * p;
-        // 軸足
-        j.leftHip.rotation.x = 0.15;
-        j.leftKnee.rotation.x = 0.3 - 0.1 * p;
-    } else if (kickCycle < 0.6) {
-        // ★ 蹴り切った瞬間（脚が前方最高点でキープ）
-        const p = (kickCycle - 0.45) / 0.15;
-        j.rightHip.rotation.x = -1.6 + 0.1 * p;
-        j.rightKnee.rotation.x = 0.21;
-        j.torso.rotation.x = -0.3 + 0.05 * p;
-        j.torso.position.y = figure.userData.baseY + 0.04;
-        j.leftShoulder.rotation.x = 0.7;
-        j.rightShoulder.rotation.x = -0.6;
-        j.leftHip.rotation.x = 0.15;
-        j.leftKnee.rotation.x = 0.2;
-    } else {
-        // 戻る（ゆっくり着地）
-        const p = (kickCycle - 0.6) / 0.4;
-        const ease = 1 - (1 - p) * (1 - p);
-        j.rightHip.rotation.x = -1.5 * (1 - ease);
-        j.rightKnee.rotation.x = 0.21 * (1 - ease);
-        j.torso.rotation.x = -0.25 * (1 - ease);
-        j.torso.position.y = figure.userData.baseY + 0.04 * (1 - ease);
-        j.leftShoulder.rotation.x = 0.7 * (1 - ease);
-        j.rightShoulder.rotation.x = -0.6 * (1 - ease);
-        j.leftHip.rotation.x = 0.15 * (1 - ease);
-        j.leftKnee.rotation.x = 0.2 * (1 - ease);
-    }
-}
-
-function animateHit(figure, t) {
-    const j = figure.userData.joints;
-    const hitCycle = (t * 1.2) % 1.0;
-
-    if (hitCycle < 0.35) {
-        // 腕を軽く振り上げ
-        const p = hitCycle / 0.35;
-        j.rightShoulder.rotation.x = 1.2 * p;
-        j.rightShoulder.rotation.z = -0.2 * p;
-        j.rightElbow.rotation.x = 0.6 * p;
-        j.torso.rotation.x = 0.1 * p;
-    } else if (hitCycle < 0.55) {
-        // 前方に振り下ろす
-        const p = (hitCycle - 0.35) / 0.2;
-        j.rightShoulder.rotation.x = 1.2 - 2.0 * p;
-        j.rightShoulder.rotation.z = -0.2 * (1 - p);
-        j.rightElbow.rotation.x = 0.6 - 0.6 * p;
-        j.torso.rotation.x = 0.1 - 0.25 * p;
-    } else {
-        // 戻る
-        const p = (hitCycle - 0.55) / 0.45;
-        j.rightShoulder.rotation.x = -0.8 * (1 - p);
-        j.rightElbow.rotation.x = 0;
-        j.torso.rotation.x = -0.15 * (1 - p);
-    }
-
-    // 左腕はバランス
-    j.leftShoulder.rotation.x = 0.2;
-    j.leftElbow.rotation.x = -0.3;
-}
-
-function animateCaptured(figure, t) {
-    const j = figure.userData.joints;
-    // 座り込み（膝を抱える）
-    j.leftHip.rotation.x = -1.5;
-    j.rightHip.rotation.x = -1.5;
-    j.leftKnee.rotation.x = 2.2;
-    j.rightKnee.rotation.x = 2.2;
-    j.torso.position.y = figure.userData.baseY - 0.55;
-    j.torso.rotation.x = 0.3;
-
-    // 腕で膝を抱える
-    j.leftShoulder.rotation.x = -1.0;
-    j.leftShoulder.rotation.z = 0.3;
-    j.leftElbow.rotation.x = -1.8;
-    j.rightShoulder.rotation.x = -1.0;
-    j.rightShoulder.rotation.z = -0.3;
-    j.rightElbow.rotation.x = -1.8;
-
-    // 頭を下げる
-    j.neckPivot.rotation.x = 0.3;
-
-    // 微妙な揺れ（悲しみの演出）
-    j.torso.rotation.z = Math.sin(t * Math.PI * 0.5) * 0.03;
-}
-
-function animateChase(figure, t, speed) {
-    const j = figure.userData.joints;
-    const cycle = t * speed;
-
-    // 前傾（追いかける感）
-    j.torso.rotation.x = 0.25;
-
-    // 脚は走行と同じ
-    j.leftHip.rotation.x = Math.sin(cycle) * 0.65;
-    j.rightHip.rotation.x = Math.sin(cycle + Math.PI) * 0.65;
-    j.leftKnee.rotation.x = Math.max(0, -Math.sin(cycle)) * 1.0;
-    j.rightKnee.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 1.0;
-
-    // 腕を前に伸ばす（追いかける感）
-    j.leftShoulder.rotation.x = -1.2 + Math.sin(cycle) * 0.3;
-    j.rightShoulder.rotation.x = -1.2 + Math.sin(cycle + Math.PI) * 0.3;
-    j.leftElbow.rotation.x = -0.2;
-    j.rightElbow.rotation.x = -0.2;
-
-    // バウンス
-    j.torso.position.y = figure.userData.baseY + Math.abs(Math.sin(cycle)) * 0.045;
-
-    // 頭を前方に
-    j.neckPivot.rotation.x = -0.15;
-}
-
-// ============================================================
-//  アニメーションループ
-// ============================================================
-
-const figures = [runner, runner2, oni, captured];
-
-function animate() {
-    requestAnimationFrame(animate);
-
-    const elapsed = clock.getElapsedTime();
-
-    // 全キャラリセット
-    figures.forEach(fig => resetPose(fig));
-
-    // 捕獲キャラは常に捕獲ポーズ
-    animateCaptured(captured, elapsed);
-
-    // 他のキャラのアニメーション
-    const activeFigures = [runner, runner2, oni];
-
-    switch (currentAnim) {
-        case 'idle':
-            activeFigures.forEach(fig => animateIdle(fig, elapsed));
-            break;
-
-        case 'walk':
-            activeFigures.forEach(fig => animateWalk(fig, elapsed, 8));
-            break;
-
-        case 'run':
-            runner.userData.joints.torso.rotation.x = 0.17;
-            animateRun(runner, elapsed, 15);
-            animateRun(runner2, elapsed + 0.3, 15);
-            animateRun(oni, elapsed + 0.6, 14);
-            break;
-
-        case 'crouch':
-            animateCrouch(runner, elapsed);
-            animateCrouch(runner2, elapsed + 0.5);
-            animateIdle(oni, elapsed);
-            break;
-
-        case 'peek':
-            // ランナーは壁の陰から中央（鬼の方）を覗く
-            animatePeek(runner, elapsed, -1);        // 左壁から右（中央）を覗く
-            animatePeek(runner2, elapsed + 1.5, 1);  // 右壁から左（中央）を覗く
-            animateWalk(oni, elapsed, 6);             // 鬼は歩いて巡回
-            break;
-
-        case 'kick':
-            animateKick(runner, elapsed);
-            animateIdle(runner2, elapsed);
-            animateIdle(oni, elapsed);
-            break;
-
-        case 'hit':
-            animateHit(runner, elapsed);
-            animateIdle(runner2, elapsed);
-            animateIdle(oni, elapsed);
-            break;
-
-        case 'captured':
-            animateCaptured(runner, elapsed);
-            animateCaptured(runner2, elapsed + 0.3);
-            animateIdle(oni, elapsed);
-            break;
-
-        case 'chase':
-            // ランナーは逃げる、鬼は追跡
-            animateRun(runner, elapsed, 16);
-            animateRun(runner2, elapsed + 0.3, 15);
-            animateChase(oni, elapsed, 14);
-            // 鬼のemissiveを強める
-            oni.userData.mat.emissiveIntensity = 0.5 + Math.sin(elapsed * 4) * 0.2;
-            break;
-    }
-
-    // 鬼のemissive脈動（常時うっすら脈打つ）
-    if (currentAnim === 'chase') {
-        oni.userData.mat.emissiveIntensity = 0.7 + Math.sin(elapsed * 5) * 0.3;
-    } else {
-        oni.userData.mat.emissiveIntensity = 0.6 + Math.sin(elapsed * 2) * 0.15;
-    }
-
-    // 鬼の目の光の脈動
-    if (oni.userData.eyeLight) {
-        oni.userData.eyeLight.intensity = 0.5 + Math.sin(elapsed * 3) * 0.3;
-    }
-    if (oni.userData.auraLight) {
-        oni.userData.auraLight.intensity = 0.6 + Math.sin(elapsed * 2.5) * 0.4;
-    }
-
-    // 鬼のオーラパーティクル更新
-    oniParticles.forEach(p => {
-        p.userData.angle += p.userData.speed * 0.016;
-        const px = Math.cos(p.userData.angle) * p.userData.radius;
-        const pz = Math.sin(p.userData.angle) * p.userData.radius;
-        const py = (p.userData.yOffset + elapsed * p.userData.ySpeed) % 2.5;
-        p.position.set(px, py + 0.3, pz);
-        p.userData.mat.opacity = p.userData.baseOpacity * (1.0 - py / 2.5);
-        const scale = 0.5 + (1.0 - py / 2.5) * 0.8;
-        p.scale.set(scale, scale, scale);
-    });
-
-    // 缶のネオンリング アニメーション
-    const cd = can.userData;
-
-    // リング1（シアン）: ゆっくり回転 + 上下に揺れる
-    cd.ring1.rotation.z = elapsed * 0.8;
-    cd.ring1.rotation.x = Math.PI / 2 + Math.sin(elapsed * 1.5) * 0.15;
-    cd.ring1Mat.opacity = 0.5 + Math.sin(elapsed * 2) * 0.25;
-
-    // リング2（ピンク）: 逆回転 + 傾き変化
-    cd.ring2.rotation.z = -elapsed * 0.6;
-    cd.ring2.rotation.x = Math.PI / 2 + Math.cos(elapsed * 1.2) * 0.25;
-    cd.ring2Mat.opacity = 0.3 + Math.sin(elapsed * 2.5 + 1) * 0.2;
-
-    // リング3（黄色）: 速回転
-    cd.ring3.rotation.z = elapsed * 1.2;
-    cd.ring3.rotation.x = Math.PI / 2 + Math.sin(elapsed * 1.8 + 2) * 0.2;
-    cd.ring3Mat.opacity = 0.25 + Math.sin(elapsed * 3) * 0.15;
-
-    // 地面の光の輪: 脈動
-    cd.groundRingMat.opacity = 0.15 + Math.sin(elapsed * 1.5) * 0.1;
-
-    // ポイントライト: 脈動
-    cd.canLight.intensity = 0.8 + Math.sin(elapsed * 2) * 0.4;
-    cd.beamLight.intensity = 0.3 + Math.sin(elapsed * 3) * 0.2;
-
-    // 缶本体の緑発光（脈動）
-    cd.canMat.emissiveIntensity = 0.4 + Math.sin(elapsed * 2) * 0.15;
-
-    controls.update();
-    renderer.render(scene, camera);
-}
-
-animate();
-
-// --- デフォルト位置を保存 ---
-const defaultPositions = {
-    runner: runner.position.clone(),
-    runner2: runner2.position.clone(),
-    oni: oni.position.clone(),
-    captured: captured.position.clone()
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAH9qbqdVoQecQe11QJk0odN261J9aMtm8",
+  authDomain: "kankeri-ce512.firebaseapp.com",
+  databaseURL: "https://kankeri-ce512-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "kankeri-ce512",
+  storageBucket: "kankeri-ce512.firebasestorage.app",
+  messagingSenderId: "28351691984",
+  appId: "1:28351691984:web:40a47b1ad36ad0486832d5"
 };
 
-// --- ボタン制御 ---
-document.querySelectorAll('.ctrl-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentAnim = btn.dataset.anim;
+const BGM_MAP = {
+  title:   'BGM/KANKERI_OP.mp3',
+  stage1:  'BGM/KANKERI_stage1.mp3',
+  stage2:  'BGM/KANKERI_stage2.mp3',
+  stage3:  'BGM/KANKERI_stage3.mp3',
+  stage4:  'BGM/KANKERI_stage4.mp3',
+  stage5:  'BGM/KANKERI_stage5.mp3',
+  multi1:  'BGM/KANKERI_multi1.mp3',
+  multi2:  'BGM/KANKERI_multi2.mp3',
+  multi3:  'BGM/KANKERI_multi3.mp3',
+  multi4:  'BGM/KANKERI_multi4.mp3',
+  multi5:  'BGM/KANKERI_multi5.mp3',
+  scoreAttack: 'BGM/KANKERI_Score_Attack.mp3'
+};
 
-        if (btn.dataset.anim === 'peek') {
-            // 覗きモード: 壁を表示、キャラを壁の裏に配置
-            wallGroup.visible = true;
-            // 左壁の裏（右端 x=-1.0 の少し奥）— 体は壁に隠れる
-            runner.position.set(-1.3, 0, 0.3);
-            runner.rotation.y = 0;
-            // 右壁の裏（左端 x=1.0 の少し奥）
-            runner2.position.set(1.3, 0, 0.3);
-            runner2.rotation.y = 0;
-            // 鬼は中央の手前を巡回
-            oni.position.set(0, 0, 1.8);
-            oni.rotation.y = Math.PI;
-            captured.visible = false;
-        } else {
-            // 通常モード: 壁を非表示、キャラを元に戻す
-            wallGroup.visible = false;
-            runner.position.copy(defaultPositions.runner);
-            runner.rotation.y = 0;
-            runner2.position.copy(defaultPositions.runner2);
-            runner2.rotation.y = 0;
-            oni.position.copy(defaultPositions.oni);
-            oni.rotation.y = 0;
-            captured.visible = true;
-            captured.position.copy(defaultPositions.captured);
-        }
+const BGM_VOLUME = 0.3;
+
+// ============================================================
+// SECTION: GAME STATE
+// ============================================================
+const gameState = {
+  deviceId: '',
+  username: '',
+  isGuest: false,
+  language: 'ja',
+  bgmEnabled: true,
+  currentScreen: 'splash',
+  storySettings: {
+    stage: 1,
+    cpuCount: 0,
+    cpuLevel: 'normal'
+  },
+  clearedStages: [1],
+  audioResumed: false
+};
+
+// ============================================================
+// SECTION: FIREBASE
+// ============================================================
+const app = firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+
+function getDeviceId() {
+  let id = localStorage.getItem('kankeri_deviceId');
+  if (!id) {
+    id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('kankeri_deviceId', id);
+  }
+  return id;
+}
+
+async function registerUser(name) {
+  const deviceId = gameState.deviceId;
+  const userRef = db.ref('users/' + deviceId);
+  await userRef.set({
+    name: name,
+    deviceId: deviceId,
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    lastLogin: firebase.database.ServerValue.TIMESTAMP
+  });
+  gameState.username = name;
+  gameState.isGuest = false;
+  localStorage.setItem('kankeri_username', name);
+}
+
+function loadSavedUser() {
+  const savedName = localStorage.getItem('kankeri_username');
+  if (savedName) {
+    gameState.username = savedName;
+    gameState.isGuest = false;
+    const input = document.getElementById('username-input');
+    if (input) input.value = savedName;
+  }
+  gameState.bgmEnabled = localStorage.getItem('kankeri_bgm') !== 'off';
+  gameState.language = localStorage.getItem('kankeri_lang') || 'ja';
+}
+
+// ============================================================
+// SECTION: SOUND (BGM/SE framework)
+// ============================================================
+let currentBGM = null;
+let bgmFadeInterval = null;
+
+function resumeAudioContext() {
+  if (gameState.audioResumed) return;
+  gameState.audioResumed = true;
+  playBGM('title');
+}
+
+function playBGM(key) {
+  if (bgmFadeInterval) { clearInterval(bgmFadeInterval); bgmFadeInterval = null; }
+
+  if (currentBGM) {
+    currentBGM.pause();
+    currentBGM.currentTime = 0;
+  }
+
+  const src = BGM_MAP[key];
+  if (!src) return;
+
+  currentBGM = new Audio(src);
+  currentBGM.loop = true;
+  currentBGM.volume = gameState.bgmEnabled ? BGM_VOLUME : 0;
+
+  currentBGM.play().catch(() => {});
+}
+
+function setBGMVolume(vol) {
+  if (currentBGM) currentBGM.volume = vol;
+}
+
+function toggleBGM() {
+  gameState.bgmEnabled = !gameState.bgmEnabled;
+  localStorage.setItem('kankeri_bgm', gameState.bgmEnabled ? 'on' : 'off');
+
+  const btn = document.getElementById('bgm-toggle');
+  if (gameState.bgmEnabled) {
+    btn.textContent = '🔊 BGM';
+    btn.className = 'bgm-btn bgm-on';
+    if (currentBGM) {
+      let vol = 0;
+      currentBGM.volume = 0;
+      bgmFadeInterval = setInterval(() => {
+        vol += 0.02;
+        if (vol >= BGM_VOLUME) { vol = BGM_VOLUME; clearInterval(bgmFadeInterval); bgmFadeInterval = null; }
+        if (currentBGM) currentBGM.volume = vol;
+      }, 20);
+    }
+  } else {
+    btn.textContent = '🔇 BGM';
+    btn.className = 'bgm-btn bgm-off';
+    if (currentBGM) currentBGM.volume = 0;
+  }
+}
+
+// ============================================================
+// SECTION: MATRIX RAIN
+// ============================================================
+function createMatrixBg() {
+  const container = document.getElementById('matrix-bg');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const katakana = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+  const digits = '0123456789ABCDEF';
+  const chars = katakana + digits;
+  const colW = 22;
+  const colCount = Math.floor(window.innerWidth / colW);
+
+  for (let i = 0; i < colCount; i++) {
+    const col = document.createElement('div');
+    const len = 30 + Math.floor(Math.random() * 30);
+    let text = '';
+    for (let j = 0; j < len; j++) {
+      text += chars[Math.floor(Math.random() * chars.length)];
+    }
+    col.textContent = text;
+    col.style.left = (i * colW) + 'px';
+
+    const duration = 8 + Math.random() * 14;
+    const delay = -(Math.random() * duration);
+    col.style.animationDuration = duration + 's';
+    col.style.animationDelay = delay + 's';
+
+    const r = Math.random();
+    if (r < 0.05) {
+      col.className = 'matrix-col matrix-col-flash';
+    } else if (r < 0.5) {
+      col.className = 'matrix-col matrix-col-pulse';
+    } else {
+      col.className = 'matrix-col';
+    }
+
+    container.appendChild(col);
+  }
+}
+
+// ============================================================
+// SECTION: CHASE ANIMATION
+// ============================================================
+let chaseAnimId = null;
+
+function initChaseAnimation() {
+  const canvas = document.getElementById('chase-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resizeChase() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+  }
+  resizeChase();
+
+  const W = () => canvas.width / dpr;
+  const H = () => canvas.height / dpr;
+
+  // Stick figure drawer
+  function drawStickFigure(x, y, h, color, phase, isOni) {
+    const headR = h * 0.16;
+    const bodyH = h * 0.32;
+    const legH = h * 0.28;
+    const armH = h * 0.24;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isOni ? 2.5 : 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const bodyTop = y - h + headR * 2 + 2;
+    const bodyBot = bodyTop + bodyH;
+    const bounce = Math.abs(Math.sin(phase * Math.PI * 2)) * 2;
+    const bY = -bounce;
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(x, y - h + headR + bY, headR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (isOni) {
+      // Horns
+      ctx.beginPath();
+      ctx.moveTo(x - headR * 0.6, y - h + bY);
+      ctx.lineTo(x - headR * 0.3, y - h - headR * 0.7 + bY);
+      ctx.moveTo(x + headR * 0.6, y - h + bY);
+      ctx.lineTo(x + headR * 0.3, y - h - headR * 0.7 + bY);
+      ctx.stroke();
+
+      // Glowing eyes
+      ctx.fillStyle = '#ffcc00';
+      ctx.beginPath();
+      ctx.arc(x - headR * 0.3, y - h + headR * 0.9 + bY, 1.5, 0, Math.PI * 2);
+      ctx.arc(x + headR * 0.3, y - h + headR * 0.9 + bY, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Body
+    ctx.beginPath();
+    ctx.moveTo(x, bodyTop + bY);
+    ctx.lineTo(x, bodyBot + bY);
+    ctx.stroke();
+
+    // Arms swing
+    const armSwing = Math.sin(phase * Math.PI * 2) * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x, bodyTop + bodyH * 0.15 + bY);
+    ctx.lineTo(x - armH * Math.cos(armSwing + 0.3), bodyTop + bodyH * 0.15 + armH * Math.abs(Math.sin(armSwing + 0.3)) + bY);
+    ctx.moveTo(x, bodyTop + bodyH * 0.15 + bY);
+    ctx.lineTo(x + armH * Math.cos(-armSwing + 0.3), bodyTop + bodyH * 0.15 + armH * Math.abs(Math.sin(-armSwing + 0.3)) + bY);
+    ctx.stroke();
+
+    // Legs swing
+    const legSwing = Math.sin(phase * Math.PI * 2) * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(x, bodyBot + bY);
+    ctx.lineTo(x + legH * Math.sin(legSwing), bodyBot + legH * Math.cos(legSwing) * 0.9 + bY);
+    ctx.moveTo(x, bodyBot + bY);
+    ctx.lineTo(x + legH * Math.sin(-legSwing), bodyBot + legH * Math.cos(-legSwing) * 0.9 + bY);
+    ctx.stroke();
+  }
+
+  function drawCan(x, y, glow) {
+    ctx.save();
+    ctx.shadowColor = '#00e5ff';
+    ctx.shadowBlur = 8 + glow * 6;
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x - 4, y - 10, 8, 10);
+    ctx.fillStyle = 'rgba(0,229,255,0.3)';
+    ctx.fillRect(x - 4, y - 10, 8, 10);
+    ctx.restore();
+  }
+
+  // Animation state
+  const runners = [
+    { x: -40, speed: 1.8, color: '#ff3366', phase: 0, h: 32 },
+    { x: -70, speed: 1.65, color: '#00e5ff', phase: 0.33, h: 30 },
+    { x: -100, speed: 1.5, color: '#ffd700', phase: 0.66, h: 28 }
+  ];
+  const oniChar = { x: -130, speed: 1.2, color: '#ff0040', phase: 0, h: 38, accel: false };
+  const canObj = { x: -999, y: 0, vy: 0, vx: 0, active: false };
+  let loopTimer = 0;
+  let kicked = false;
+
+  function resetLoop() {
+    const w = W();
+    runners[0].x = -40;
+    runners[1].x = -70;
+    runners[2].x = -100;
+    oniChar.x = -130;
+    oniChar.accel = false;
+    canObj.active = false;
+    canObj.x = -999;
+    kicked = false;
+    loopTimer = 0;
+  }
+
+  function animateChase(timestamp) {
+    const w = W();
+    const h = H();
+    const groundY = h - 4;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Ground line
+    ctx.strokeStyle = 'rgba(255,51,102,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(w, groundY);
+    ctx.stroke();
+
+    loopTimer += 0.016;
+
+    // Move runners
+    runners.forEach(r => {
+      r.x += r.speed;
+      r.phase += 0.04;
+      drawStickFigure(r.x, groundY, r.h, r.color, r.phase, false);
     });
-});
 
-// --- リサイズ対応 ---
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
+    // Can — static position until kicked
+    const canStaticX = w * 0.55;
+    if (!kicked && runners[1].x > canStaticX - 20 && runners[1].x < canStaticX + 5) {
+      // Runner 2 kicks the can
+      kicked = true;
+      canObj.active = true;
+      canObj.x = canStaticX;
+      canObj.y = groundY;
+      canObj.vx = 4;
+      canObj.vy = -5;
+      oniChar.accel = true;
+    }
 
+    if (!kicked && !canObj.active) {
+      drawCan(canStaticX, groundY, Math.sin(loopTimer * 3) * 0.5 + 0.5);
+    }
+
+    if (canObj.active) {
+      canObj.x += canObj.vx;
+      canObj.y += canObj.vy;
+      canObj.vy += 0.25;
+      if (canObj.y >= groundY) {
+        canObj.y = groundY;
+        canObj.vy *= -0.4;
+        canObj.vx *= 0.85;
+        if (Math.abs(canObj.vy) < 0.5) canObj.vy = 0;
+      }
+      drawCan(canObj.x, canObj.y, 0.8);
+
+      // Trail
+      ctx.strokeStyle = 'rgba(0,229,255,0.2)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(canObj.x, canObj.y);
+      ctx.lineTo(canObj.x - canObj.vx * 3, canObj.y - canObj.vy * 3);
+      ctx.stroke();
+    }
+
+    // Move oni
+    oniChar.phase += 0.035;
+    if (oniChar.accel) {
+      // Chase the can
+      oniChar.speed = 2.5;
+      oniChar.x += oniChar.speed;
+    } else {
+      oniChar.x += oniChar.speed;
+    }
+    drawStickFigure(oniChar.x, groundY, oniChar.h, oniChar.color, oniChar.phase, true);
+
+    // Reset when all off screen
+    const allOffScreen = runners.every(r => r.x > w + 50) && oniChar.x > w + 50;
+    if (allOffScreen) resetLoop();
+
+    chaseAnimId = requestAnimationFrame(animateChase);
+  }
+
+  resetLoop();
+  chaseAnimId = requestAnimationFrame(animateChase);
+}
+
+// ============================================================
+// SECTION: SCREEN MANAGEMENT
+// ============================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const screen = document.getElementById(id);
+  if (screen) {
+    screen.classList.add('active');
+    gameState.currentScreen = id.replace('-screen', '');
+  }
+}
+
+function openModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.add('active');
+}
+
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.remove('active');
+}
+
+function showNotification(msg) {
+  const existing = document.querySelector('.notification');
+  if (existing) existing.remove();
+
+  const el = document.createElement('div');
+  el.className = 'notification';
+  el.textContent = msg;
+  document.body.appendChild(el);
+
+  setTimeout(() => {
+    el.style.animation = 'slideUp 0.3s ease forwards';
+    setTimeout(() => el.remove(), 300);
+  }, 2500);
+}
+
+// ============================================================
+// SECTION: SPLASH SEQUENCE
+// ============================================================
+function startSplashSequence() {
+  const quote = document.getElementById('splash-quote');
+  const title = document.getElementById('splash-title');
+
+  // Phase 1: Quote fade in
+  setTimeout(() => {
+    quote.style.transition = 'opacity 0.8s ease';
+    quote.style.opacity = '1';
+  }, 300);
+
+  // Phase 2: Quote fade out
+  setTimeout(() => {
+    quote.style.transition = 'opacity 0.6s ease';
+    quote.style.opacity = '0';
+  }, 2100);
+
+  // Phase 3: Title glitch appear
+  setTimeout(() => {
+    title.style.opacity = '1';
+    title.classList.add('glitch-active');
+  }, 2900);
+
+  // Phase 4: Stop glitch, hold
+  setTimeout(() => {
+    title.classList.remove('glitch-active');
+  }, 3400);
+
+  // Phase 5: Fade to title screen
+  setTimeout(() => {
+    const splash = document.getElementById('splash-screen');
+    splash.style.transition = 'opacity 0.5s ease';
+    splash.style.opacity = '0';
+    setTimeout(() => {
+      splash.classList.remove('active');
+      splash.style.display = 'none';
+      showScreen('title-screen');
+      createMatrixBg();
+      initChaseAnimation();
+    }, 500);
+  }, 4600);
+}
+
+// ============================================================
+// SECTION: LANGUAGE (i18n)
+// ============================================================
+const I18N = {
+  ja: {
+    USER_NAME: 'USER NAME',
+    NAME_PLACEHOLDER: '名前を入力...',
+    BTN_REGISTER: '登録してゲームを始める',
+    BTN_GUEST: '▶ 登録しないでゲームを始める',
+    BTN_MULTI: 'マルチプレイ（最大4人）',
+    BTN_SCORE: '🏆 スコアアタック',
+    BTN_RULES: 'ルール説明を見る',
+    BTN_RANKING: 'ランキングを見る',
+    STORY_TITLE: 'STORY MODE',
+    SELECT_STAGE: '● ステージ',
+    CPU_COUNT: '● 味方CPU人数',
+    CPU_NOTE: '※ 0人 = 自分1人で挑戦',
+    CPU_LEVEL: '● CPUレベル',
+    LEVEL_WEAK: '弱',
+    LEVEL_NORMAL: '中',
+    LEVEL_STRONG: '強',
+    BTN_START: 'ゲーム開始',
+    SCORE_TITLE: 'SCORE ATTACK',
+    SA_STAGE: '● ステージ',
+    SA_NOTE: '捕まるまで生き残れ。生存時間がスコアになる。',
+    RULES_TITLE: 'RULES',
+    RULES_H1: '缶蹴りの流れ',
+    RULE_1: '缶を蹴って鬼を遠ざける（タイミングゲージで飛距離が決まる）',
+    RULE_2: '鬼が缶を拾いに行く間に隠れる',
+    RULE_3: '鬼がフィールドを探索。見つかったら捕獲される',
+    RULE_4: '味方が缶を蹴れば捕獲された仲間を全員解放！',
+    RULES_H2: '操作',
+    RULE_MOVE: '移動（WASD / 左スティック）',
+    RULE_DASH: 'Shift = ダッシュ（スタミナ消費）',
+    RULE_CROUCH: 'C = しゃがみ（足音を消す）',
+    RULE_PEEK: 'Q = 壁から覗く（安全に偵察）',
+    RULE_KICK: 'F = 缶を蹴る（缶の近くで）',
+    RULES_H3: 'コツ',
+    RULE_TIP1: '砂利の上は足音が大きい。しゃがんで移動しよう',
+    RULE_TIP2: '物を叩いて鬼の注意を逸らせる（陽動）',
+    RULE_TIP3: '心拍が速くなったら鬼が近い。隠れろ！',
+    RANKING_TITLE: 'RANKING',
+    RANKING_EMPTY: 'まだ記録がありません',
+    NOTIFY_REGISTERED: '登録完了！',
+    NOTIFY_GUEST: 'ゲストモードで開始',
+    ERROR_NAME: '名前を入力してください（1〜16文字）',
+    NOTIFY_STAGE_LOCKED: 'このステージはまだ解放されていません',
+  },
+  en: {
+    USER_NAME: 'USER NAME',
+    NAME_PLACEHOLDER: 'Enter your name...',
+    BTN_REGISTER: 'Register & Start',
+    BTN_GUEST: '▶ Play as Guest',
+    BTN_MULTI: 'Multiplayer (up to 4)',
+    BTN_SCORE: '🏆 Score Attack',
+    BTN_RULES: 'How to Play',
+    BTN_RANKING: 'Rankings',
+    STORY_TITLE: 'STORY MODE',
+    SELECT_STAGE: '● Stage',
+    CPU_COUNT: '● Ally CPU Count',
+    CPU_NOTE: '※ 0 = Solo challenge',
+    CPU_LEVEL: '● CPU Level',
+    LEVEL_WEAK: 'Easy',
+    LEVEL_NORMAL: 'Normal',
+    LEVEL_STRONG: 'Hard',
+    BTN_START: 'Start Game',
+    SCORE_TITLE: 'SCORE ATTACK',
+    SA_STAGE: '● Stage',
+    SA_NOTE: 'Survive as long as you can. Your survival time is your score.',
+    RULES_TITLE: 'RULES',
+    RULES_H1: 'How Can Kick Works',
+    RULE_1: 'Kick the can to send the "it" running after it (timing gauge determines distance)',
+    RULE_2: 'Hide while the "it" retrieves the can',
+    RULE_3: 'The "it" searches the field. If found, you\'re captured!',
+    RULE_4: 'An ally kicks the can to free ALL captured players!',
+    RULES_H2: 'Controls',
+    RULE_MOVE: 'Move (WASD / Left Stick)',
+    RULE_DASH: 'Shift = Dash (uses stamina)',
+    RULE_CROUCH: 'C = Crouch (silent movement)',
+    RULE_PEEK: 'Q = Peek around corners',
+    RULE_KICK: 'F = Kick the can (when near)',
+    RULES_H3: 'Tips',
+    RULE_TIP1: 'Gravel makes loud footsteps. Crouch to move quietly!',
+    RULE_TIP2: 'Hit objects to create diversions and distract the "it"',
+    RULE_TIP3: 'Faster heartbeat = the "it" is close. HIDE!',
+    RANKING_TITLE: 'RANKING',
+    RANKING_EMPTY: 'No records yet',
+    NOTIFY_REGISTERED: 'Registered!',
+    NOTIFY_GUEST: 'Playing as Guest',
+    ERROR_NAME: 'Please enter a name (1-16 characters)',
+    NOTIFY_STAGE_LOCKED: 'This stage is not yet unlocked',
+  }
+};
+
+function setLanguage(lang) {
+  gameState.language = lang;
+  localStorage.setItem('kankeri_lang', lang);
+
+  // Update active button
+  document.getElementById('lang-ja').classList.toggle('active', lang === 'ja');
+  document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+
+  // Update all i18n elements
+  const dict = I18N[lang] || I18N.ja;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (dict[key]) el.textContent = dict[key];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (dict[key]) el.placeholder = dict[key];
+  });
+
+  // Update HTML lang
+  document.documentElement.lang = lang === 'ja' ? 'ja' : 'en';
+}
+
+function t(key) {
+  const dict = I18N[gameState.language] || I18N.ja;
+  return dict[key] || key;
+}
+
+// ============================================================
+// SECTION: SETTINGS ROW BUTTONS
+// ============================================================
+function initSettingRows() {
+  // CPU count
+  document.querySelectorAll('#cpu-count-row .setting-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#cpu-count-row .setting-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      gameState.storySettings.cpuCount = parseInt(btn.dataset.val);
+    });
+  });
+
+  // CPU level
+  document.querySelectorAll('#cpu-level-row .setting-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#cpu-level-row .setting-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      gameState.storySettings.cpuLevel = btn.dataset.val;
+    });
+  });
+
+  // Stage select
+  document.getElementById('story-stage-select').addEventListener('change', (e) => {
+    gameState.storySettings.stage = parseInt(e.target.value);
+  });
+}
+
+// ============================================================
+// SECTION: ESCAPE HTML (XSS prevention)
+// ============================================================
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
+// ============================================================
+// SECTION: BUTTON HANDLERS
+// ============================================================
+function initButtonHandlers() {
+  // Register button
+  document.getElementById('btn-register').addEventListener('click', async () => {
+    const input = document.getElementById('username-input');
+    const name = input.value.trim();
+    if (!name || name.length > 16) {
+      document.getElementById('username-error').textContent = t('ERROR_NAME');
+      return;
+    }
+    document.getElementById('username-error').textContent = '';
+    try {
+      await registerUser(name);
+      showNotification(t('NOTIFY_REGISTERED'));
+      openModal('story-modal');
+    } catch (e) {
+      console.error('Registration error:', e);
+      // Fallback: continue as guest
+      gameState.username = name;
+      gameState.isGuest = true;
+      openModal('story-modal');
+    }
+  });
+
+  // Guest button
+  document.getElementById('btn-guest').addEventListener('click', () => {
+    gameState.username = 'Guest_' + Math.floor(Math.random() * 9999);
+    gameState.isGuest = true;
+    showNotification(t('NOTIFY_GUEST'));
+    openModal('story-modal');
+  });
+
+  // Multiplayer button
+  document.getElementById('btn-multi').addEventListener('click', () => {
+    showNotification('Coming Soon...');
+  });
+
+  // Score Attack button
+  document.getElementById('btn-score').addEventListener('click', () => {
+    resumeAudioContext();
+    openModal('score-modal');
+  });
+
+  // Rules button
+  document.getElementById('btn-rules').addEventListener('click', () => {
+    openModal('rules-modal');
+  });
+
+  // Ranking button
+  document.getElementById('btn-ranking').addEventListener('click', () => {
+    openModal('ranking-modal');
+  });
+
+  // Language buttons
+  document.getElementById('lang-ja').addEventListener('click', () => setLanguage('ja'));
+  document.getElementById('lang-en').addEventListener('click', () => setLanguage('en'));
+
+  // BGM toggle
+  document.getElementById('bgm-toggle').addEventListener('click', () => {
+    resumeAudioContext();
+    toggleBGM();
+  });
+
+  // Story start
+  document.getElementById('btn-story-start').addEventListener('click', () => {
+    closeModal('story-modal');
+    resumeAudioContext();
+    showNotification('Stage ' + gameState.storySettings.stage + ' — Loading...');
+    // TODO: Phase 2 — 3Dゲーム画面へ遷移
+  });
+
+  // Score attack start
+  document.getElementById('btn-score-start').addEventListener('click', () => {
+    closeModal('score-modal');
+    resumeAudioContext();
+    showNotification('Score Attack — Loading...');
+    // TODO: Phase 2 — 3Dゲーム画面へ遷移
+  });
+
+  // Close modals on overlay click
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.classList.remove('active');
+      }
+    });
+  });
+
+  // Resume audio on first interaction
+  document.addEventListener('click', () => resumeAudioContext(), { once: true });
+  document.addEventListener('touchstart', () => resumeAudioContext(), { once: true });
+}
+
+// ============================================================
+// SECTION: WINDOW RESIZE
+// ============================================================
+function initResize() {
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      createMatrixBg();
+      // Resize chase canvas
+      const canvas = document.getElementById('chase-canvas');
+      if (canvas) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+      }
+    }, 200);
+  });
+}
+
+// ============================================================
+// SECTION: INIT
+// ============================================================
+function init() {
+  gameState.deviceId = getDeviceId();
+  loadSavedUser();
+
+  // Apply saved language
+  setLanguage(gameState.language);
+
+  // Apply saved BGM state
+  const bgmBtn = document.getElementById('bgm-toggle');
+  if (!gameState.bgmEnabled) {
+    bgmBtn.textContent = '🔇 BGM';
+    bgmBtn.className = 'bgm-btn bgm-off';
+  }
+
+  // Init UI
+  initSettingRows();
+  initButtonHandlers();
+  initResize();
+
+  // Prevent default touch behaviors
+  document.addEventListener('touchmove', (e) => {
+    if (e.target.closest('.modal-box') || e.target.closest('#title-screen')) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  // Start splash
+  startSplashSequence();
+}
+
+// Start
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
