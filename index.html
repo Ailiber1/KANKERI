@@ -2430,7 +2430,7 @@ function createGameScene(stageConfig) {
   // Scene
   g.scene = new THREE.Scene();
   g.scene.background = new THREE.Color(0x87ceeb);
-  g.scene.fog = new THREE.FogExp2(0x9ad4e8, 0.015);
+  g.scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
 
   // Camera (TPS)
   g.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
