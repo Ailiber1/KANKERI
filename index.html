@@ -903,8 +903,10 @@ function createMatrixBg() {
   container.innerHTML = '';
 
   const katakana = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
-  const digits = '0123456789ABCDEF';
-  const chars = katakana + digits;
+  const digits = '0123456789';
+  const hex = 'ABCDEF';
+  const symbols = '+-×÷=<>{}[]#$%&@!?';
+  const chars = katakana + digits + digits + hex + symbols;
   const colW = 22;
   const colCount = Math.floor(window.innerWidth / colW);
 
@@ -918,7 +920,7 @@ function createMatrixBg() {
     col.textContent = text;
     col.style.left = (i * colW) + 'px';
 
-    const duration = 8 + Math.random() * 14;
+    const duration = 4 + Math.random() * 7;
     const delay = -(Math.random() * duration);
     col.style.animationDuration = duration + 's';
     col.style.animationDelay = delay + 's';
