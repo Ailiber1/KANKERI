@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KANKERI - 棒人間キャラクター プレビュー</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #0a0a0a;
+    overflow: hidden;
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+}
+canvas { display: block; }
+
+#ui-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    pointer-events: none;
+    z-index: 10;
+    padding: 20px;
+}
+
+#title {
+    text-align: center;
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 28px;
+    color: #ff3366;
+    text-shadow: 0 0 20px #ff3366, 0 0 40px #ff336666;
+    letter-spacing: 4px;
+    margin-bottom: 8px;
+}
+
+#subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #888;
+    letter-spacing: 2px;
+}
+
+#controls-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    border: 1px solid #ff336644;
+    border-radius: 8px;
+    padding: 16px 24px;
+    pointer-events: auto;
+    z-index: 10;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.ctrl-btn {
+    background: transparent;
+    border: 1px solid #ff336688;
+    color: #ff3366;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+.ctrl-btn:hover {
+    background: #ff336622;
+    border-color: #ff3366;
+    box-shadow: 0 0 10px #ff336644;
+}
+.ctrl-btn.active {
+    background: #ff336633;
+    border-color: #ff3366;
+    color: #fff;
+}
+
+#anim-label {
+    color: #666;
+    font-size: 12px;
+}
+
+#info-panel {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: rgba(0,0,0,0.8);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 16px;
+    z-index: 10;
+    font-size: 12px;
+    line-height: 1.8;
+    color: #aaa;
+    max-width: 220px;
+}
+
+.info-title {
+    color: #ff3366;
+    font-size: 14px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 4px;
+}
+
+.runner-color { color: #4488ff; }
+.oni-color { color: #cc0000; }
+.captured-color { color: #666666; }
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Share+Tech+Mono&display=swap');
+</style>
+</head>
+<body>
+
+<div id="ui-overlay">
+    <div id="title">KANKERI</div>
+    <div id="subtitle">棒人間キャラクター プレビュー</div>
+</div>
+
+<div id="info-panel">
+    <div class="info-title">キャラクター情報</div>
+    <span class="runner-color">● ランナー（子ども）</span><br>
+    身長: 1.2m / 頭大きめ<br>
+    色: #4488ff<br><br>
+    <span class="oni-color">● 鬼（大人）</span><br>
+    身長: 1.9m / ツノ+光る目<br>
+    色: #aa0000（濃い赤）<br><br>
+    <span class="captured-color">● 捕獲済み</span><br>
+    色: #666666<br><br>
+    <div style="color:#555; border-top:1px solid #333; padding-top:8px; margin-top:4px;">
+    マウスドラッグ: 回転<br>
+    ホイール: ズーム
+    </div>
+</div>
+
+<div id="controls-panel">
+    <span id="anim-label">アニメーション:</span>
+    <button class="ctrl-btn active" data-anim="idle">待機</button>
+    <button class="ctrl-btn" data-anim="walk">歩行</button>
+    <button class="ctrl-btn" data-anim="run">走行</button>
+    <button class="ctrl-btn" data-anim="crouch">しゃがみ</button>
+    <button class="ctrl-btn" data-anim="peek">覗き</button>
+    <button class="ctrl-btn" data-anim="kick">缶蹴り</button>
+    <button class="ctrl-btn" data-anim="hit">叩く</button>
+    <button class="ctrl-btn" data-anim="captured">捕獲</button>
+    <button class="ctrl-btn" data-anim="chase">鬼追跡</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ============================================================
+//  KANKERI 棒人間キャラクター プレビュー
+// ============================================================
+
+// --- シーン初期化 ---
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0a);
+scene.fog = new THREE.FogExp2(0x0a0a0a, 0.04);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 2.0, 6);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 2;
+controls.maxDistance = 15;
+controls.maxPolarAngle = Math.PI * 0.85;
+controls.update();
+
+// --- ライティング ---
+const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.6);
+scene.add(ambientLight);
+
+// メイン照明（街灯風）
+const mainLight = new THREE.SpotLight(0xffeedd, 1.5, 20, Math.PI * 0.3, 0.5, 1.5);
+mainLight.position.set(0, 8, 0);
+mainLight.castShadow = true;
+mainLight.shadow.mapSize.set(2048, 2048);
+mainLight.shadow.camera.near = 1;
+mainLight.shadow.camera.far = 20;
+scene.add(mainLight);
+
+// 環境リム
+const rimLight = new THREE.DirectionalLight(0x4488ff, 0.3);
+rimLight.position.set(-5, 3, -3);
+scene.add(rimLight);
+
+const rimLight2 = new THREE.DirectionalLight(0xff3366, 0.2);
+rimLight2.position.set(5, 3, -3);
+scene.add(rimLight2);
+
+// 地面のバウンスライト
+const bounceLight = new THREE.HemisphereLight(0x0a0a2e, 0x1a0a0a, 0.3);
+scene.add(bounceLight);
+
+// --- 地面 ---
+const groundGeo = new THREE.PlaneGeometry(30, 30);
+const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x1a1a1a,
+    roughness: 0.9,
+    metalness: 0.1
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// グリッドヘルパー（薄く）
+const grid = new THREE.GridHelper(20, 40, 0x222222, 0x181818);
+grid.position.y = 0.005;
+scene.add(grid);
+
+// --- 缶（中央に配置 — 仕様書準拠: シアン #00e5ff ネオン） ---
+function createCan() {
+    const canGroup = new THREE.Group();
+
+    // 缶本体（明るい緑色）
+    const canGeo = new THREE.CylinderGeometry(0.08, 0.075, 0.22, 24);
+    const canMat = new THREE.MeshStandardMaterial({
+        color: 0x22cc44,
+        roughness: 0.25,
+        metalness: 0.6,
+        emissive: 0x22cc44,
+        emissiveIntensity: 0.5
+    });
+    const canMesh = new THREE.Mesh(canGeo, canMat);
+    canMesh.position.y = 0.11;
+    canMesh.castShadow = true;
+    canGroup.add(canMesh);
+
+    // 缶の上蓋（シルバー）
+    const lidGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.01, 24);
+    const lidMat = new THREE.MeshStandardMaterial({
+        color: 0xcccccc,
+        roughness: 0.15,
+        metalness: 0.95,
+        emissive: 0x44dd66,
+        emissiveIntensity: 0.2
+    });
+    const lid = new THREE.Mesh(lidGeo, lidMat);
+    lid.position.y = 0.22;
+    canGroup.add(lid);
+
+    // --- ネオンリング1（シアン・メインリング） ---
+    const ring1Geo = new THREE.TorusGeometry(0.28, 0.012, 8, 48);
+    const ring1Mat = new THREE.MeshBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        opacity: 0.7
+    });
+    const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+    ring1.rotation.x = Math.PI / 2;
+    ring1.position.y = 0.08;
+    canGroup.add(ring1);
+
+    // --- ネオンリング2（ピンク・サブリング — パッケージの虹色演出） ---
+    const ring2Geo = new THREE.TorusGeometry(0.35, 0.008, 8, 48);
+    const ring2Mat = new THREE.MeshBasicMaterial({
+        color: 0xff3366,
+        transparent: true,
+        opacity: 0.45
+    });
+    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+    ring2.rotation.x = Math.PI / 2;
+    ring2.position.y = 0.12;
+    canGroup.add(ring2);
+
+    // --- ネオンリング3（黄色・アクセントリング） ---
+    const ring3Geo = new THREE.TorusGeometry(0.22, 0.006, 8, 48);
+    const ring3Mat = new THREE.MeshBasicMaterial({
+        color: 0xffcc00,
+        transparent: true,
+        opacity: 0.35
+    });
+    const ring3 = new THREE.Mesh(ring3Geo, ring3Mat);
+    ring3.rotation.x = Math.PI / 2;
+    ring3.position.y = 0.15;
+    canGroup.add(ring3);
+
+    // --- 地面の光の輪（シアン） ---
+    const groundRingGeo = new THREE.RingGeometry(0.3, 0.45, 48);
+    const groundRingMat = new THREE.MeshBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        opacity: 0.2,
+        side: THREE.DoubleSide
+    });
+    const groundRing = new THREE.Mesh(groundRingGeo, groundRingMat);
+    groundRing.rotation.x = -Math.PI / 2;
+    groundRing.position.y = 0.005;
+    canGroup.add(groundRing);
+
+    // --- メインポイントライト（シアン） ---
+    const canLight = new THREE.PointLight(0x00e5ff, 1.0, 4);
+    canLight.position.y = 0.3;
+    canGroup.add(canLight);
+
+    // --- 上方向へのスポットライト風（ビーム演出） ---
+    const beamLight = new THREE.PointLight(0x00e5ff, 0.4, 2);
+    beamLight.position.y = 0.6;
+    canGroup.add(beamLight);
+
+    // ユーザーデータに参照を保存（アニメーション用）
+    canGroup.userData = {
+        ring1, ring2, ring3, groundRing,
+        ring1Mat, ring2Mat, ring3Mat, groundRingMat,
+        canLight, beamLight, canMat
+    };
+
+    return canGroup;
+}
+
+const can = createCan();
+scene.add(can);
+
+// --- 壁（覗きアニメーション用） ---
+const wallGroup = new THREE.Group();
+wallGroup.visible = false; // 覗きモード時のみ表示
+
+const wallMat = new THREE.MeshStandardMaterial({
+    color: 0x3a3a3a,
+    roughness: 0.85,
+    metalness: 0.1
+});
+
+// 左壁（カメラとランナーの間に配置して体を隠す）
+// カメラ(0,2,6)から見て、ランナーの体を遮る幅広い壁
+const wallGeoL = new THREE.BoxGeometry(2.2, 2.5, 0.35);
+const wallL = new THREE.Mesh(wallGeoL, wallMat);
+wallL.position.set(-2.1, 1.25, 0.8);
+wallL.castShadow = true;
+wallL.receiveShadow = true;
+wallGroup.add(wallL);
+
+// 左壁の奥行き壁（L字コーナー: ランナーが隠れる空間を作る）
+const wallGeoLD = new THREE.BoxGeometry(0.3, 2.5, 2.0);
+const wallLD = new THREE.Mesh(wallGeoLD, wallMat);
+wallLD.position.set(-3.05, 1.25, -0.2);
+wallLD.castShadow = true;
+wallLD.receiveShadow = true;
+wallGroup.add(wallLD);
+
+// 右壁（左壁のミラー）
+const wallR = new THREE.Mesh(wallGeoL, wallMat);
+wallR.position.set(2.1, 1.25, 0.8);
+wallR.castShadow = true;
+wallR.receiveShadow = true;
+wallGroup.add(wallR);
+
+const wallRD = new THREE.Mesh(wallGeoLD, wallMat);
+wallRD.position.set(3.05, 1.25, -0.2);
+wallRD.castShadow = true;
+wallRD.receiveShadow = true;
+wallGroup.add(wallRD);
+
+// 壁のエッジライン（覗く端を強調）
+const edgeGeo = new THREE.BoxGeometry(0.02, 2.5, 0.02);
+const edgeMat = new THREE.MeshBasicMaterial({ color: 0x666666 });
+const edgeL = new THREE.Mesh(edgeGeo, edgeMat);
+edgeL.position.set(-1.0, 1.25, 0.975);
+wallGroup.add(edgeL);
+const edgeR = new THREE.Mesh(edgeGeo, edgeMat);
+edgeR.position.set(1.0, 1.25, 0.975);
+wallGroup.add(edgeR);
+
+scene.add(wallGroup);
+
+// ============================================================
+//  棒人間ファクトリー
+// ============================================================
+
+function createStickFigure(config) {
+    const {
+        color = 0x4488ff,
+        emissiveIntensity = 0.3,
+        headRadius = 0.15,
+        torsoLength = 0.5,
+        torsoRadius = 0.06,
+        upperArmLength = 0.28,
+        lowerArmLength = 0.25,
+        armRadius = 0.03,
+        upperLegLength = 0.30,
+        lowerLegLength = 0.30,
+        legRadius = 0.04,
+        isChild = false,
+        isOni = false
+    } = config;
+
+    const mat = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: emissiveIntensity,
+        roughness: isOni ? 0.4 : 0.7,
+        metalness: isOni ? 0.3 : 0.1
+    });
+
+    const figure = new THREE.Group();
+    figure.userData = {
+        color, mat, config,
+        joints: {},
+        isOni: isOni
+    };
+
+    // --- 頭 ---
+    const headGeo = new THREE.SphereGeometry(headRadius, 16, 16);
+    const head = new THREE.Mesh(headGeo, mat);
+
+    // 子どもは目を追加（かわいさ演出）
+    if (isChild) {
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const pupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+
+        // 左目
+        const leftEyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), eyeMat);
+        leftEyeWhite.position.set(-0.05, 0.03, headRadius * 0.85);
+        head.add(leftEyeWhite);
+        const leftPupil = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), pupilMat);
+        leftPupil.position.set(0, 0, 0.02);
+        leftEyeWhite.add(leftPupil);
+
+        // 右目
+        const rightEyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), eyeMat);
+        rightEyeWhite.position.set(0.05, 0.03, headRadius * 0.85);
+        head.add(rightEyeWhite);
+        const rightPupil = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), pupilMat);
+        rightPupil.position.set(0, 0, 0.02);
+        rightEyeWhite.add(rightPupil);
+    }
+
+    // ★ 鬼の顔パーツ（威圧感MAX）
+    if (isOni) {
+        // --- 光る黄色い目（大きく、ギラッと光る） ---
+        const oniEyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+
+        // 左目（つり目・横長楕円）
+        const leftEyeOuter = new THREE.Mesh(
+            new THREE.SphereGeometry(0.045, 12, 12),
+            new THREE.MeshBasicMaterial({ color: 0xff4400 })
+        );
+        leftEyeOuter.scale.set(1.3, 0.7, 0.6);
+        leftEyeOuter.position.set(-0.06, 0.035, headRadius * 0.82);
+        leftEyeOuter.rotation.z = 0.25; // つり目
+        head.add(leftEyeOuter);
+
+        const leftPupil = new THREE.Mesh(
+            new THREE.SphereGeometry(0.03, 10, 10), oniEyeGlowMat
+        );
+        leftPupil.position.set(0, 0, 0.015);
+        leftEyeOuter.add(leftPupil);
+
+        // 右目
+        const rightEyeOuter = new THREE.Mesh(
+            new THREE.SphereGeometry(0.045, 12, 12),
+            new THREE.MeshBasicMaterial({ color: 0xff4400 })
+        );
+        rightEyeOuter.scale.set(1.3, 0.7, 0.6);
+        rightEyeOuter.position.set(0.06, 0.035, headRadius * 0.82);
+        rightEyeOuter.rotation.z = -0.25; // つり目
+        head.add(rightEyeOuter);
+
+        const rightPupil = new THREE.Mesh(
+            new THREE.SphereGeometry(0.03, 10, 10), oniEyeGlowMat
+        );
+        rightPupil.position.set(0, 0, 0.015);
+        rightEyeOuter.add(rightPupil);
+
+        // 目の光源（目が実際に光っている演出）
+        const eyeLight = new THREE.PointLight(0xffcc00, 0.6, 1.5);
+        eyeLight.position.set(0, 0.04, headRadius * 0.9);
+        head.add(eyeLight);
+        figure.userData.eyeLight = eyeLight;
+
+        // --- ツノ（2本） ---
+        const hornMat = new THREE.MeshStandardMaterial({
+            color: 0x440000,
+            emissive: 0x660000,
+            emissiveIntensity: 0.4,
+            roughness: 0.3,
+            metalness: 0.5
+        });
+
+        // 左ツノ
+        const leftHornGeo = new THREE.ConeGeometry(0.035, 0.18, 8);
+        const leftHorn = new THREE.Mesh(leftHornGeo, hornMat);
+        leftHorn.position.set(-0.08, headRadius * 0.75, 0);
+        leftHorn.rotation.z = 0.3;  // 外側に少し傾ける
+        leftHorn.castShadow = true;
+        head.add(leftHorn);
+
+        // 右ツノ
+        const rightHornGeo = new THREE.ConeGeometry(0.035, 0.18, 8);
+        const rightHorn = new THREE.Mesh(rightHornGeo, hornMat);
+        rightHorn.position.set(0.08, headRadius * 0.75, 0);
+        rightHorn.rotation.z = -0.3;
+        rightHorn.castShadow = true;
+        head.add(rightHorn);
+
+        // --- 口（歪んだ笑み） ---
+        const mouthMat = new THREE.MeshBasicMaterial({ color: 0x110000 });
+        const mouthGeo = new THREE.TorusGeometry(0.04, 0.008, 8, 12, Math.PI);
+        const mouth = new THREE.Mesh(mouthGeo, mouthMat);
+        mouth.position.set(0, -0.04, headRadius * 0.9);
+        mouth.rotation.x = Math.PI; // 笑み（上弧）
+        head.add(mouth);
+
+        // --- 赤いオーラ（頭上の光） ---
+        const auraLight = new THREE.PointLight(0xff0000, 0.8, 3);
+        auraLight.position.set(0, headRadius + 0.3, 0);
+        head.add(auraLight);
+        figure.userData.auraLight = auraLight;
+    }
+
+    head.castShadow = true;
+
+    // --- 首ピボット ---
+    const neckPivot = new THREE.Object3D();
+    neckPivot.position.y = torsoLength / 2;
+    head.position.y = headRadius * 0.8;
+    neckPivot.add(head);
+
+    // --- 胴体 ---
+    // 子どもは丸みのある体型、鬼はがっしり逆三角形
+    const torsoTopR = isOni ? torsoRadius * 1.15 : torsoRadius;
+    const torsoBotR = isOni ? torsoRadius * 0.85 : (isChild ? torsoRadius * 1.05 : torsoRadius * 0.9);
+    const torsoGeo = new THREE.CylinderGeometry(torsoTopR, torsoBotR, torsoLength, 12);
+    const torso = new THREE.Mesh(torsoGeo, mat);
+    torso.castShadow = true;
+    torso.add(neckPivot);
+
+    // --- 腕 ---
+    function createArm(side) {
+        const shoulderPivot = new THREE.Object3D();
+        shoulderPivot.position.set(side * (torsoRadius + armRadius + 0.01), torsoLength / 2 - 0.05, 0);
+
+        const upperArmGeo = new THREE.CylinderGeometry(armRadius, armRadius * 0.88, upperArmLength, 10);
+        const upperArm = new THREE.Mesh(upperArmGeo, mat);
+        upperArm.position.y = -upperArmLength / 2;
+        upperArm.castShadow = true;
+        shoulderPivot.add(upperArm);
+
+        const elbowPivot = new THREE.Object3D();
+        elbowPivot.position.y = -upperArmLength / 2;
+        upperArm.add(elbowPivot);
+
+        const lowerArmGeo = new THREE.CylinderGeometry(armRadius * 0.88, armRadius * 0.75, lowerArmLength, 10);
+        const lowerArm = new THREE.Mesh(lowerArmGeo, mat);
+        lowerArm.position.y = -lowerArmLength / 2;
+        lowerArm.castShadow = true;
+        elbowPivot.add(lowerArm);
+
+        // 子どもの場合、手を丸く
+        if (isChild) {
+            const hand = new THREE.Mesh(new THREE.SphereGeometry(armRadius * 1.2, 8, 8), mat);
+            hand.position.y = -lowerArmLength / 2;
+            lowerArm.add(hand);
+        }
+
+        return { shoulderPivot, upperArm, elbowPivot, lowerArm };
+    }
+
+    const leftArm = createArm(-1);
+    const rightArm = createArm(1);
+    torso.add(leftArm.shoulderPivot);
+    torso.add(rightArm.shoulderPivot);
+
+    // --- 脚 ---
+    function createLeg(side) {
+        const hipPivot = new THREE.Object3D();
+        hipPivot.position.set(side * (torsoRadius * 0.5), -torsoLength / 2, 0);
+
+        const upperLegGeo = new THREE.CylinderGeometry(legRadius * 1.1, legRadius * 0.9, upperLegLength, 10);
+        const upperLeg = new THREE.Mesh(upperLegGeo, mat);
+        upperLeg.position.y = -upperLegLength / 2;
+        upperLeg.castShadow = true;
+        hipPivot.add(upperLeg);
+
+        const kneePivot = new THREE.Object3D();
+        kneePivot.position.y = -upperLegLength / 2;
+        upperLeg.add(kneePivot);
+
+        const lowerLegGeo = new THREE.CylinderGeometry(legRadius * 0.9, legRadius * 0.7, lowerLegLength, 10);
+        const lowerLeg = new THREE.Mesh(lowerLegGeo, mat);
+        lowerLeg.position.y = -lowerLegLength / 2;
+        lowerLeg.castShadow = true;
+        kneePivot.add(lowerLeg);
+
+        // 足
+        const footGeo = new THREE.BoxGeometry(legRadius * 2.5, 0.04, isChild ? 0.1 : 0.14);
+        const foot = new THREE.Mesh(footGeo, mat);
+        foot.position.set(0, -lowerLegLength / 2, isChild ? 0.03 : 0.04);
+        foot.castShadow = true;
+        lowerLeg.add(foot);
+
+        return { hipPivot, upperLeg, kneePivot, lowerLeg, foot };
+    }
+
+    const leftLeg = createLeg(-1);
+    const rightLeg = createLeg(1);
+    torso.add(leftLeg.hipPivot);
+    torso.add(rightLeg.hipPivot);
+
+    // --- 全体の高さ調整 ---
+    const totalHeight = torsoLength + upperLegLength + lowerLegLength + 0.04;
+    torso.position.y = totalHeight - torsoLength / 2 + 0.02;
+    figure.add(torso);
+
+    // 関節参照を保存
+    figure.userData.joints = {
+        head, neckPivot, torso,
+        leftShoulder: leftArm.shoulderPivot,
+        leftElbow: leftArm.elbowPivot,
+        leftUpperArm: leftArm.upperArm,
+        leftLowerArm: leftArm.lowerArm,
+        rightShoulder: rightArm.shoulderPivot,
+        rightElbow: rightArm.elbowPivot,
+        rightUpperArm: rightArm.upperArm,
+        rightLowerArm: rightArm.lowerArm,
+        leftHip: leftLeg.hipPivot,
+        leftKnee: leftLeg.kneePivot,
+        leftUpperLeg: leftLeg.upperLeg,
+        leftLowerLeg: leftLeg.lowerLeg,
+        rightHip: rightLeg.hipPivot,
+        rightKnee: rightLeg.kneePivot,
+        rightUpperLeg: rightLeg.upperLeg,
+        rightLowerLeg: rightLeg.lowerLeg
+    };
+
+    figure.userData.baseY = torso.position.y;
+
+    return figure;
+}
+
+// ============================================================
+//  キャラクター生成
+// ============================================================
+
+// ランナー（子ども体型）
+const runner = createStickFigure({
+    color: 0x4488ff,
+    emissiveIntensity: 0.3,
+    headRadius: 0.17,       // 大きめの頭
+    torsoLength: 0.34,      // 短い胴体
+    torsoRadius: 0.10,      // ★太め（肉付き）
+    upperArmLength: 0.18,   // 短い腕
+    lowerArmLength: 0.16,
+    armRadius: 0.045,       // ★太め
+    upperLegLength: 0.22,   // 短い脚
+    lowerLegLength: 0.22,
+    legRadius: 0.055,       // ★太め
+    isChild: true
+});
+runner.position.set(-1.5, 0, 0);
+scene.add(runner);
+
+// ランナー2（子ども・右側 — 少し小さめ）
+const runner2 = createStickFigure({
+    color: 0x4488ff,
+    emissiveIntensity: 0.3,
+    headRadius: 0.16,
+    torsoLength: 0.30,
+    torsoRadius: 0.09,      // ★太め
+    upperArmLength: 0.16,
+    lowerArmLength: 0.14,
+    armRadius: 0.04,        // ★太め
+    upperLegLength: 0.20,
+    lowerLegLength: 0.20,
+    legRadius: 0.05,        // ★太め
+    isChild: true
+});
+runner2.position.set(1.5, 0, 0);
+scene.add(runner2);
+
+// 鬼（大人体型 — 威圧感を出す）
+const oni = createStickFigure({
+    color: 0xaa0000,         // 濃い赤
+    emissiveIntensity: 0.7,
+    headRadius: 0.19,        // やや大きい頭
+    torsoLength: 0.50,       // 胴体（少し短く）
+    torsoRadius: 0.13,       // ★かなり太め（ガッシリ）
+    upperArmLength: 0.28,    // 腕（少し短く）
+    lowerArmLength: 0.25,
+    armRadius: 0.055,        // ★太い腕
+    upperLegLength: 0.32,    // 脚（少し短く）
+    lowerLegLength: 0.30,
+    legRadius: 0.065,        // ★太い脚
+    isChild: false,
+    isOni: true
+});
+oni.position.set(0, 0, -1.8);
+scene.add(oni);
+
+// --- 鬼のオーラパーティクル ---
+const oniParticles = [];
+const particleGeo = new THREE.SphereGeometry(0.03, 6, 6);
+for (let i = 0; i < 20; i++) {
+    const pMat = new THREE.MeshBasicMaterial({
+        color: 0xff2200,
+        transparent: true,
+        opacity: 0.5
+    });
+    const p = new THREE.Mesh(particleGeo, pMat);
+    p.userData.angle = Math.random() * Math.PI * 2;
+    p.userData.speed = 0.5 + Math.random() * 1.5;
+    p.userData.radius = 0.3 + Math.random() * 0.4;
+    p.userData.ySpeed = 0.5 + Math.random() * 1.0;
+    p.userData.yOffset = Math.random() * 2.0;
+    p.userData.baseOpacity = 0.2 + Math.random() * 0.4;
+    p.userData.mat = pMat;
+    oni.add(p);
+    oniParticles.push(p);
+}
+
+// 捕獲されたランナー
+const captured = createStickFigure({
+    color: 0x666666,
+    emissiveIntensity: 0.05,
+    headRadius: 0.16,
+    torsoLength: 0.32,
+    torsoRadius: 0.09,      // ★太め
+    upperArmLength: 0.17,
+    lowerArmLength: 0.15,
+    armRadius: 0.042,       // ★太め
+    upperLegLength: 0.21,
+    lowerLegLength: 0.21,
+    legRadius: 0.052,       // ★太め
+    isChild: true
+});
+captured.position.set(0.4, 0, 0.8);
+scene.add(captured);
+
+// --- 名前表示（Canvas2D → Sprite） ---
+function createNameSprite(name, color = '#ffffff') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+
+    ctx.font = 'bold 28px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // 黒縁取り
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.strokeText(name, 128, 32);
+
+    // テキスト
+    ctx.fillStyle = color;
+    ctx.fillText(name, 128, 32);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false
+    });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(1.0, 0.25, 1);
+
+    return sprite;
+}
+
+// 名前をキャラに追加
+function addNameToFigure(figure, name, color, offsetY) {
+    const sprite = createNameSprite(name, color);
+    sprite.position.y = offsetY;
+    figure.userData.joints.torso.add(sprite);
+}
+
+// ランナーの名前（高さ = 頭の上）
+addNameToFigure(runner, 'プレイヤー1', '#4488ff', runner.userData.joints.neckPivot.position.y + 0.45);
+addNameToFigure(runner2, 'プレイヤー2', '#4488ff', runner2.userData.joints.neckPivot.position.y + 0.42);
+addNameToFigure(oni, '鬼', '#ff4444', oni.userData.joints.neckPivot.position.y + 0.55);
+addNameToFigure(captured, 'プレイヤー3', '#666666', captured.userData.joints.neckPivot.position.y + 0.42);
+
+// 自分キャラのマーカー ▼
+function addSelfMarker(figure, offsetY) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.font = 'bold 40px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ff3366';
+    ctx.fillText('▼', 32, 32);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(0.3, 0.3, 1);
+    sprite.position.y = offsetY + 0.25;
+    figure.userData.joints.torso.add(sprite);
+}
+addSelfMarker(runner, runner.userData.joints.neckPivot.position.y + 0.45);
+
+// ============================================================
+//  アニメーションシステム
+// ============================================================
+
+let currentAnim = 'idle';
+const clock = new THREE.Clock();
+
+function resetPose(figure) {
+    const j = figure.userData.joints;
+    j.neckPivot.rotation.set(0, 0, 0);
+    j.torso.rotation.x = 0;
+    j.torso.rotation.z = 0;
+    j.torso.position.y = figure.userData.baseY;
+    j.leftShoulder.rotation.set(0, 0, 0);
+    j.rightShoulder.rotation.set(0, 0, 0);
+    j.leftElbow.rotation.set(0, 0, 0);
+    j.rightElbow.rotation.set(0, 0, 0);
+    j.leftHip.rotation.set(0, 0, 0);
+    j.rightHip.rotation.set(0, 0, 0);
+    j.leftKnee.rotation.set(0, 0, 0);
+    j.rightKnee.rotation.set(0, 0, 0);
+}
+
+function animateIdle(figure, t) {
+    const j = figure.userData.joints;
+    // ゆるいバウンス
+    const bounce = Math.sin(t * Math.PI) * 0.015;
+    j.torso.position.y = figure.userData.baseY + bounce;
+    // 微妙な腕揺れ
+    j.leftShoulder.rotation.x = Math.sin(t * Math.PI * 0.7) * 0.05;
+    j.rightShoulder.rotation.x = Math.sin(t * Math.PI * 0.7 + 0.5) * 0.05;
+    // 子どもは少し首を傾ける
+    if (figure.userData.config.isChild) {
+        j.neckPivot.rotation.z = Math.sin(t * Math.PI * 0.3) * 0.06;
+    }
+}
+
+function animateWalk(figure, t, speed) {
+    const j = figure.userData.joints;
+    const cycle = t * speed;
+    const legSwing = 0.35;  // ±20度
+    const armSwing = 0.26;  // ±15度
+
+    // 脚
+    j.leftHip.rotation.x = Math.sin(cycle) * legSwing;
+    j.rightHip.rotation.x = Math.sin(cycle + Math.PI) * legSwing;
+
+    // 膝（後ろに行く時に曲げる）
+    j.leftKnee.rotation.x = Math.max(0, -Math.sin(cycle)) * 0.5;
+    j.rightKnee.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 0.5;
+
+    // 腕（脚と逆位相）
+    j.leftShoulder.rotation.x = Math.sin(cycle + Math.PI) * armSwing;
+    j.rightShoulder.rotation.x = Math.sin(cycle) * armSwing;
+
+    // バウンス
+    j.torso.position.y = figure.userData.baseY + Math.abs(Math.sin(cycle)) * 0.02;
+}
+
+function animateRun(figure, t, speed) {
+    const j = figure.userData.joints;
+    const cycle = t * speed;
+    const legSwing = 0.6;   // ±35度
+    const armSwing = 0.52;  // ±30度
+
+    // 前傾
+    j.torso.rotation.x = 0.17; // 10度
+
+    // 脚 — 大きく振る
+    j.leftHip.rotation.x = Math.sin(cycle) * legSwing;
+    j.rightHip.rotation.x = Math.sin(cycle + Math.PI) * legSwing;
+
+    // 膝 — 大きく曲げる
+    j.leftKnee.rotation.x = Math.max(0, -Math.sin(cycle)) * 0.9;
+    j.rightKnee.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 0.9;
+
+    // 腕 — 大きく振る + 肘を曲げる
+    j.leftShoulder.rotation.x = Math.sin(cycle + Math.PI) * armSwing;
+    j.rightShoulder.rotation.x = Math.sin(cycle) * armSwing;
+    j.leftElbow.rotation.x = -0.8;
+    j.rightElbow.rotation.x = -0.8;
+
+    // バウンス（走行は大きめ）
+    j.torso.position.y = figure.userData.baseY + Math.abs(Math.sin(cycle)) * 0.04;
+}
+
+function animateCrouch(figure, t) {
+    const j = figure.userData.joints;
+    // 膝を曲げて低い姿勢
+    j.leftHip.rotation.x = -0.8;
+    j.rightHip.rotation.x = -0.8;
+    j.leftKnee.rotation.x = 1.4;
+    j.rightKnee.rotation.x = 1.4;
+    j.torso.position.y = figure.userData.baseY - 0.35;
+    j.torso.rotation.x = 0.2;
+
+    // 腕を体に寄せる
+    j.leftShoulder.rotation.x = -0.3;
+    j.leftShoulder.rotation.z = 0.2;
+    j.rightShoulder.rotation.x = -0.3;
+    j.rightShoulder.rotation.z = -0.2;
+    j.leftElbow.rotation.x = -0.6;
+    j.rightElbow.rotation.x = -0.6;
+
+    // 微妙な呼吸
+    j.torso.position.y += Math.sin(t * Math.PI) * 0.008;
+}
+
+function animatePeek(figure, t, side) {
+    // side: 1 = 壁の右端から覗く（左壁用）, -1 = 壁の左端から覗く（右壁用）
+    const j = figure.userData.joints;
+    const peekCycle = (Math.sin(t * Math.PI * 0.5) + 1) / 2; // 0→1→0 ゆっくり
+
+    // 体全体を大きく傾けて頭だけ壁の端から出す
+    j.torso.rotation.z = side * peekCycle * 0.55;
+
+    // 頭をさらに傾けて壁の先を覗き込む
+    j.neckPivot.rotation.z = side * peekCycle * 0.35;
+    j.neckPivot.rotation.x = -0.2 * peekCycle; // 前に出す
+
+    // 壁側の手を壁につける（支え）
+    if (side > 0) {
+        // 左壁から右を覗く → 左手で壁を支える
+        j.leftShoulder.rotation.x = -0.5;
+        j.leftShoulder.rotation.z = 0.8 * peekCycle;
+        j.leftElbow.rotation.x = -1.0 * peekCycle;
+        j.rightShoulder.rotation.x = 0.05;
+        j.rightShoulder.rotation.z = -0.1;
+    } else {
+        // 右壁から左を覗く → 右手で壁を支える
+        j.rightShoulder.rotation.x = -0.5;
+        j.rightShoulder.rotation.z = -0.8 * peekCycle;
+        j.rightElbow.rotation.x = -1.0 * peekCycle;
+        j.leftShoulder.rotation.x = 0.05;
+        j.leftShoulder.rotation.z = 0.1;
+    }
+
+    // 脚を踏ん張る（体を傾けても踏ん張っている感じ）
+    j.leftHip.rotation.x = -0.15;
+    j.rightHip.rotation.x = -0.15;
+    j.leftKnee.rotation.x = 0.25;
+    j.rightKnee.rotation.x = 0.25;
+
+    // 少し腰を落とす（こっそり感）
+    j.torso.position.y = figure.userData.baseY - 0.08;
+}
+
+function animateKick(figure, t) {
+    const j = figure.userData.joints;
+    const kickCycle = (t * 0.9) % 1.0;
+
+    if (kickCycle < 0.3) {
+        // ★ 脚を後ろに引く（ため）
+        const p = kickCycle / 0.3;
+        j.rightHip.rotation.x = 1.2 * p;           // 脚を後ろへ引く
+        j.rightKnee.rotation.x = 1.4 * p;          // 膝を深く曲げる
+        j.torso.rotation.x = 0.2 * p;              // 体を少し前傾
+        j.torso.position.y = figure.userData.baseY - 0.06 * p;
+        // 腕を振りかぶる
+        j.leftShoulder.rotation.x = -0.7 * p;
+        j.leftElbow.rotation.x = -0.4 * p;
+        j.rightShoulder.rotation.x = 0.6 * p;
+        j.rightElbow.rotation.x = -0.6 * p;
+        // 軸足で踏ん張る
+        j.leftHip.rotation.x = 0.15 * p;
+        j.leftKnee.rotation.x = 0.3 * p;
+    } else if (kickCycle < 0.45) {
+        // ★ 一気に前へ蹴り出す！
+        const p = (kickCycle - 0.3) / 0.15;
+        j.rightHip.rotation.x = 1.2 - 2.8 * p;    // 後ろ→前に大振り
+        j.rightKnee.rotation.x = 1.4 * (1 - p * 0.85);
+        j.torso.rotation.x = 0.2 - 0.5 * p;       // 体を後ろに反らす（反動）
+        j.torso.position.y = figure.userData.baseY - 0.06 + 0.1 * p;
+        // 腕を逆に振る（反動）
+        j.leftShoulder.rotation.x = -0.7 + 1.4 * p;
+        j.leftElbow.rotation.x = -0.4;
+        j.rightShoulder.rotation.x = 0.6 - 1.2 * p;
+        j.rightElbow.rotation.x = -0.6 + 0.3 * p;
+        // 軸足
+        j.leftHip.rotation.x = 0.15;
+        j.leftKnee.rotation.x = 0.3 - 0.1 * p;
+    } else if (kickCycle < 0.6) {
+        // ★ 蹴り切った瞬間（脚が前方最高点でキープ）
+        const p = (kickCycle - 0.45) / 0.15;
+        j.rightHip.rotation.x = -1.6 + 0.1 * p;
+        j.rightKnee.rotation.x = 0.21;
+        j.torso.rotation.x = -0.3 + 0.05 * p;
+        j.torso.position.y = figure.userData.baseY + 0.04;
+        j.leftShoulder.rotation.x = 0.7;
+        j.rightShoulder.rotation.x = -0.6;
+        j.leftHip.rotation.x = 0.15;
+        j.leftKnee.rotation.x = 0.2;
+    } else {
+        // 戻る（ゆっくり着地）
+        const p = (kickCycle - 0.6) / 0.4;
+        const ease = 1 - (1 - p) * (1 - p);
+        j.rightHip.rotation.x = -1.5 * (1 - ease);
+        j.rightKnee.rotation.x = 0.21 * (1 - ease);
+        j.torso.rotation.x = -0.25 * (1 - ease);
+        j.torso.position.y = figure.userData.baseY + 0.04 * (1 - ease);
+        j.leftShoulder.rotation.x = 0.7 * (1 - ease);
+        j.rightShoulder.rotation.x = -0.6 * (1 - ease);
+        j.leftHip.rotation.x = 0.15 * (1 - ease);
+        j.leftKnee.rotation.x = 0.2 * (1 - ease);
+    }
+}
+
+function animateHit(figure, t) {
+    const j = figure.userData.joints;
+    const hitCycle = (t * 1.2) % 1.0;
+
+    if (hitCycle < 0.35) {
+        // 腕を軽く振り上げ
+        const p = hitCycle / 0.35;
+        j.rightShoulder.rotation.x = 1.2 * p;
+        j.rightShoulder.rotation.z = -0.2 * p;
+        j.rightElbow.rotation.x = 0.6 * p;
+        j.torso.rotation.x = 0.1 * p;
+    } else if (hitCycle < 0.55) {
+        // 前方に振り下ろす
+        const p = (hitCycle - 0.35) / 0.2;
+        j.rightShoulder.rotation.x = 1.2 - 2.0 * p;
+        j.rightShoulder.rotation.z = -0.2 * (1 - p);
+        j.rightElbow.rotation.x = 0.6 - 0.6 * p;
+        j.torso.rotation.x = 0.1 - 0.25 * p;
+    } else {
+        // 戻る
+        const p = (hitCycle - 0.55) / 0.45;
+        j.rightShoulder.rotation.x = -0.8 * (1 - p);
+        j.rightElbow.rotation.x = 0;
+        j.torso.rotation.x = -0.15 * (1 - p);
+    }
+
+    // 左腕はバランス
+    j.leftShoulder.rotation.x = 0.2;
+    j.leftElbow.rotation.x = -0.3;
+}
+
+function animateCaptured(figure, t) {
+    const j = figure.userData.joints;
+    // 座り込み（膝を抱える）
+    j.leftHip.rotation.x = -1.5;
+    j.rightHip.rotation.x = -1.5;
+    j.leftKnee.rotation.x = 2.2;
+    j.rightKnee.rotation.x = 2.2;
+    j.torso.position.y = figure.userData.baseY - 0.55;
+    j.torso.rotation.x = 0.3;
+
+    // 腕で膝を抱える
+    j.leftShoulder.rotation.x = -1.0;
+    j.leftShoulder.rotation.z = 0.3;
+    j.leftElbow.rotation.x = -1.8;
+    j.rightShoulder.rotation.x = -1.0;
+    j.rightShoulder.rotation.z = -0.3;
+    j.rightElbow.rotation.x = -1.8;
+
+    // 頭を下げる
+    j.neckPivot.rotation.x = 0.3;
+
+    // 微妙な揺れ（悲しみの演出）
+    j.torso.rotation.z = Math.sin(t * Math.PI * 0.5) * 0.03;
+}
+
+function animateChase(figure, t, speed) {
+    const j = figure.userData.joints;
+    const cycle = t * speed;
+
+    // 前傾（追いかける感）
+    j.torso.rotation.x = 0.25;
+
+    // 脚は走行と同じ
+    j.leftHip.rotation.x = Math.sin(cycle) * 0.65;
+    j.rightHip.rotation.x = Math.sin(cycle + Math.PI) * 0.65;
+    j.leftKnee.rotation.x = Math.max(0, -Math.sin(cycle)) * 1.0;
+    j.rightKnee.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 1.0;
+
+    // 腕を前に伸ばす（追いかける感）
+    j.leftShoulder.rotation.x = -1.2 + Math.sin(cycle) * 0.3;
+    j.rightShoulder.rotation.x = -1.2 + Math.sin(cycle + Math.PI) * 0.3;
+    j.leftElbow.rotation.x = -0.2;
+    j.rightElbow.rotation.x = -0.2;
+
+    // バウンス
+    j.torso.position.y = figure.userData.baseY + Math.abs(Math.sin(cycle)) * 0.045;
+
+    // 頭を前方に
+    j.neckPivot.rotation.x = -0.15;
+}
+
+// ============================================================
+//  アニメーションループ
+// ============================================================
+
+const figures = [runner, runner2, oni, captured];
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    const elapsed = clock.getElapsedTime();
+
+    // 全キャラリセット
+    figures.forEach(fig => resetPose(fig));
+
+    // 捕獲キャラは常に捕獲ポーズ
+    animateCaptured(captured, elapsed);
+
+    // 他のキャラのアニメーション
+    const activeFigures = [runner, runner2, oni];
+
+    switch (currentAnim) {
+        case 'idle':
+            activeFigures.forEach(fig => animateIdle(fig, elapsed));
+            break;
+
+        case 'walk':
+            activeFigures.forEach(fig => animateWalk(fig, elapsed, 8));
+            break;
+
+        case 'run':
+            runner.userData.joints.torso.rotation.x = 0.17;
+            animateRun(runner, elapsed, 15);
+            animateRun(runner2, elapsed + 0.3, 15);
+            animateRun(oni, elapsed + 0.6, 14);
+            break;
+
+        case 'crouch':
+            animateCrouch(runner, elapsed);
+            animateCrouch(runner2, elapsed + 0.5);
+            animateIdle(oni, elapsed);
+            break;
+
+        case 'peek':
+            // ランナーは壁の陰から中央（鬼の方）を覗く
+            animatePeek(runner, elapsed, -1);        // 左壁から右（中央）を覗く
+            animatePeek(runner2, elapsed + 1.5, 1);  // 右壁から左（中央）を覗く
+            animateWalk(oni, elapsed, 6);             // 鬼は歩いて巡回
+            break;
+
+        case 'kick':
+            animateKick(runner, elapsed);
+            animateIdle(runner2, elapsed);
+            animateIdle(oni, elapsed);
+            break;
+
+        case 'hit':
+            animateHit(runner, elapsed);
+            animateIdle(runner2, elapsed);
+            animateIdle(oni, elapsed);
+            break;
+
+        case 'captured':
+            animateCaptured(runner, elapsed);
+            animateCaptured(runner2, elapsed + 0.3);
+            animateIdle(oni, elapsed);
+            break;
+
+        case 'chase':
+            // ランナーは逃げる、鬼は追跡
+            animateRun(runner, elapsed, 16);
+            animateRun(runner2, elapsed + 0.3, 15);
+            animateChase(oni, elapsed, 14);
+            // 鬼のemissiveを強める
+            oni.userData.mat.emissiveIntensity = 0.5 + Math.sin(elapsed * 4) * 0.2;
+            break;
+    }
+
+    // 鬼のemissive脈動（常時うっすら脈打つ）
+    if (currentAnim === 'chase') {
+        oni.userData.mat.emissiveIntensity = 0.7 + Math.sin(elapsed * 5) * 0.3;
+    } else {
+        oni.userData.mat.emissiveIntensity = 0.6 + Math.sin(elapsed * 2) * 0.15;
+    }
+
+    // 鬼の目の光の脈動
+    if (oni.userData.eyeLight) {
+        oni.userData.eyeLight.intensity = 0.5 + Math.sin(elapsed * 3) * 0.3;
+    }
+    if (oni.userData.auraLight) {
+        oni.userData.auraLight.intensity = 0.6 + Math.sin(elapsed * 2.5) * 0.4;
+    }
+
+    // 鬼のオーラパーティクル更新
+    oniParticles.forEach(p => {
+        p.userData.angle += p.userData.speed * 0.016;
+        const px = Math.cos(p.userData.angle) * p.userData.radius;
+        const pz = Math.sin(p.userData.angle) * p.userData.radius;
+        const py = (p.userData.yOffset + elapsed * p.userData.ySpeed) % 2.5;
+        p.position.set(px, py + 0.3, pz);
+        p.userData.mat.opacity = p.userData.baseOpacity * (1.0 - py / 2.5);
+        const scale = 0.5 + (1.0 - py / 2.5) * 0.8;
+        p.scale.set(scale, scale, scale);
+    });
+
+    // 缶のネオンリング アニメーション
+    const cd = can.userData;
+
+    // リング1（シアン）: ゆっくり回転 + 上下に揺れる
+    cd.ring1.rotation.z = elapsed * 0.8;
+    cd.ring1.rotation.x = Math.PI / 2 + Math.sin(elapsed * 1.5) * 0.15;
+    cd.ring1Mat.opacity = 0.5 + Math.sin(elapsed * 2) * 0.25;
+
+    // リング2（ピンク）: 逆回転 + 傾き変化
+    cd.ring2.rotation.z = -elapsed * 0.6;
+    cd.ring2.rotation.x = Math.PI / 2 + Math.cos(elapsed * 1.2) * 0.25;
+    cd.ring2Mat.opacity = 0.3 + Math.sin(elapsed * 2.5 + 1) * 0.2;
+
+    // リング3（黄色）: 速回転
+    cd.ring3.rotation.z = elapsed * 1.2;
+    cd.ring3.rotation.x = Math.PI / 2 + Math.sin(elapsed * 1.8 + 2) * 0.2;
+    cd.ring3Mat.opacity = 0.25 + Math.sin(elapsed * 3) * 0.15;
+
+    // 地面の光の輪: 脈動
+    cd.groundRingMat.opacity = 0.15 + Math.sin(elapsed * 1.5) * 0.1;
+
+    // ポイントライト: 脈動
+    cd.canLight.intensity = 0.8 + Math.sin(elapsed * 2) * 0.4;
+    cd.beamLight.intensity = 0.3 + Math.sin(elapsed * 3) * 0.2;
+
+    // 缶本体の緑発光（脈動）
+    cd.canMat.emissiveIntensity = 0.4 + Math.sin(elapsed * 2) * 0.15;
+
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+animate();
+
+// --- デフォルト位置を保存 ---
+const defaultPositions = {
+    runner: runner.position.clone(),
+    runner2: runner2.position.clone(),
+    oni: oni.position.clone(),
+    captured: captured.position.clone()
+};
+
+// --- ボタン制御 ---
+document.querySelectorAll('.ctrl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentAnim = btn.dataset.anim;
+
+        if (btn.dataset.anim === 'peek') {
+            // 覗きモード: 壁を表示、キャラを壁の裏に配置
+            wallGroup.visible = true;
+            // 左壁の裏（右端 x=-1.0 の少し奥）— 体は壁に隠れる
+            runner.position.set(-1.3, 0, 0.3);
+            runner.rotation.y = 0;
+            // 右壁の裏（左端 x=1.0 の少し奥）
+            runner2.position.set(1.3, 0, 0.3);
+            runner2.rotation.y = 0;
+            // 鬼は中央の手前を巡回
+            oni.position.set(0, 0, 1.8);
+            oni.rotation.y = Math.PI;
+            captured.visible = false;
+        } else {
+            // 通常モード: 壁を非表示、キャラを元に戻す
+            wallGroup.visible = false;
+            runner.position.copy(defaultPositions.runner);
+            runner.rotation.y = 0;
+            runner2.position.copy(defaultPositions.runner2);
+            runner2.rotation.y = 0;
+            oni.position.copy(defaultPositions.oni);
+            oni.rotation.y = 0;
+            captured.visible = true;
+            captured.position.copy(defaultPositions.captured);
+        }
+    });
+});
+
+// --- リサイズ対応 ---
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+</script>
+</body>
+</html>
