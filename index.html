@@ -613,10 +613,10 @@ html, body {
 .pause-panel { max-width: 300px; width: 90%; padding: 30px; }
 #controls-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 55; }
 .controls-panel { width: 90%; padding: 24px; }
-#controls-table { width: 100%; border-collapse: collapse; font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ccc; }
-#controls-table th { color: #5599ff; text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(85,153,255,0.3); }
-#controls-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-#controls-table td:nth-child(2) { color: #ffcc00; text-align: right; }
+#controls-table, #controls-table-mobile { width: 100%; border-collapse: collapse; font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ccc; }
+#controls-table th, #controls-table-mobile th { color: #5599ff; text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(85,153,255,0.3); }
+#controls-table td, #controls-table-mobile td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+#controls-table td:nth-child(2), #controls-table-mobile td:nth-child(2) { color: #ffcc00; text-align: right; }
 #controls-rules { font-family: 'Noto Sans JP', sans-serif; font-size: 13px; color: #aaa; padding-left: 18px; line-height: 1.8; }
 #controls-rules li { margin-bottom: 2px; }
 #result-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 50; }
@@ -880,15 +880,26 @@ html, body {
     <div class="controls-panel ui-panel" style="max-width:420px;max-height:80vh;overflow-y:auto;">
       <div class="corner-bl"></div><div class="corner-br"></div>
       <h2 style="font-family:'Cinzel Decorative',serif;color:#5599ff;text-align:center;margin-bottom:16px;font-size:20px;">操作説明</h2>
+      <h3 style="color:#00e5ff;margin:0 0 8px;font-size:14px;">PC操作</h3>
       <table id="controls-table">
         <tr><th>操作</th><th>キー</th></tr>
-        <tr><td>移動</td><td>W A S D</td></tr>
+        <tr><td>移動</td><td>W A S D / 矢印キー</td></tr>
         <tr><td>視点回転</td><td>マウス移動</td></tr>
         <tr><td>しゃがむ</td><td>C</td></tr>
         <tr><td>ダッシュ</td><td>Shift</td></tr>
-        <tr><td>蹴る / アクション</td><td>F</td></tr>
+        <tr><td>蹴る / アクション</td><td>F / Space</td></tr>
         <tr><td>覗き（左 / 右）</td><td>Q / E</td></tr>
         <tr><td>ポーズ</td><td>Esc</td></tr>
+      </table>
+      <h3 style="color:#00e5ff;margin:14px 0 8px;font-size:14px;">スマホ操作</h3>
+      <table id="controls-table-mobile">
+        <tr><th>操作</th><th>方法</th></tr>
+        <tr><td>移動</td><td>左側スティック（ドラッグ）</td></tr>
+        <tr><td>視点回転</td><td>右側スワイプ</td></tr>
+        <tr><td>しゃがむ</td><td>CROUCHボタン</td></tr>
+        <tr><td>ダッシュ</td><td>DASHボタン</td></tr>
+        <tr><td>蹴る / アクション</td><td>KICKボタン（対象近くで表示）</td></tr>
+        <tr><td>ポーズ</td><td>画面上部のPAUSEボタン</td></tr>
       </table>
       <h3 style="color:#ff3366;margin:14px 0 8px;font-size:14px;">ルール</h3>
       <ul id="controls-rules">
