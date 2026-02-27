@@ -4248,55 +4248,96 @@ function createCpuAlly(g, name, level, spawnX, spawnZ, colorIndex) {
 }
 
 function findHideSpot(g, ally) {
-  // Use colliders as potential hiding spots
-  const spots = g.colliders.filter(c => c.h >= 1.0); // Only tall enough cover
+  // Use colliders as potential hiding spots (must be tall enough to hide behind)
+  const spots = g.colliders.filter(c => c.h >= 1.0);
   if (spots.length === 0) return null;
 
-  const level = ally.level;
   const half = g.config.size / 2 - 2;
 
-  // Get closest oni position for smarter hiding
+  // Get all oni positions for comprehensive hiding
+  const oniPositions = g.onis.map(o => o.position);
   const { oni: closestOni } = getClosestOniDist(g, ally.position);
   const oniPos = closestOni ? closestOni.position : new THREE.Vector3(0, 0, 0);
 
-  // Score each spot: farther from oni = better, must be at least 3m from ally (avoid instant arrival)
-  let scoredSpots = spots.map(s => {
-    const oniDx = s.x - oniPos.x;
-    const oniDz = s.z - oniPos.z;
-    const oniDist = Math.sqrt(oniDx * oniDx + oniDz * oniDz);
-    const allyDx = s.x - ally.position.x;
-    const allyDz = s.z - ally.position.z;
-    const allyDist = Math.sqrt(allyDx * allyDx + allyDz * allyDz);
-    return { spot: s, oniDist, allyDist };
-  });
-  // Filter out spots too close to current position (minimum 3m walk)
-  const farEnough = scoredSpots.filter(s => s.allyDist >= 3);
-  if (farEnough.length > 0) scoredSpots = farEnough;
+  // For each collider, compute a candidate hiding position on the far side from oni,
+  // then verify it's actually hidden (cover blocks line of sight)
+  const candidates = [];
+  for (const col of spots) {
+    // Compute hiding position: behind the collider relative to oni
+    const hideAngle = Math.atan2(col.x - oniPos.x, col.z - oniPos.z);
+    // Offset depends on collider size — stay close to the cover
+    const coverSize = col.type === 'cylinder' ? col.r : Math.max(col.hw, col.hd);
+    const offset = coverSize + 0.6; // just behind cover
+    const hx = col.x + Math.sin(hideAngle) * offset;
+    const hz = col.z + Math.cos(hideAngle) * offset;
+    // Clamp to map bounds
+    const cx = Math.max(-half, Math.min(half, hx));
+    const cz = Math.max(-half, Math.min(half, hz));
 
-  let chosen = null;
-  if (level === 'weak') {
-    // Weak: prefer spots far from oni but not too far to walk
-    scoredSpots.sort((a, b) => (b.oniDist - a.allyDist * 0.3) - (a.oniDist - b.allyDist * 0.3));
-    chosen = scoredSpots[Math.floor(Math.random() * Math.min(3, scoredSpots.length))].spot;
-  } else if (level === 'strong') {
-    // Strong: farthest from oni, distance to walk is irrelevant
-    scoredSpots.sort((a, b) => b.oniDist - a.oniDist);
-    chosen = scoredSpots[Math.floor(Math.random() * Math.min(2, scoredSpots.length))].spot;
-  } else {
-    // Normal: balanced — prefer far from oni with some randomness
-    scoredSpots.sort((a, b) => (b.oniDist - a.allyDist * 0.2) - (a.oniDist - b.allyDist * 0.2));
-    chosen = scoredSpots[Math.floor(Math.random() * Math.min(3, scoredSpots.length))].spot;
+    const allyDx = cx - ally.position.x;
+    const allyDz = cz - ally.position.z;
+    const allyDist = Math.sqrt(allyDx * allyDx + allyDz * allyDz);
+
+    // Check if this position is actually hidden from all onis
+    let hiddenFromAll = true;
+    let coverScore = 0;
+    for (const op of oniPositions) {
+      const toHideX = cx - op.x, toHideZ = cz - op.z;
+      const distToOni = Math.sqrt(toHideX * toHideX + toHideZ * toHideZ);
+      const nx = toHideX / distToOni, nz = toHideZ / distToOni;
+      // Check if ANY collider blocks line of sight from oni to hiding position
+      let blocked = false;
+      for (const blocker of spots) {
+        const bx = blocker.x - op.x, bz = blocker.z - op.z;
+        const proj = bx * nx + bz * nz;
+        if (proj < 0.3 || proj > distToOni - 0.3) continue;
+        const perpX = bx - nx * proj, perpZ = bz - nz * proj;
+        const perpDist = Math.sqrt(perpX * perpX + perpZ * perpZ);
+        const blockR = blocker.type === 'cylinder' ? blocker.r : Math.max(blocker.hw, blocker.hd);
+        if (perpDist < blockR + 0.2) { blocked = true; break; }
+      }
+      if (blocked) {
+        coverScore += distToOni; // farther from oni with cover = better
+      } else {
+        hiddenFromAll = false;
+      }
+    }
+
+    const oniDist = Math.sqrt((cx - oniPos.x) ** 2 + (cz - oniPos.z) ** 2);
+
+    candidates.push({
+      x: cx, z: cz, allyDist, oniDist, hiddenFromAll, coverScore, coverSize
+    });
   }
 
-  if (chosen) {
-    // Position on the far side of the collider relative to oni
-    const hideAngle = Math.atan2(chosen.x - oniPos.x, chosen.z - oniPos.z);
-    const ox = chosen.x + Math.sin(hideAngle) * 1.5;
-    const oz = chosen.z + Math.cos(hideAngle) * 1.5;
-    return new THREE.Vector3(
-      Math.max(-half, Math.min(half, ox)), 0,
-      Math.max(-half, Math.min(half, oz))
-    );
+  // Filter: minimum 3m walk to avoid instant arrival
+  let valid = candidates.filter(c => c.allyDist >= 3);
+  if (valid.length === 0) valid = candidates;
+
+  // Prioritize hidden spots (cover from ALL onis), then sort by score
+  const hidden = valid.filter(c => c.hiddenFromAll);
+
+  let pool;
+  if (hidden.length >= 2) {
+    // Plenty of hidden spots — use them exclusively
+    // Sort by: far from oni + big cover
+    hidden.sort((a, b) => (b.oniDist + b.coverSize * 3) - (a.oniDist + a.coverSize * 3));
+    pool = hidden;
+  } else {
+    // Fallback: sort all candidates, preferring covered ones heavily
+    valid.sort((a, b) => {
+      const aScore = (a.hiddenFromAll ? 50 : 0) + a.oniDist + a.coverSize * 3;
+      const bScore = (b.hiddenFromAll ? 50 : 0) + b.oniDist + b.coverSize * 3;
+      return bScore - aScore;
+    });
+    pool = valid;
+  }
+
+  // Pick from top candidates with slight randomness
+  const pickRange = ally.level === 'strong' ? 2 : (ally.level === 'normal' ? 3 : 3);
+  const pick = pool[Math.floor(Math.random() * Math.min(pickRange, pool.length))];
+  if (pick) {
+    return new THREE.Vector3(pick.x, 0, pick.z);
   }
   return null;
 }
