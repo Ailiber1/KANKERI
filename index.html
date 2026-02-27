@@ -3462,12 +3462,14 @@ function updateCamera(g, dt) {
   const maxDist = playerHead.distanceTo(camTarget);
 
   const raycaster = new THREE.Raycaster(playerHead, dir, 0, maxDist);
-  const hits = raycaster.intersectObjects(g.scene.children, true);
   let finalDist = maxDist;
-  for (const hit of hits) {
-    if (hit.object === fig.shadow || hit.object.type === 'Line' || hit.object.isMesh === false) continue;
-    if (hit.distance < finalDist && hit.distance > 0.5) {
-      finalDist = hit.distance - 0.3;
+  if (g.cameraMeshes && g.cameraMeshes.length > 0) {
+    const hits = raycaster.intersectObjects(g.cameraMeshes, false);
+    for (const hit of hits) {
+      if (hit.object === fig.shadow) continue;
+      if (hit.distance < finalDist && hit.distance > 0.5) {
+        finalDist = hit.distance - 0.3;
+      }
     }
   }
 
@@ -3579,22 +3581,12 @@ function updateOni(g, oni, dt) {
     const targetCenter = new THREE.Vector3(targetPos.x, targetPos.y + (targetIsCrouching ? 0.6 : 1.0), targetPos.z);
     const dir3d = targetCenter.clone().sub(oniEyePos).normalize();
     const ray = new THREE.Raycaster(oniEyePos, dir3d, 0, tDist);
-    const hits = ray.intersectObjects(g.scene.children, true);
-    for (const hit of hits) {
-      if (hit.object === g.ground) continue;
-      if (hit.object.material && hit.object.material.transparent && hit.object.material.opacity < 0.5) continue;
-      if (hit.object.material && hit.object.material.wireframe) continue;
-      if (hit.object.type === 'Line' || hit.object.type === 'Sprite') continue;
-      let isCharacter = false;
-      hit.object.traverseAncestors(p => {
-        if (p === g.playerFig.group) isCharacter = true;
-        for (const o of g.onis) { if (p === o.fig.group) isCharacter = true; }
-        if (g.cpuAllies) {
-          for (const a of g.cpuAllies) { if (p === a.fig.group) isCharacter = true; }
-        }
-      });
-      if (isCharacter) continue;
-      if (hit.distance < tDist - 0.5) return false;
+    if (g.cameraMeshes && g.cameraMeshes.length > 0) {
+      const hits = ray.intersectObjects(g.cameraMeshes, false);
+      for (const hit of hits) {
+        if (hit.object === g.ground) continue;
+        if (hit.distance < tDist - 0.5) return false;
+      }
     }
     return true;
   }
@@ -5057,6 +5049,12 @@ function startGame(stageNum, mode) {
   if (retryBtn) retryBtn.onclick = () => { cleanupGame(); startGame(stageNum, mode); };
   const titleBtn = document.getElementById('btn-to-title');
   if (titleBtn) titleBtn.onclick = () => cleanupGame();
+
+  // Cache meshes for camera raycasting (excludes lights, sprites, line helpers)
+  G.cameraMeshes = [];
+  G.scene.traverse(obj => {
+    if (obj.isMesh && obj.geometry && !obj.material?.transparent) G.cameraMeshes.push(obj);
+  });
 
   // Start loop
   _lastGameTime = 0;
