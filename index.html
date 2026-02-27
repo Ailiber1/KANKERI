@@ -1164,47 +1164,130 @@ const SoundManager = {
 
       switch (type) {
         case 'kick': {
-          // 金属的な缶を蹴る音
-          const osc1 = ctx.createOscillator();
-          const osc2 = ctx.createOscillator();
-          const gain1 = ctx.createGain();
-          const gain2 = ctx.createGain();
-          osc1.connect(gain1); gain1.connect(ctx.destination);
-          osc2.connect(gain2); gain2.connect(ctx.destination);
-          osc1.type = 'square'; osc1.frequency.setValueAtTime(800, now);
-          osc1.frequency.exponentialRampToValueAtTime(200, now + 0.15);
-          gain1.gain.setValueAtTime(0.5, now);
-          gain1.gain.linearRampToValueAtTime(0, now + 0.15);
-          osc2.type = 'triangle'; osc2.frequency.setValueAtTime(2400, now);
-          osc2.frequency.exponentialRampToValueAtTime(600, now + 0.1);
-          gain2.gain.setValueAtTime(0.3, now);
-          gain2.gain.linearRampToValueAtTime(0, now + 0.1);
-          osc1.start(now); osc1.stop(now + 0.15);
-          osc2.start(now); osc2.stop(now + 0.1);
+          // リアル空き缶キック音（衝撃 + 金属共鳴 + カラン音）
+          const master = ctx.createGain();
+          master.gain.setValueAtTime(0.6, now);
+          master.connect(ctx.destination);
+
+          // 1. 衝撃ノイズ（足が缶に当たる「パコッ」）
+          const noiseLen = ctx.sampleRate * 0.04;
+          const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+          const noiseData = noiseBuf.getChannelData(0);
+          for (let i = 0; i < noiseLen; i++) noiseData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (noiseLen * 0.15));
+          const noiseSrc = ctx.createBufferSource();
+          noiseSrc.buffer = noiseBuf;
+          const noiseBP = ctx.createBiquadFilter();
+          noiseBP.type = 'bandpass'; noiseBP.frequency.value = 3500; noiseBP.Q.value = 1.2;
+          const noiseGain = ctx.createGain();
+          noiseGain.gain.setValueAtTime(0.8, now);
+          noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+          noiseSrc.connect(noiseBP); noiseBP.connect(noiseGain); noiseGain.connect(master);
+          noiseSrc.start(now); noiseSrc.stop(now + 0.05);
+
+          // 2. 缶の空洞共鳴（「カーン」高音の金属リング）
+          const freqs = [1800, 2900, 4200];
+          const vols = [0.25, 0.15, 0.08];
+          const decays = [0.25, 0.18, 0.12];
+          for (let i = 0; i < freqs.length; i++) {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freqs[i], now);
+            osc.frequency.exponentialRampToValueAtTime(freqs[i] * 0.85, now + decays[i]);
+            g.gain.setValueAtTime(vols[i], now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + decays[i]);
+            osc.connect(g); g.connect(master);
+            osc.start(now); osc.stop(now + decays[i]);
+          }
+
+          // 3. 低音の缶ボディ振動（「ボコッ」）
+          const body = ctx.createOscillator();
+          const bodyG = ctx.createGain();
+          body.type = 'sine';
+          body.frequency.setValueAtTime(280, now);
+          body.frequency.exponentialRampToValueAtTime(120, now + 0.1);
+          bodyG.gain.setValueAtTime(0.3, now);
+          bodyG.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          body.connect(bodyG); bodyG.connect(master);
+          body.start(now); body.stop(now + 0.1);
+
+          // 4. 転がり音（「カラカラ」短い繰り返し）
+          for (let j = 0; j < 4; j++) {
+            const t = now + 0.08 + j * 0.06;
+            const click = ctx.createOscillator();
+            const cg = ctx.createGain();
+            click.type = 'sine';
+            click.frequency.setValueAtTime(2200 + Math.random() * 800, t);
+            click.frequency.exponentialRampToValueAtTime(1200, t + 0.02);
+            cg.gain.setValueAtTime(0.12 * (1 - j * 0.2), t);
+            cg.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+            click.connect(cg); cg.connect(master);
+            click.start(t); click.stop(t + 0.03);
+          }
           break;
         }
         case 'can_land': {
-          // 缶が着地するカランという音
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.type = 'triangle'; osc.frequency.setValueAtTime(1200, now);
-          osc.frequency.exponentialRampToValueAtTime(400, now + 0.2);
-          gain.gain.setValueAtTime(0.3, now);
-          gain.gain.linearRampToValueAtTime(0, now + 0.25);
-          osc.start(now); osc.stop(now + 0.25);
+          // 缶着地音（「ガシャン」+ カラカラ転がり）
+          const landMaster = ctx.createGain();
+          landMaster.gain.setValueAtTime(0.5, now);
+          landMaster.connect(ctx.destination);
+          // 衝撃
+          const landNLen = ctx.sampleRate * 0.03;
+          const landNBuf = ctx.createBuffer(1, landNLen, ctx.sampleRate);
+          const landND = landNBuf.getChannelData(0);
+          for (let i = 0; i < landNLen; i++) landND[i] = (Math.random() * 2 - 1) * Math.exp(-i / (landNLen * 0.2));
+          const landNS = ctx.createBufferSource(); landNS.buffer = landNBuf;
+          const landBP = ctx.createBiquadFilter();
+          landBP.type = 'bandpass'; landBP.frequency.value = 2800; landBP.Q.value = 1.0;
+          const landNG = ctx.createGain();
+          landNG.gain.setValueAtTime(0.5, now);
+          landNG.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
+          landNS.connect(landBP); landBP.connect(landNG); landNG.connect(landMaster);
+          landNS.start(now); landNS.stop(now + 0.04);
+          // 金属リング
+          const landO = ctx.createOscillator();
+          const landOG = ctx.createGain();
+          landO.type = 'sine'; landO.frequency.setValueAtTime(2100, now);
+          landO.frequency.exponentialRampToValueAtTime(1400, now + 0.2);
+          landOG.gain.setValueAtTime(0.2, now);
+          landOG.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          landO.connect(landOG); landOG.connect(landMaster);
+          landO.start(now); landO.stop(now + 0.2);
+          // 転がり
+          for (let j = 0; j < 5; j++) {
+            const lt = now + 0.05 + j * 0.05;
+            const lc = ctx.createOscillator();
+            const lcg = ctx.createGain();
+            lc.type = 'sine';
+            lc.frequency.setValueAtTime(1800 + Math.random() * 600, lt);
+            lcg.gain.setValueAtTime(0.08 * (1 - j * 0.15), lt);
+            lcg.gain.exponentialRampToValueAtTime(0.001, lt + 0.025);
+            lc.connect(lcg); lcg.connect(landMaster);
+            lc.start(lt); lc.stop(lt + 0.025);
+          }
           break;
         }
         case 'can_bounce': {
-          // 缶がバウンドする軽い音
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.type = 'sine'; osc.frequency.setValueAtTime(900, now);
-          osc.frequency.exponentialRampToValueAtTime(300, now + 0.08);
-          gain.gain.setValueAtTime(0.15, now);
-          gain.gain.linearRampToValueAtTime(0, now + 0.1);
-          osc.start(now); osc.stop(now + 0.1);
+          // 缶バウンド音（「カン！」軽い金属音）
+          const bMaster = ctx.createGain();
+          bMaster.gain.setValueAtTime(0.3, now);
+          bMaster.connect(ctx.destination);
+          const bOsc = ctx.createOscillator();
+          const bG = ctx.createGain();
+          bOsc.type = 'sine'; bOsc.frequency.setValueAtTime(2400, now);
+          bOsc.frequency.exponentialRampToValueAtTime(1600, now + 0.08);
+          bG.gain.setValueAtTime(0.25, now);
+          bG.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          bOsc.connect(bG); bG.connect(bMaster);
+          bOsc.start(now); bOsc.stop(now + 0.1);
+          const bBody = ctx.createOscillator();
+          const bBG = ctx.createGain();
+          bBody.type = 'sine'; bBody.frequency.setValueAtTime(350, now);
+          bBody.frequency.exponentialRampToValueAtTime(150, now + 0.06);
+          bBG.gain.setValueAtTime(0.15, now);
+          bBG.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+          bBody.connect(bBG); bBG.connect(bMaster);
+          bBody.start(now); bBody.stop(now + 0.06);
           break;
         }
         case 'footstep': {
