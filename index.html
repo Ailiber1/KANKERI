@@ -1355,15 +1355,64 @@ const SoundManager = {
           break;
         }
         case 'hit': {
-          // 物を叩く音
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.type = 'square'; osc.frequency.setValueAtTime(300, now);
-          osc.frequency.exponentialRampToValueAtTime(100, now + 0.12);
-          gain.gain.setValueAtTime(0.4, now);
-          gain.gain.linearRampToValueAtTime(0, now + 0.15);
-          osc.start(now); osc.stop(now + 0.15);
+          // 物を叩く鈍い音（木・壁・茂みなど）
+          const n = ctx.createBufferSource();
+          const buf = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.03));
+          n.buffer = buf;
+          const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+          const gn = ctx.createGain(); gn.gain.setValueAtTime(0.5, now); gn.gain.linearRampToValueAtTime(0, now + 0.12);
+          n.connect(lp); lp.connect(gn); gn.connect(ctx.destination);
+          n.start(now); n.stop(now + 0.12);
+          // Low thump
+          const o = ctx.createOscillator(); const g2 = ctx.createGain();
+          o.type = 'sine'; o.frequency.setValueAtTime(120, now); o.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+          g2.gain.setValueAtTime(0.4, now); g2.gain.linearRampToValueAtTime(0, now + 0.1);
+          o.connect(g2); g2.connect(ctx.destination); o.start(now); o.stop(now + 0.1);
+          break;
+        }
+        case 'hit_metal': {
+          // 金属を蹴る音（フェンス・ジャングルジム・ブランコ等）
+          const freqs = [1200, 2400, 3600];
+          for (const f of freqs) {
+            const o = ctx.createOscillator(); const g = ctx.createGain();
+            o.type = 'sine'; o.frequency.value = f + (Math.random() - 0.5) * 100;
+            g.gain.setValueAtTime(0.15, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+            o.connect(g); g.connect(ctx.destination); o.start(now); o.stop(now + 0.3);
+          }
+          // Impact click
+          const n = ctx.createBufferSource();
+          const buf = ctx.createBuffer(1, ctx.sampleRate * 0.02, ctx.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.005));
+          n.buffer = buf;
+          const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2000;
+          const gn = ctx.createGain(); gn.gain.setValueAtTime(0.4, now); gn.gain.linearRampToValueAtTime(0, now + 0.02);
+          n.connect(hp); hp.connect(gn); gn.connect(ctx.destination); n.start(now); n.stop(now + 0.03);
+          break;
+        }
+        case 'hit_stone': {
+          // 石を蹴る音（カコッ＋転がりカラカラ）
+          // Impact
+          const o1 = ctx.createOscillator(); const g1 = ctx.createGain();
+          o1.type = 'triangle'; o1.frequency.setValueAtTime(800, now); o1.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+          g1.gain.setValueAtTime(0.5, now); g1.gain.linearRampToValueAtTime(0, now + 0.06);
+          o1.connect(g1); g1.connect(ctx.destination); o1.start(now); o1.stop(now + 0.06);
+          // Stone click
+          const o2 = ctx.createOscillator(); const g2 = ctx.createGain();
+          o2.type = 'square'; o2.frequency.setValueAtTime(1500, now); o2.frequency.exponentialRampToValueAtTime(600, now + 0.03);
+          g2.gain.setValueAtTime(0.3, now); g2.gain.linearRampToValueAtTime(0, now + 0.04);
+          o2.connect(g2); g2.connect(ctx.destination); o2.start(now); o2.stop(now + 0.04);
+          // Rolling clicks (カラカラカラ)
+          for (let i = 0; i < 6; i++) {
+            const t = now + 0.08 + i * 0.07;
+            const o = ctx.createOscillator(); const g = ctx.createGain();
+            o.type = 'triangle'; o.frequency.value = 600 + Math.random() * 800;
+            const vol = 0.2 * Math.exp(-i * 0.4);
+            g.gain.setValueAtTime(vol, t); g.gain.linearRampToValueAtTime(0, t + 0.03);
+            o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.03);
+          }
           break;
         }
         case 'heartbeat': {
@@ -2127,12 +2176,21 @@ const STAGE_CONFIGS = {
     ],
     interactables: [
       { type:'swing_chain', x:-5, z:-8, radius:25, label:'ブランコの鎖', sound:'metal' },
-      { type:'trashcan', x:14, z:0, radius:20, label:'ゴミ箱', sound:'thud' },
+      { type:'trashcan', x:14, z:0, radius:20, label:'ゴミ箱', sound:'metal' },
       { type:'jungle_gym', x:6, z:-5, radius:20, label:'ジャングルジム', sound:'metal' },
       { type:'bench', x:12, z:8, radius:15, label:'ベンチ', sound:'thud' },
       { type:'shed_wall', x:-16, z:-12, radius:20, label:'小屋の壁', sound:'thud' },
-      { type:'rock', x:12, z:-4, radius:15, label:'大きな岩', sound:'thud' },
-      { type:'streetlight', x:-3, z:-14, radius:20, label:'街灯の柱', sound:'metal' }
+      { type:'rock', x:12, z:-4, radius:15, label:'大きな岩', sound:'stone' },
+      { type:'rock', x:-6, z:-14, radius:15, label:'岩', sound:'stone' },
+      { type:'streetlight', x:-3, z:-14, radius:20, label:'街灯の柱', sound:'metal' },
+      { type:'hedge', x:6, z:6, radius:15, label:'生垣', sound:'thud' },
+      { type:'hedge', x:-10, z:6, radius:15, label:'生垣', sound:'thud' },
+      { type:'hedge', x:14, z:-10, radius:15, label:'生垣', sound:'thud' },
+      { type:'bush', x:-7, z:3, radius:12, label:'茂み', sound:'thud' },
+      { type:'bush', x:8, z:2, radius:12, label:'茂み', sound:'thud' },
+      { type:'slide', x:-10, z:-6, radius:18, label:'滑り台', sound:'metal' },
+      { type:'fence', x:0, z:-20, radius:20, label:'フェンス', sound:'metal' },
+      { type:'fence', x:0, z:20, radius:20, label:'フェンス', sound:'metal' }
     ]
   }
 };
@@ -3593,7 +3651,7 @@ function updatePlayer(g, dt) {
 
   // Check interactable proximity
   ctrl.canHit = null;
-  if (!ctrl.canKick) {
+  if (!ctrl.canKick && g.config.interactables) {
     for (const inter of g.config.interactables) {
       const dx = ctrl.position.x - inter.x;
       const dz = ctrl.position.z - inter.z;
@@ -4859,10 +4917,20 @@ function performHit(g, interactable) {
   g._hitCooldown = true;
   setTimeout(() => { g._hitCooldown = false; }, 3000);
   showNotification('💥 ' + interactable.label + ' を蹴った！');
-  SoundManager.playGameSE('hit');
+
+  // Play sound based on material type
+  const snd = interactable.sound || 'thud';
+  if (snd === 'metal') SoundManager.playGameSE('hit_metal');
+  else if (snd === 'stone') SoundManager.playGameSE('hit_stone');
+  else SoundManager.playGameSE('hit');
 
   // Kick animation (swing leg forward)
   doKickLegAnim(g.playerFig);
+
+  // Stone/rock rolling visual effect
+  if (snd === 'stone' || interactable.type === 'rock') {
+    spawnRollingPebbles(g, interactable.x, interactable.z, g.player.rotation || g.player.cameraYaw);
+  }
 
   // Alert nearest oni
   let nearest = null, nearestDist = Infinity;
@@ -4879,6 +4947,62 @@ function performHit(g, interactable) {
     nearest.state = 'distraction';
     nearest.distractionPos = new THREE.Vector3(interactable.x, 0, interactable.z);
     nearest.stateTimer = 0;
+  }
+}
+
+function spawnRollingPebbles(g, ox, oz, kickYaw) {
+  if (!g.rollingPebbles) g.rollingPebbles = [];
+  const count = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.SphereGeometry(0.06 + Math.random() * 0.06, 5, 4);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x888877, roughness: 0.9 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    const spread = (Math.random() - 0.5) * 1.0;
+    mesh.position.set(ox, 0.1, oz);
+    g.scene.add(mesh);
+    const speed = 2 + Math.random() * 3;
+    const angle = kickYaw + spread;
+    g.rollingPebbles.push({
+      mesh, age: 0, lifetime: 1.0 + Math.random() * 0.8,
+      vx: Math.sin(angle) * speed,
+      vy: 0.5 + Math.random() * 1.5,
+      vz: Math.cos(angle) * speed,
+      rotSpeed: (Math.random() - 0.5) * 15
+    });
+  }
+}
+
+function updateRollingPebbles(g, dt) {
+  if (!g.rollingPebbles) return;
+  for (let i = g.rollingPebbles.length - 1; i >= 0; i--) {
+    const p = g.rollingPebbles[i];
+    p.age += dt;
+    if (p.age > p.lifetime) {
+      g.scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+      p.mesh.material.dispose();
+      g.rollingPebbles.splice(i, 1);
+      continue;
+    }
+    // Physics
+    p.vy -= 9.8 * dt;
+    p.mesh.position.x += p.vx * dt;
+    p.mesh.position.y += p.vy * dt;
+    p.mesh.position.z += p.vz * dt;
+    // Bounce on ground
+    if (p.mesh.position.y < 0.05) {
+      p.mesh.position.y = 0.05;
+      p.vy = Math.abs(p.vy) * 0.3;
+      p.vx *= 0.7;
+      p.vz *= 0.7;
+    }
+    // Rolling rotation
+    p.mesh.rotation.x += p.rotSpeed * dt;
+    p.mesh.rotation.z += p.rotSpeed * 0.7 * dt;
+    // Friction
+    p.vx *= (1 - 2.0 * dt);
+    p.vz *= (1 - 2.0 * dt);
   }
 }
 
@@ -5289,6 +5413,7 @@ function gameLoop(timestamp) {
     ['updateCanEffects', () => updateCanEffects(G, dt)],
     ['updateSwings', () => updateSwings(G, dt)],
     ['updateDayNight', () => updateDayNight(G, dt)],
+    ['updateRollingPebbles', () => updateRollingPebbles(G, dt)],
     ['updateGamePhases', () => updateGamePhases(G, dt)],
     ['updateHUD', () => updateHUD(G)]
   ];
