@@ -2396,27 +2396,41 @@ function buildParkObjects(g) {
   createBench(12, 8, 0);
   createBench(-14, 4, Math.PI/4);
 
-  // --- Trees (3) ---
+  // --- Trees (5 — thicker trunks for hiding) ---
   function createTree(px, pz, scale) {
     const s = scale || 1;
     const tree = new THREE.Group();
     tree.position.set(px, 0, pz);
-    const trunkGeo = addGeo(new THREE.CylinderGeometry(0.15*s, 0.2*s, 3*s, 8));
-    const trunk = new THREE.Mesh(trunkGeo, objMat(0x654321));
-    trunk.position.y = 1.5*s;
+    // Thick trunk (wide enough to hide behind)
+    const trunkGeo = addGeo(new THREE.CylinderGeometry(0.25*s, 0.35*s, 3.5*s, 10));
+    const trunkMat = objMat(0x654321);
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = 1.75*s;
     trunk.castShadow = true;
     tree.add(trunk);
-    const canopyGeo = addGeo(new THREE.SphereGeometry(1.8*s, 12, 10));
-    const canopy = new THREE.Mesh(canopyGeo, objMat(0x2d7a2d, 0x1a4a1a));
-    canopy.position.y = 3.5*s;
+    // Main canopy (large, low-hanging)
+    const canopyGeo = addGeo(new THREE.SphereGeometry(2.2*s, 12, 10));
+    const canopyMat = objMat(0x2d7a2d, 0x1a4a1a);
+    const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+    canopy.position.y = 3.8*s;
+    canopy.scale.set(1.0, 0.8, 1.0);
     canopy.castShadow = true;
     tree.add(canopy);
+    // Low foliage (helps block line of sight at ground level)
+    const lowGeo = addGeo(new THREE.SphereGeometry(1.0*s, 8, 6));
+    const low = new THREE.Mesh(lowGeo, canopyMat);
+    low.position.y = 1.8*s;
+    low.scale.set(1.3, 0.6, 1.3);
+    low.castShadow = true;
+    tree.add(low);
     g.scene.add(tree);
-    g.colliders.push({ type: 'cylinder', x: px, z: pz, r: 0.4*s, h: 4*s });
+    g.colliders.push({ type: 'cylinder', x: px, z: pz, r: 0.8*s, h: 4*s });
   }
   createTree(-15, -3, 1.2);
   createTree(10, -12, 1.0);
   createTree(-8, 14, 1.1);
+  createTree(16, 12, 1.0);   // Additional tree
+  createTree(-3, -16, 0.9);  // Additional tree
 
   // --- Trash Can ---
   const trashGeo = addGeo(new THREE.CylinderGeometry(0.25, 0.3, 0.8, 12));
@@ -2461,6 +2475,133 @@ function buildParkObjects(g) {
   createStreetLight(-3, -14);
   createStreetLight(10, 5);
   createStreetLight(-12, 10);
+
+  // --- Bushes (main hiding spots — dense, opaque) ---
+  function createBush(px, pz, scaleX, scaleZ) {
+    const sx = scaleX || 1, sz = scaleZ || 1;
+    const bush = new THREE.Group();
+    bush.position.set(px, 0, pz);
+    const bushMat = objMat(0x1a5c1a, 0x0a3a0a);
+    // Main body (large ellipsoid)
+    const mainGeo = addGeo(new THREE.SphereGeometry(1.0, 10, 8));
+    const main = new THREE.Mesh(mainGeo, bushMat);
+    main.scale.set(1.2 * sx, 0.8, 1.2 * sz);
+    main.position.y = 0.7;
+    main.castShadow = true;
+    main.receiveShadow = true;
+    bush.add(main);
+    // Sub-spheres for organic shape
+    const subGeo = addGeo(new THREE.SphereGeometry(0.6, 8, 6));
+    for (let i = 0; i < 3; i++) {
+      const sub = new THREE.Mesh(subGeo, bushMat);
+      const a = (i / 3) * Math.PI * 2 + Math.random() * 0.5;
+      sub.position.set(Math.cos(a) * 0.5 * sx, 0.4 + Math.random() * 0.3, Math.sin(a) * 0.5 * sz);
+      sub.scale.setScalar(0.7 + Math.random() * 0.4);
+      sub.castShadow = true;
+      bush.add(sub);
+    }
+    g.scene.add(bush);
+    g.colliders.push({ type: 'box', x: px, z: pz, hw: 1.2 * sx, hd: 1.2 * sz, h: 1.5 });
+  }
+  // Scattered bushes around the park
+  createBush(-7, 3, 1.3, 1.0);     // Near sandbox
+  createBush(8, 2, 1.0, 1.2);      // Right side
+  createBush(-13, -8, 1.5, 1.0);   // Near slide area
+  createBush(4, 12, 1.2, 1.3);     // Back area
+  createBush(-4, 15, 1.0, 1.5);    // Far back
+  createBush(15, -6, 1.1, 1.0);    // Right far
+  createBush(-16, 8, 1.3, 1.1);    // Left side
+  createBush(0, -13, 1.4, 1.0);    // Front center
+
+  // --- Hedge rows (linear barriers for cover) ---
+  function createHedge(px, pz, length, ry) {
+    const hedge = new THREE.Group();
+    hedge.position.set(px, 0, pz);
+    hedge.rotation.y = ry || 0;
+    const hedgeMat = objMat(0x1d6b1d, 0x0d3d0d);
+    const bodyGeo = addGeo(new THREE.BoxGeometry(length, 1.2, 0.8));
+    const body = new THREE.Mesh(bodyGeo, hedgeMat);
+    body.position.y = 0.6;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    hedge.add(body);
+    // Rounded top
+    const topGeo = addGeo(new THREE.CylinderGeometry(0.4, 0.4, length, 8));
+    const top = new THREE.Mesh(topGeo, hedgeMat);
+    top.rotation.z = Math.PI / 2;
+    top.position.y = 1.2;
+    top.castShadow = true;
+    hedge.add(top);
+    g.scene.add(hedge);
+    // Collider (rotated box approximation)
+    const cos = Math.cos(ry || 0), sin = Math.sin(ry || 0);
+    g.colliders.push({ type: 'box', x: px, z: pz, hw: Math.abs(cos * length/2) + Math.abs(sin * 0.5), hd: Math.abs(sin * length/2) + Math.abs(cos * 0.5), h: 1.5 });
+  }
+  createHedge(6, 6, 5, 0);              // East side, horizontal
+  createHedge(-10, 6, 4, Math.PI/2);    // West side, vertical
+  createHedge(14, -10, 3.5, Math.PI/4); // Far right, diagonal
+
+  // --- Toilet / Equipment Shed (solid building) ---
+  const shedGroup = new THREE.Group();
+  shedGroup.position.set(-16, 0, -12);
+  const wallMat = objMat(0x888888);
+  // Walls
+  const shedWallGeo = addGeo(new THREE.BoxGeometry(3, 2.5, 3));
+  const shedWall = new THREE.Mesh(shedWallGeo, wallMat);
+  shedWall.position.y = 1.25;
+  shedWall.castShadow = true;
+  shedWall.receiveShadow = true;
+  shedGroup.add(shedWall);
+  // Roof
+  const roofGeo = addGeo(new THREE.BoxGeometry(3.4, 0.15, 3.4));
+  const roofMat = objMat(0x555555);
+  const roof = new THREE.Mesh(roofGeo, roofMat);
+  roof.position.y = 2.6;
+  roof.castShadow = true;
+  shedGroup.add(roof);
+  // Door (dark rectangle)
+  const doorGeo = addGeo(new THREE.BoxGeometry(0.8, 1.8, 0.05));
+  const doorMat = objMat(0x333333);
+  const door = new THREE.Mesh(doorGeo, doorMat);
+  door.position.set(0, 0.9, 1.53);
+  shedGroup.add(door);
+  // Sign
+  const signGeo = addGeo(new THREE.BoxGeometry(0.6, 0.3, 0.02));
+  const signMat = new THREE.MeshStandardMaterial({ color: 0x2244aa, emissive: 0x2244aa, emissiveIntensity: 0.2, roughness: 0.5 });
+  g.materials.push(signMat);
+  const sign = new THREE.Mesh(signGeo, signMat);
+  sign.position.set(0, 2.1, 1.53);
+  shedGroup.add(sign);
+  g.scene.add(shedGroup);
+  g.colliders.push({ type: 'box', x: -16, z: -12, hw: 1.8, hd: 1.8, h: 2.5 });
+
+  // --- Large Rocks (2-3 clusters) ---
+  function createRock(px, pz, scale) {
+    const s = scale || 1;
+    const rock = new THREE.Group();
+    rock.position.set(px, 0, pz);
+    const rockMat = objMat(0x666655);
+    // Main rock
+    const mainGeo = addGeo(new THREE.SphereGeometry(0.8 * s, 8, 6));
+    const main = new THREE.Mesh(mainGeo, rockMat);
+    main.scale.set(1.2, 0.7, 1.0);
+    main.position.y = 0.5 * s;
+    main.castShadow = true;
+    rock.add(main);
+    // Sub rocks
+    for (let i = 0; i < 2; i++) {
+      const subGeo = addGeo(new THREE.SphereGeometry(0.4 * s, 6, 5));
+      const sub = new THREE.Mesh(subGeo, rockMat);
+      sub.position.set((i === 0 ? -0.6 : 0.7) * s, 0.3 * s, (i === 0 ? 0.3 : -0.2) * s);
+      sub.scale.set(1.1, 0.6, 0.9);
+      sub.castShadow = true;
+      rock.add(sub);
+    }
+    g.scene.add(rock);
+    g.colliders.push({ type: 'cylinder', x: px, z: pz, r: 1.0 * s, h: 1.0 * s });
+  }
+  createRock(12, -4, 1.2);   // Near jungle gym
+  createRock(-6, -14, 1.0);  // Front left
 
   // --- Small details (pebbles, leaves) via InstancedMesh ---
   const pebbleGeo = addGeo(new THREE.SphereGeometry(0.05, 4, 4));
@@ -3161,15 +3302,16 @@ function updatePlayer(g, dt) {
     }
   }
 
-  // Space key action
-  if (keys['Space'] && !ctrl._spacePrev) {
-    if (ctrl.canKick && g.gamePhase === 'seek') {
+  // F key action (interact: kick can / hit objects)
+  const fDown = keys['KeyF'] || keys['Space'];
+  if (fDown && !ctrl._fPrev) {
+    if (ctrl.canKick && (g.gamePhase === 'seek' || g.gamePhase === 'hide')) {
       startKickGauge(g);
-    } else if (ctrl.canHit && g.gamePhase === 'seek' && !g._hitCooldown) {
+    } else if (ctrl.canHit && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g._hitCooldown) {
       performHit(g, ctrl.canHit);
     }
   }
-  ctrl._spacePrev = keys['Space'];
+  ctrl._fPrev = fDown;
 
   // Pause
   if (keys['Escape'] && !ctrl._escPrev && g.gamePhase !== 'result') {
@@ -3593,14 +3735,15 @@ function updateKickGauge(g, dt) {
   if (fill) fill.style.width = g.kickGaugeValue + '%';
   if (marker) marker.style.left = g.kickGaugeValue + '%';
 
-  // Confirm kick on Space
-  if (g.player.keys['Space'] && !g._kickSpacePrev) {
+  // Confirm kick on F / Space
+  const kickConfirm = g.player.keys['KeyF'] || g.player.keys['Space'];
+  if (kickConfirm && !g._kickFPrev) {
     performCanKick(g, g.kickGaugeValue);
     g.kickGaugeActive = false;
     const wrap = document.getElementById('kick-gauge-wrap');
     if (wrap) wrap.style.display = 'none';
   }
-  g._kickSpacePrev = g.player.keys['Space'];
+  g._kickFPrev = kickConfirm;
 }
 
 function performCanKick(g, power) {
@@ -3962,11 +4105,11 @@ function updateHUD(g) {
   // Action prompt
   const actionEl = document.getElementById('hud-action-prompt');
   if (actionEl) {
-    if (g.player.canKick && g.gamePhase === 'seek' && !g.kickGaugeActive) {
-      actionEl.textContent = 'Space: 缶を蹴る！';
+    if (g.player.canKick && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
+      actionEl.textContent = 'F: 缶を蹴る！';
       actionEl.style.display = 'block';
-    } else if (g.player.canHit && g.gamePhase === 'seek' && !g._hitCooldown) {
-      actionEl.textContent = 'Space: ' + g.player.canHit.label;
+    } else if (g.player.canHit && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g._hitCooldown) {
+      actionEl.textContent = 'F: ' + g.player.canHit.label;
       actionEl.style.display = 'block';
     } else {
       actionEl.style.display = 'none';
