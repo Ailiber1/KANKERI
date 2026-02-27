@@ -2528,79 +2528,185 @@ function createStickFigure(g, color, isOni) {
 
   const fig = new THREE.Group();
 
-  // Root (at feet level) — body center at torso midpoint
-  // Total: legs 0.9m + torso 0.5m + head 0.3m = 1.7m
-  const body = new THREE.Group();
-  body.position.y = 1.15;
-  fig.add(body);
+  // --- SIZE PARAMETERS (child vs adult) ---
+  const headR   = isOni ? 0.17 : 0.20;  // Children have bigger head (cute)
+  const bodyTopR= isOni ? 0.13 : 0.15;
+  const bodyBotR= isOni ? 0.11 : 0.13;
+  const bodyH   = isOni ? 0.50 : 0.40;
+  const armR    = isOni ? 0.048 : 0.055;
+  const armL    = isOni ? 0.32 : 0.25;
+  const legR    = isOni ? 0.058 : 0.065;
+  const legL    = isOni ? 0.42 : 0.35;
+  const hipW    = isOni ? 0.07 : 0.08;
+  const shouldW = isOni ? bodyTopR + armR : bodyTopR + armR;
 
-  // Torso
-  const torsoGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8);
+  // --- COMPUTE POSITIONS ---
+  const legTotal = legL * 2;
+  const hipY = legTotal;           // Hip height from ground
+  const bodyCenter = hipY + bodyH / 2; // Body group Y (center of torso)
+  const shoulderY = bodyH / 2;     // Shoulder relative to body center
+  const headY = shoulderY + headR * 0.85; // Head relative to body center
+
+  const body = new THREE.Group();
+  body.position.y = bodyCenter;
+  fig.add(body);
+  fig._bodyCenter = bodyCenter; // Store for animation
+
+  // --- TORSO (rounded capsule: cylinder + sphere caps) ---
+  const torsoGeo = new THREE.CylinderGeometry(bodyTopR, bodyBotR, bodyH, 12);
   g.geometries.push(torsoGeo);
   const torso = new THREE.Mesh(torsoGeo, mat);
+  torso.castShadow = true;
   body.add(torso);
+  // Top cap
+  const topCapGeo = new THREE.SphereGeometry(bodyTopR, 12, 6, 0, Math.PI*2, 0, Math.PI/2);
+  g.geometries.push(topCapGeo);
+  const topCap = new THREE.Mesh(topCapGeo, mat);
+  topCap.position.y = bodyH / 2;
+  body.add(topCap);
+  // Bottom cap
+  const botCapGeo = new THREE.SphereGeometry(bodyBotR, 12, 6, 0, Math.PI*2, Math.PI/2, Math.PI/2);
+  g.geometries.push(botCapGeo);
+  const botCap = new THREE.Mesh(botCapGeo, mat);
+  botCap.position.y = -bodyH / 2;
+  body.add(botCap);
 
-  // Head
-  const headGeo = new THREE.SphereGeometry(0.15, 16, 16);
+  // --- HEAD ---
+  const headGeo = new THREE.SphereGeometry(headR, 16, 16);
   g.geometries.push(headGeo);
   const head = new THREE.Mesh(headGeo, mat);
-  head.position.y = 0.4;
+  head.position.y = headY;
   head.castShadow = true;
   body.add(head);
 
-  // Arms — §9.2: CylinderGeometry(0.03, 0.03, 0.4, 8) × 上腕+前腕
-  const armGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.4, 8);
-  g.geometries.push(armGeo);
+  // --- EYES ---
+  const eyeWhiteMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.2,
+    roughness: 0.3, metalness: 0.0
+  });
+  const pupilMat = new THREE.MeshStandardMaterial({
+    color: 0x111122, roughness: 0.5, metalness: 0.0
+  });
+  g.materials.push(eyeWhiteMat, pupilMat);
 
-  function createLimb(geo, parentY, offsetX) {
+  const eyeR = headR * 0.32;
+  const pupilR = eyeR * 0.5;
+  const eyeGeo = new THREE.SphereGeometry(eyeR, 10, 10);
+  const pupilGeo = new THREE.SphereGeometry(pupilR, 8, 8);
+  g.geometries.push(eyeGeo, pupilGeo);
+
+  const eyeSpread = headR * 0.38;
+  const eyeForward = headR * 0.88;
+  const eyeHeight = headR * 0.05;
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(eyeGeo, eyeWhiteMat);
+    eye.position.set(side * eyeSpread, eyeHeight, eyeForward);
+    head.add(eye);
+    const pupil = new THREE.Mesh(pupilGeo, pupilMat);
+    pupil.position.set(0, 0, eyeR * 0.55);
+    eye.add(pupil);
+  }
+
+  // --- ONI: angry eyebrows ---
+  if (isOni) {
+    const browGeo = new THREE.BoxGeometry(eyeR * 1.8, eyeR * 0.3, eyeR * 0.2);
+    const browMat = new THREE.MeshStandardMaterial({
+      color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5,
+      roughness: 0.5
+    });
+    g.geometries.push(browGeo);
+    g.materials.push(browMat);
+    for (const side of [-1, 1]) {
+      const brow = new THREE.Mesh(browGeo, browMat);
+      brow.position.set(side * eyeSpread, eyeHeight + eyeR * 1.1, eyeForward);
+      brow.rotation.z = side * 0.35; // Angry angle
+      head.add(brow);
+    }
+  }
+
+  // --- ARMS (rounded with joint spheres + hands) ---
+  const armGeo = new THREE.CylinderGeometry(armR, armR * 0.85, armL, 8);
+  g.geometries.push(armGeo);
+  const jointGeo = new THREE.SphereGeometry(armR * 1.1, 8, 8);
+  const handGeo = new THREE.SphereGeometry(armR * 1.3, 8, 8);
+  g.geometries.push(jointGeo, handGeo);
+
+  function createArm(sideX) {
     const pivot = new THREE.Object3D();
-    pivot.position.set(offsetX, parentY, 0);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.y = -0.2; // half of 0.4
-    mesh.castShadow = true;
-    pivot.add(mesh);
-    // Lower limb pivot (elbow)
+    pivot.position.set(sideX, shoulderY, 0);
+    // Shoulder joint
+    const joint = new THREE.Mesh(jointGeo, mat);
+    pivot.add(joint);
+    // Upper arm
+    const upper = new THREE.Mesh(armGeo, mat);
+    upper.position.y = -armL / 2;
+    upper.castShadow = true;
+    pivot.add(upper);
+    // Elbow pivot
     const lowerPivot = new THREE.Object3D();
-    lowerPivot.position.y = -0.4; // full length of upper arm
-    const lowerMesh = new THREE.Mesh(geo, mat);
-    lowerMesh.position.y = -0.2; // half of 0.4
-    lowerMesh.castShadow = true;
-    lowerPivot.add(lowerMesh);
+    lowerPivot.position.y = -armL;
+    const elbowJoint = new THREE.Mesh(jointGeo, mat);
+    lowerPivot.add(elbowJoint);
+    // Forearm
+    const forearm = new THREE.Mesh(armGeo, mat);
+    forearm.position.y = -armL / 2;
+    forearm.castShadow = true;
+    lowerPivot.add(forearm);
+    // Hand
+    const hand = new THREE.Mesh(handGeo, mat);
+    hand.position.y = -armL;
+    lowerPivot.add(hand);
     pivot.add(lowerPivot);
     body.add(pivot);
     return { pivot, lowerPivot };
   }
 
-  const leftArm = createLimb(armGeo, 0.25, -0.12);
-  const rightArm = createLimb(armGeo, 0.25, 0.12);
+  const leftArm = createArm(-shouldW);
+  const rightArm = createArm(shouldW);
 
-  // Legs — §9.2: CylinderGeometry(0.04, 0.04, 0.45, 8) × 太もも+すね
-  const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.45, 8);
+  // --- LEGS (rounded with joint spheres + feet) ---
+  const legGeo = new THREE.CylinderGeometry(legR, legR * 0.85, legL, 8);
   g.geometries.push(legGeo);
+  const legJointGeo = new THREE.SphereGeometry(legR * 1.05, 8, 8);
+  const footGeo = new THREE.SphereGeometry(legR * 1.4, 8, 6);
+  g.geometries.push(legJointGeo, footGeo);
 
-  function createLeg(offsetX) {
+  function createLeg(sideX) {
     const pivot = new THREE.Object3D();
-    pivot.position.set(offsetX, -0.25, 0);
-    const mesh = new THREE.Mesh(legGeo, mat);
-    mesh.position.y = -0.225; // half of 0.45
-    mesh.castShadow = true;
-    pivot.add(mesh);
+    pivot.position.set(sideX, -bodyH / 2, 0);
+    // Hip joint
+    const joint = new THREE.Mesh(legJointGeo, mat);
+    pivot.add(joint);
+    // Thigh
+    const thigh = new THREE.Mesh(legGeo, mat);
+    thigh.position.y = -legL / 2;
+    thigh.castShadow = true;
+    pivot.add(thigh);
+    // Knee pivot
     const kneePivot = new THREE.Object3D();
-    kneePivot.position.y = -0.45; // full length of thigh
-    const lowerLeg = new THREE.Mesh(legGeo, mat);
-    lowerLeg.position.y = -0.225; // half of 0.45
-    lowerLeg.castShadow = true;
-    kneePivot.add(lowerLeg);
+    kneePivot.position.y = -legL;
+    const kneeJoint = new THREE.Mesh(legJointGeo, mat);
+    kneePivot.add(kneeJoint);
+    // Shin
+    const shin = new THREE.Mesh(legGeo, mat);
+    shin.position.y = -legL / 2;
+    shin.castShadow = true;
+    kneePivot.add(shin);
+    // Foot (flat sphere)
+    const foot = new THREE.Mesh(footGeo, mat);
+    foot.position.y = -legL;
+    foot.scale.set(1.0, 0.5, 1.3);
+    kneePivot.add(foot);
     pivot.add(kneePivot);
     body.add(pivot);
     return { pivot, kneePivot };
   }
 
-  const leftLeg = createLeg(-0.06);
-  const rightLeg = createLeg(0.06);
+  const leftLeg = createLeg(-hipW);
+  const rightLeg = createLeg(hipW);
 
-  // Foot shadow
-  const shadowGeo = new THREE.PlaneGeometry(0.6, 0.6);
+  // --- FOOT SHADOW ---
+  const shadowGeo = new THREE.PlaneGeometry(0.7, 0.7);
   g.geometries.push(shadowGeo);
   const shadowCanvas = document.createElement('canvas');
   shadowCanvas.width = shadowCanvas.height = 64;
@@ -2624,7 +2730,7 @@ function createStickFigure(g, color, isOni) {
   return {
     group: fig, body, head, torso,
     leftArm, rightArm, leftLeg, rightLeg,
-    shadow, mat,
+    shadow, mat, isOni: !!isOni,
     animTime: 0, state: 'idle',
     crouching: false, peeking: 'none'
   };
@@ -2634,6 +2740,7 @@ function createStickFigure(g, color, isOni) {
 function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
   fig.animTime += dt;
   const t = fig.animTime;
+  const bc = fig.group._bodyCenter; // Stored body center Y
 
   if (isCrouching) {
     fig.state = 'crouch';
@@ -2645,8 +2752,8 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
     fig.state = 'idle';
   }
 
-  // Reset
-  fig.body.position.y = 1.15;
+  // Reset all joints
+  fig.body.position.y = bc;
   fig.body.rotation.x = 0;
   fig.leftArm.pivot.rotation.x = 0;
   fig.rightArm.pivot.rotation.x = 0;
@@ -2661,21 +2768,23 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
 
   switch (fig.state) {
     case 'idle':
-      fig.body.position.y = 1.15 + Math.sin(t * 2) * 0.02;
+      fig.body.position.y = bc + Math.sin(t * 2) * 0.02;
       fig.leftArm.pivot.rotation.x = 5 * deg;
       fig.rightArm.pivot.rotation.x = 5 * deg;
       break;
     case 'walk': {
-      const p = 0.8; // period
+      const p = 0.8;
       const phase = (t % p) / p * Math.PI * 2;
       const swing = 20 * deg;
       fig.leftLeg.pivot.rotation.x = Math.sin(phase) * swing;
       fig.rightLeg.pivot.rotation.x = Math.sin(phase + Math.PI) * swing;
       fig.leftArm.pivot.rotation.x = Math.sin(phase + Math.PI) * 15 * deg;
       fig.rightArm.pivot.rotation.x = Math.sin(phase) * 15 * deg;
-      // Knee bend on back swing
       fig.leftLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(phase)) * 20 * deg;
       fig.rightLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(phase + Math.PI)) * 20 * deg;
+      // Slight arm elbow bend
+      fig.leftArm.lowerPivot.rotation.x = 10 * deg;
+      fig.rightArm.lowerPivot.rotation.x = 10 * deg;
       break;
     }
     case 'run': {
@@ -2688,12 +2797,14 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
       fig.rightArm.pivot.rotation.x = Math.sin(phase) * 30 * deg;
       fig.leftLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(phase)) * 35 * deg;
       fig.rightLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(phase + Math.PI)) * 35 * deg;
-      // Body lean forward
+      // Arm elbows bent while running
+      fig.leftArm.lowerPivot.rotation.x = 25 * deg;
+      fig.rightArm.lowerPivot.rotation.x = 25 * deg;
       fig.body.rotation.x = 10 * deg;
       break;
     }
     case 'crouch': {
-      fig.body.position.y = 0.75; // 1.15 - 0.40 = 0.75
+      fig.body.position.y = bc - 0.4;
       fig.leftLeg.pivot.rotation.x = -45 * deg;
       fig.rightLeg.pivot.rotation.x = -45 * deg;
       fig.leftLeg.kneePivot.rotation.x = 90 * deg;
