@@ -120,11 +120,15 @@ html, body {
 }
 .glitch-active::before {
   color: var(--neon-cyan);
+  -webkit-text-fill-color: var(--neon-cyan);
+  background: none;
   animation: glitch2 0.12s linear infinite;
   opacity: 0.7;
 }
 .glitch-active::after {
   color: var(--neon-yellow);
+  -webkit-text-fill-color: var(--neon-yellow);
+  background: none;
   animation: glitch1 0.08s linear infinite reverse;
   opacity: 0.5;
 }
