@@ -921,54 +921,31 @@ const SoundManager = {
     return this.audioCtx;
   },
 
-  playSE(name) {
+  playSE(type) {
     if (!this.seEnabled) return;
-    const ctx = this.getCtx();
-    if (!ctx) return;
-    const se = SE_DEFS[name];
-    if (!se) return;
-    se(ctx);
-  }
-};
+    try {
+      const ctx = this.getCtx();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const now = ctx.currentTime;
 
-const SE_DEFS = {
-  hover: function(ctx) {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 1200;
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.03);
-  },
+      const conf = {
+        hover:  { f: 1400, d: 0.06, t: 'sine',     g: 0.35, sweep: 1800 },
+        click:  { f: 600,  d: 0.10, t: 'sine',     g: 0.40, sweep: 1200 },
+        error:  { f: 400,  d: 0.20, t: 'sawtooth', g: 0.35, sweep: 150 }
+      }[type] || { f: 800, d: 0.1, t: 'sine', g: 0.35 };
 
-  click: function(ctx) {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.value = 800;
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.05);
-  },
-
-  error: function(ctx) {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.value = 300;
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(conf.g, now);
+      osc.type = conf.t;
+      osc.frequency.setValueAtTime(conf.f, now);
+      if (conf.sweep) osc.frequency.linearRampToValueAtTime(conf.sweep, now + conf.d);
+      gain.gain.linearRampToValueAtTime(0, now + conf.d);
+      osc.start(now);
+      osc.stop(now + conf.d);
+    } catch (e) {}
   }
 };
 
