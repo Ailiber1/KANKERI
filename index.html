@@ -778,6 +778,7 @@ html, body {
       <div class="rule-step"><span class="step-num">C</span><span data-i18n="RULE_CROUCH">C = しゃがみ（足音を消す）</span></div>
       <div class="rule-step"><span class="step-num">Q/E</span><span data-i18n="RULE_PEEK">Q / E = 壁から覗く（左右の安全確認）</span></div>
       <div class="rule-step"><span class="step-num">F</span><span data-i18n="RULE_KICK">F / Space = 缶を蹴る・物を蹴る</span></div>
+      <div class="rule-step"><span class="step-num">M</span><span>M = マップ俯瞰（全体を上から確認）</span></div>
       <div class="rule-step"><span class="step-num">Esc</span><span>Esc = ポーズ（操作説明もここから確認可）</span></div>
 
       <h3>操作・スマホ（逃げ側）</h3>
@@ -786,6 +787,7 @@ html, body {
       <div class="rule-step"><span class="step-num">DASH</span><span>DASHボタン = ダッシュ</span></div>
       <div class="rule-step"><span class="step-num">CR</span><span>CROUCHボタン = しゃがみ</span></div>
       <div class="rule-step"><span class="step-num">KICK</span><span>KICKボタン = 缶を蹴る・物を蹴る（対象の近くで表示）</span></div>
+      <div class="rule-step"><span class="step-num">MAP</span><span>MAPボタン = マップ俯瞰</span></div>
       <div class="rule-step"><span class="step-num">⏸</span><span>画面上部のPAUSEボタン = ポーズ</span></div>
 
       <h3 data-i18n="RULES_H4">操作（鬼側 — チーム戦）</h3>
@@ -874,6 +876,7 @@ html, body {
     <!-- Mobile controls -->
     <div id="mobile-joystick" class="mobile-only" style="display:none;"><div id="joystick-knob"></div></div>
     <div id="mobile-buttons" class="mobile-only" style="display:none;">
+      <button id="mob-map">MAP</button>
       <button id="mob-dash">DASH</button>
       <button id="mob-crouch">CROUCH</button>
       <button id="mob-action" style="display:none;">KICK</button>
@@ -901,6 +904,7 @@ html, body {
         <tr><td>ダッシュ</td><td>Shift</td></tr>
         <tr><td>蹴る / アクション</td><td>F / Space</td></tr>
         <tr><td>覗き（左 / 右）</td><td>Q / E</td></tr>
+        <tr><td>マップ俯瞰</td><td>M</td></tr>
         <tr><td>ポーズ</td><td>Esc</td></tr>
       </table>
       <h3 style="color:#00e5ff;margin:14px 0 8px;font-size:14px;">スマホ操作</h3>
@@ -911,6 +915,7 @@ html, body {
         <tr><td>しゃがむ</td><td>CROUCHボタン</td></tr>
         <tr><td>ダッシュ</td><td>DASHボタン</td></tr>
         <tr><td>蹴る / アクション</td><td>KICKボタン（対象近くで表示）</td></tr>
+        <tr><td>マップ俯瞰</td><td>MAPボタン</td></tr>
         <tr><td>ポーズ</td><td>画面上部のPAUSEボタン</td></tr>
       </table>
       <h3 style="color:#ff3366;margin:14px 0 8px;font-size:14px;">ルール</h3>
@@ -3391,6 +3396,10 @@ function createPlayerController(g) {
     if (crouchBtn) {
       crouchBtn.addEventListener('touchstart', (e) => { e.preventDefault(); ctrl.isCrouching = !ctrl.isCrouching; });
     }
+    const mapBtn = document.getElementById('mob-map');
+    if (mapBtn) {
+      mapBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (G) G.overheadView = !G.overheadView; });
+    }
   }
 
   return ctrl;
@@ -3402,13 +3411,13 @@ function updatePlayer(g, dt) {
   if (ctrl.captured) {
     // Captured: frozen in place, only camera rotation works (via pointermove listener)
     ctrl.moveSpeed = 0;
-    ctrl.isCrouching = false;
+    ctrl.isCrouching = true;
     ctrl.isDashing = false;
     ctrl.isPeeking = 'none';
     ctrl.position.y = getGroundHeight(g, ctrl.position.x, ctrl.position.z);
     const fig = g.playerFig;
     fig.group.position.copy(ctrl.position);
-    updateStickAnimation(fig, dt, 0, false, false);
+    updateStickAnimation(fig, dt, 0, true, false);
     return;
   }
 
@@ -3638,6 +3647,26 @@ function getGroundHeight(g, x, z) {
 function updateCamera(g, dt) {
   const ctrl = g.player;
   const fig = g.playerFig;
+
+  // --- Overhead map toggle (M key / mob-map button) ---
+  const pKeys = ctrl.keys;
+  if (pKeys && pKeys['KeyM'] && !ctrl._mPrev) {
+    g.overheadView = !g.overheadView;
+  }
+  ctrl._mPrev = pKeys ? pKeys['KeyM'] : false;
+
+  // --- Overhead (bird's eye) view ---
+  if (g.overheadView) {
+    const mapSize = g.config.size;
+    const camH = mapSize * 0.9;
+    const targetPos = new THREE.Vector3(0, camH, 0.1);
+    g.camera.position.lerp(targetPos, Math.min(6 * dt, 1));
+    g.camera.lookAt(0, 0, 0);
+    const targetFOV = 70;
+    g.camera.fov += (targetFOV - g.camera.fov) * 4 * dt;
+    g.camera.updateProjectionMatrix();
+    return;
+  }
 
   // Camera target distances based on state
   let camDist = 3.0, camHeight = 1.5, shoulderOffset = 0.5;
@@ -4128,8 +4157,8 @@ function createCpuAlly(g, name, level, spawnX, spawnZ, colorIndex) {
     state: 'idle', // idle, sneak, hiding, relocate, tryKick, captured
     targetPos: null,
     hideSpot: null,
-    sneakSpeed: level === 'strong' ? 3.5 : (level === 'normal' ? 3.0 : 2.5),
-    sprintSpeed: level === 'strong' ? 7.0 : (level === 'normal' ? 6.0 : 4.5),
+    sneakSpeed: level === 'strong' ? 4.0 : (level === 'normal' ? 3.5 : 3.0),
+    sprintSpeed: level === 'strong' ? 8.0 : (level === 'normal' ? 7.0 : 5.5),
     moveSpeed: 0,
     stateTimer: 0,
     kickCheckTimer: 0,
@@ -4270,8 +4299,8 @@ function moveCpuAlly(ally, targetX, targetZ, speed, dt, g) {
 
 function cpuPerformKick(g, ally) {
   // CPU ally kicks the can — similar to performCanKick but simulated
-  const power = ally.level === 'strong' ? 70 + Math.random() * 25
-    : (ally.level === 'normal' ? 40 + Math.random() * 40 : 20 + Math.random() * 30);
+  const power = ally.level === 'strong' ? 75 + Math.random() * 25
+    : (ally.level === 'normal' ? 50 + Math.random() * 35 : 35 + Math.random() * 30);
 
   let quality, hideTime;
   if (power >= 80) { quality = 'PERFECT'; hideTime = 15; }
@@ -4314,10 +4343,10 @@ function cpuPerformKick(g, ally) {
 
 function updateCpuAlly(g, ally, dt) {
   if (ally.captured) {
-    // Stay near can when captured
+    // Stay crouched when captured
     ally.moveSpeed = 0;
-    ally.isCrouching = false;
-    updateStickAnimation(ally.fig, dt, 0, false, false);
+    ally.isCrouching = true;
+    updateStickAnimation(ally.fig, dt, 0, true, false);
     return;
   }
 
@@ -4386,38 +4415,86 @@ function updateCpuAlly(g, ally, dt) {
 
       if (g.gamePhase !== 'seek') break;
 
-      // --- Danger check: should we relocate? ---
-      // Only relocate if oni is close AND facing us (about to discover us)
-      const dangerClose = ally.level === 'strong' ? 6 : (ally.level === 'normal' ? 7 : 5);
-      const dangerFar = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 10 : 8);
-
-      if (oniDist < dangerClose || (oniDist < dangerFar && oniFacingAlly)) {
-        // Danger! Decide: try kick or relocate?
-        if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
-          // Captured allies exist — consider dashing for the can
-          const kickBravery = ally.level === 'strong' ? 0.7 : (ally.level === 'normal' ? 0.3 : 0.05);
-          if (Math.random() < kickBravery && canToOniDist > 6) {
-            ally.state = 'tryKick';
-            ally.stateTimer = 0;
-            ally.isCrouching = false;
-            ally.targetPos = canPos.clone();
-            break;
+      // --- Helper: check if cover exists between ally and oni ---
+      let hasCoverFromOni = false;
+      if (closestOni) {
+        const ox = closestOni.position.x, oz = closestOni.position.z;
+        const ax = ally.position.x, az = ally.position.z;
+        const dx = ax - ox, dz = az - oz;
+        const segLen = Math.sqrt(dx * dx + dz * dz);
+        if (segLen > 0.5) {
+          const nx = dx / segLen, nz = dz / segLen;
+          for (const col of g.colliders) {
+            if (col.h < 1.0) continue; // too short to hide behind
+            const cx = col.x - ox, cz = col.z - oz;
+            const proj = cx * nx + cz * nz;
+            if (proj < 0.5 || proj > segLen - 0.5) continue; // not between
+            const perpX = cx - nx * proj, perpZ = cz - nz * proj;
+            const perpDist = Math.sqrt(perpX * perpX + perpZ * perpZ);
+            const blockRadius = col.type === 'cylinder' ? col.r : Math.max(col.hw, col.hd);
+            if (perpDist < blockRadius + 0.3) { hasCoverFromOni = true; break; }
           }
         }
-        // Relocate to a new hiding spot
-        ally.state = 'relocate';
-        ally.stateTimer = 0;
-        break;
       }
 
-      // --- Proactive can kick opportunity (when safe) ---
-      if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
-        const kickInterval = ally.level === 'strong' ? 3 : (ally.level === 'normal' ? 6 : 15);
-        const safeOniDist = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 15 : 20);
-        const maxCanDist = ally.level === 'strong' ? 30 : (ally.level === 'normal' ? 20 : 12);
-        const kickChance = ally.level === 'strong' ? 0.85 : (ally.level === 'normal' ? 0.5 : 0.15);
+      // --- Core principle: STAY HIDDEN. React situationally ---
+      if (oniDist < 8 && oniFacingAlly) {
+        if (hasCoverFromOni) {
+          // Cover exists → stay completely still, don't move
+          // (moving would make noise and draw attention)
+          break;
+        } else if (oniDist < 3) {
+          // Very close, no cover, facing us → sidestep behind nearest cover
+          let bestCover = null, bestScore = Infinity;
+          for (const col of g.colliders) {
+            if (col.h < 1.0) continue;
+            const cdx = col.x - ally.position.x;
+            const cdz = col.z - ally.position.z;
+            const coverDist = Math.sqrt(cdx * cdx + cdz * cdz);
+            if (coverDist < 1 || coverDist > 10) continue;
+            // Prefer cover that puts collider between us and oni
+            const toOniX = closestOni.position.x - col.x;
+            const toOniZ = closestOni.position.z - col.z;
+            const toAllyX = ally.position.x - col.x;
+            const toAllyZ = ally.position.z - col.z;
+            const dot = toOniX * toAllyX + toOniZ * toAllyZ;
+            if (dot > 0) continue; // ally and oni on same side of cover
+            const score = coverDist;
+            if (score < bestScore) { bestScore = score; bestCover = col; }
+          }
+          if (bestCover) {
+            // Sidestep to the far side of the nearest cover
+            const hideAngle = Math.atan2(bestCover.x - closestOni.position.x, bestCover.z - closestOni.position.z);
+            const half = g.config.size / 2 - 2;
+            ally.targetPos = new THREE.Vector3(
+              Math.max(-half, Math.min(half, bestCover.x + Math.sin(hideAngle) * 1.5)),
+              0,
+              Math.max(-half, Math.min(half, bestCover.z + Math.cos(hideAngle) * 1.5))
+            );
+            ally.state = 'relocate';
+            ally.stateTimer = 0;
+          } else {
+            // No nearby cover → crouch and stay (moving in the open is worse)
+          }
+          break;
+        }
+        // 3~8m, facing us, no cover → stay still and hope oni turns away
+        // (running would guarantee detection via footstep sounds)
+      }
 
-        if (ally.kickCheckTimer > kickInterval && canToOniDist > safeOniDist && canDist < maxCanDist) {
+      // --- Rescue logic: if allies are captured, look for safe opportunity to kick ---
+      if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
+        const kickInterval = ally.level === 'strong' ? 4 : (ally.level === 'normal' ? 6 : 10);
+        const safeOniFromCan = ally.level === 'strong' ? 8 : (ally.level === 'normal' ? 12 : 15);
+        const safeOniFromAlly = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 14 : 18);
+        const maxCanDist = ally.level === 'strong' ? 40 : (ally.level === 'normal' ? 30 : 25);
+        const kickChance = ally.level === 'strong' ? 0.85 : (ally.level === 'normal' ? 0.65 : 0.45);
+
+        if (ally.kickCheckTimer > kickInterval
+          && canToOniDist > safeOniFromCan
+          && oniDist > safeOniFromAlly
+          && !oniFacingAlly
+          && canDist < maxCanDist) {
           ally.kickCheckTimer = 0;
           if (Math.random() < kickChance) {
             ally.state = 'tryKick';
@@ -4480,8 +4557,8 @@ function updateCpuAlly(g, ally, dt) {
       ally.isCrouching = false;
       if (!ally.targetPos) ally.targetPos = canPos.clone();
 
-      // If oni gets too close to US, abort
-      const abortDist = ally.level === 'strong' ? 4 : (ally.level === 'normal' ? 5 : 6);
+      // If oni gets too close to US, abort (but strong allies are more persistent)
+      const abortDist = ally.level === 'strong' ? 2.5 : (ally.level === 'normal' ? 3.5 : 4.5);
       if (oniDist < abortDist) {
         // Abort — find new hiding spot
         ally.state = 'idle';
@@ -4565,7 +4642,7 @@ function captureAlly(g, ally) {
   ally.captured = true;
   ally.state = 'captured';
   ally.moveSpeed = 0;
-  ally.isCrouching = false;
+  ally.isCrouching = true;
   g.capturedCount++;
 
   // Grey out ally figure
@@ -5238,6 +5315,7 @@ function startGame(stageNum, mode) {
   G.gameTimer = config.timeLimit;
   G.capturedCount = 0;
   G.paused = false;
+  G.overheadView = false;
   G.kickGaugeActive = false;
   G.selectedCanPos = 0;
   G.placementTimer = 15;
