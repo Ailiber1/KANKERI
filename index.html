@@ -3069,9 +3069,11 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
   fig.leftArm.lowerPivot.rotation.set(0, 0, 0);
   fig.rightArm.lowerPivot.rotation.set(0, 0, 0);
   fig.leftLeg.pivot.rotation.set(0, 0, 0);
-  fig.rightLeg.pivot.rotation.set(0, 0, 0);
   fig.leftLeg.kneePivot.rotation.set(0, 0, 0);
-  fig.rightLeg.kneePivot.rotation.set(0, 0, 0);
+  if (!fig._kickAnim) {
+    fig.rightLeg.pivot.rotation.set(0, 0, 0);
+    fig.rightLeg.kneePivot.rotation.set(0, 0, 0);
+  }
 
   switch (fig.state) {
     case 'idle': {
@@ -3090,9 +3092,11 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
       const legSwing = 0.35;
       const armSwing = 0.26;
       fig.leftLeg.pivot.rotation.x = Math.sin(cycle) * legSwing;
-      fig.rightLeg.pivot.rotation.x = Math.sin(cycle + Math.PI) * legSwing;
+      if (!fig._kickAnim) {
+        fig.rightLeg.pivot.rotation.x = Math.sin(cycle + Math.PI) * legSwing;
+        fig.rightLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 0.5;
+      }
       fig.leftLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(cycle)) * 0.5;
-      fig.rightLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 0.5;
       fig.leftArm.pivot.rotation.x = Math.sin(cycle + Math.PI) * armSwing;
       fig.rightArm.pivot.rotation.x = Math.sin(cycle) * armSwing;
       fig.body.position.y = bc + Math.abs(Math.sin(cycle)) * 0.02;
@@ -3105,9 +3109,11 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
       const armSwing = 0.52;
       fig.body.rotation.x = 0.17;
       fig.leftLeg.pivot.rotation.x = Math.sin(cycle) * legSwing;
-      fig.rightLeg.pivot.rotation.x = Math.sin(cycle + Math.PI) * legSwing;
+      if (!fig._kickAnim) {
+        fig.rightLeg.pivot.rotation.x = Math.sin(cycle + Math.PI) * legSwing;
+        fig.rightLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 0.9;
+      }
       fig.leftLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(cycle)) * 0.9;
-      fig.rightLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI)) * 0.9;
       fig.leftArm.pivot.rotation.x = Math.sin(cycle + Math.PI) * armSwing;
       fig.rightArm.pivot.rotation.x = Math.sin(cycle) * armSwing;
       fig.leftArm.lowerPivot.rotation.x = -0.8;
@@ -3117,9 +3123,11 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
     }
     case 'crouch': {
       fig.leftLeg.pivot.rotation.x = -0.8;
-      fig.rightLeg.pivot.rotation.x = -0.8;
       fig.leftLeg.kneePivot.rotation.x = 1.4;
-      fig.rightLeg.kneePivot.rotation.x = 1.4;
+      if (!fig._kickAnim) {
+        fig.rightLeg.pivot.rotation.x = -0.8;
+        fig.rightLeg.kneePivot.rotation.x = 1.4;
+      }
       fig.body.position.y = bc - 0.35;
       fig.body.rotation.x = 0.2;
       fig.leftArm.pivot.rotation.x = -0.3;
@@ -4645,27 +4653,29 @@ function freeAllCaptured(g) {
 
 function doKickLegAnim(fig) {
   if (!fig || !fig.rightLeg || !fig.rightLeg.pivot) return;
-  // Wind-up: pull leg back slightly
-  fig.rightLeg.pivot.rotation.x = 0.4;
-  if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0.6;
+  fig._kickAnim = true; // Prevent animation system from overriding right leg
+  // Wind-up: pull leg back slightly (positive = backward)
+  fig.rightLeg.pivot.rotation.x = 0.5;
+  if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0.8;
   setTimeout(() => {
     if (!fig.rightLeg) return;
-    // Kick forward: hip flexion + knee extension
-    fig.rightLeg.pivot.rotation.x = -1.0;
+    // Kick forward: swing leg forward (negative = forward)
+    fig.rightLeg.pivot.rotation.x = -1.2;
     if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0;
     setTimeout(() => {
       if (!fig.rightLeg) return;
-      // Follow-through
-      fig.rightLeg.pivot.rotation.x = -0.5;
-      if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0.2;
+      // Follow-through: leg stays forward
+      fig.rightLeg.pivot.rotation.x = -0.6;
+      if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0.3;
       setTimeout(() => {
         if (!fig.rightLeg) return;
         // Return to neutral
         fig.rightLeg.pivot.rotation.x = 0;
         if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0;
+        fig._kickAnim = false; // Re-enable animation system
       }, 300);
-    }, 250);
-  }, 200);
+    }, 300);
+  }, 250);
 }
 
 function performKickAnim(g) {
