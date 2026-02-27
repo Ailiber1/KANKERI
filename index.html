@@ -1090,6 +1090,202 @@ const SoundManager = {
       osc.start(now);
       osc.stop(now + conf.d);
     } catch (e) {}
+  },
+
+  // ゲーム用SE（複数オシレータで複雑な音色を生成）
+  playGameSE(type) {
+    if (!this.seEnabled) return;
+    try {
+      const ctx = this.getCtx();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      switch (type) {
+        case 'kick': {
+          // 金属的な缶を蹴る音
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          const gain2 = ctx.createGain();
+          osc1.connect(gain1); gain1.connect(ctx.destination);
+          osc2.connect(gain2); gain2.connect(ctx.destination);
+          osc1.type = 'square'; osc1.frequency.setValueAtTime(800, now);
+          osc1.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+          gain1.gain.setValueAtTime(0.5, now);
+          gain1.gain.linearRampToValueAtTime(0, now + 0.15);
+          osc2.type = 'triangle'; osc2.frequency.setValueAtTime(2400, now);
+          osc2.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+          gain2.gain.setValueAtTime(0.3, now);
+          gain2.gain.linearRampToValueAtTime(0, now + 0.1);
+          osc1.start(now); osc1.stop(now + 0.15);
+          osc2.start(now); osc2.stop(now + 0.1);
+          break;
+        }
+        case 'can_land': {
+          // 缶が着地するカランという音
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'triangle'; osc.frequency.setValueAtTime(1200, now);
+          osc.frequency.exponentialRampToValueAtTime(400, now + 0.2);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0, now + 0.25);
+          osc.start(now); osc.stop(now + 0.25);
+          break;
+        }
+        case 'can_bounce': {
+          // 缶がバウンドする軽い音
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.setValueAtTime(900, now);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.08);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.linearRampToValueAtTime(0, now + 0.1);
+          osc.start(now); osc.stop(now + 0.1);
+          break;
+        }
+        case 'footstep': {
+          // 足音（低くて短い）
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.setValueAtTime(120, now);
+          osc.frequency.linearRampToValueAtTime(80, now + 0.06);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.linearRampToValueAtTime(0, now + 0.08);
+          osc.start(now); osc.stop(now + 0.08);
+          break;
+        }
+        case 'found': {
+          // 鬼に見つかった時の警告音
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          const gain2 = ctx.createGain();
+          osc1.connect(gain1); gain1.connect(ctx.destination);
+          osc2.connect(gain2); gain2.connect(ctx.destination);
+          osc1.type = 'sawtooth'; osc1.frequency.setValueAtTime(600, now);
+          osc1.frequency.linearRampToValueAtTime(900, now + 0.15);
+          osc1.frequency.linearRampToValueAtTime(600, now + 0.3);
+          gain1.gain.setValueAtTime(0.35, now);
+          gain1.gain.linearRampToValueAtTime(0, now + 0.4);
+          osc2.type = 'square'; osc2.frequency.setValueAtTime(800, now);
+          osc2.frequency.linearRampToValueAtTime(1200, now + 0.15);
+          osc2.frequency.linearRampToValueAtTime(800, now + 0.3);
+          gain2.gain.setValueAtTime(0.2, now);
+          gain2.gain.linearRampToValueAtTime(0, now + 0.4);
+          osc1.start(now); osc1.stop(now + 0.4);
+          osc2.start(now); osc2.stop(now + 0.4);
+          break;
+        }
+        case 'capture': {
+          // 捕獲された時の重い音
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sawtooth'; osc.frequency.setValueAtTime(400, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + 0.5);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.linearRampToValueAtTime(0, now + 0.6);
+          osc.start(now); osc.stop(now + 0.6);
+          break;
+        }
+        case 'free': {
+          // 解放された時の爽快な音
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.setValueAtTime(400, now);
+          osc.frequency.linearRampToValueAtTime(800, now + 0.1);
+          osc.frequency.linearRampToValueAtTime(1200, now + 0.2);
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.linearRampToValueAtTime(0, now + 0.35);
+          osc.start(now); osc.stop(now + 0.35);
+          break;
+        }
+        case 'hit': {
+          // 物を叩く音
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'square'; osc.frequency.setValueAtTime(300, now);
+          osc.frequency.exponentialRampToValueAtTime(100, now + 0.12);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.linearRampToValueAtTime(0, now + 0.15);
+          osc.start(now); osc.stop(now + 0.15);
+          break;
+        }
+        case 'heartbeat': {
+          // 鬼が近い時の心臓音（ドクン）
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.setValueAtTime(60, now);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0.4, now + 0.05);
+          gain.gain.linearRampToValueAtTime(0, now + 0.15);
+          osc.start(now); osc.stop(now + 0.2);
+          // 二拍目
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.connect(gain2); gain2.connect(ctx.destination);
+          osc2.type = 'sine'; osc2.frequency.setValueAtTime(50, now + 0.2);
+          gain2.gain.setValueAtTime(0, now + 0.2);
+          gain2.gain.linearRampToValueAtTime(0.25, now + 0.25);
+          gain2.gain.linearRampToValueAtTime(0, now + 0.35);
+          osc2.start(now + 0.2); osc2.stop(now + 0.4);
+          break;
+        }
+        case 'countdown': {
+          // カウントダウンのティック音
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.setValueAtTime(1000, now);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.linearRampToValueAtTime(0, now + 0.08);
+          osc.start(now); osc.stop(now + 0.1);
+          break;
+        }
+        case 'notify': {
+          // 通知音（軽いチャイム）
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.setValueAtTime(880, now);
+          osc.frequency.linearRampToValueAtTime(1320, now + 0.1);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0, now + 0.2);
+          osc.start(now); osc.stop(now + 0.2);
+          break;
+        }
+      }
+    } catch (e) {}
+  },
+
+  // 足音タイマー（連続再生防止）
+  _lastFootstep: 0,
+  playFootstep(moveSpeed) {
+    if (!this.seEnabled) return;
+    const now = performance.now();
+    const interval = moveSpeed > 3 ? 250 : 450; // 走行時は短い間隔
+    if (now - this._lastFootstep > interval) {
+      this._lastFootstep = now;
+      this.playGameSE('footstep');
+    }
+  },
+
+  // 心拍タイマー
+  _lastHeartbeat: 0,
+  playHeartbeatIfClose(oniDist) {
+    if (!this.seEnabled || oniDist > 12) return;
+    const now = performance.now();
+    const interval = oniDist < 5 ? 600 : (oniDist < 8 ? 900 : 1200);
+    if (now - this._lastHeartbeat > interval) {
+      this._lastHeartbeat = now;
+      this.playGameSE('heartbeat');
+    }
   }
 };
 
@@ -2291,9 +2487,10 @@ function createStickFigure(g, color, isOni) {
 
   const fig = new THREE.Group();
 
-  // Root (at feet level)
+  // Root (at feet level) — body center at torso midpoint
+  // Total: legs 0.9m + torso 0.5m + head 0.3m = 1.7m
   const body = new THREE.Group();
-  body.position.y = 1.05;
+  body.position.y = 1.15;
   fig.add(body);
 
   // Torso
@@ -2310,22 +2507,22 @@ function createStickFigure(g, color, isOni) {
   head.castShadow = true;
   body.add(head);
 
-  // Arms
-  const armGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.35, 8);
+  // Arms — §9.2: CylinderGeometry(0.03, 0.03, 0.4, 8) × 上腕+前腕
+  const armGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.4, 8);
   g.geometries.push(armGeo);
 
   function createLimb(geo, parentY, offsetX) {
     const pivot = new THREE.Object3D();
     pivot.position.set(offsetX, parentY, 0);
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.y = -0.175;
+    mesh.position.y = -0.2; // half of 0.4
     mesh.castShadow = true;
     pivot.add(mesh);
-    // Lower limb pivot
+    // Lower limb pivot (elbow)
     const lowerPivot = new THREE.Object3D();
-    lowerPivot.position.y = -0.35;
+    lowerPivot.position.y = -0.4; // full length of upper arm
     const lowerMesh = new THREE.Mesh(geo, mat);
-    lowerMesh.position.y = -0.175;
+    lowerMesh.position.y = -0.2; // half of 0.4
     lowerMesh.castShadow = true;
     lowerPivot.add(lowerMesh);
     pivot.add(lowerPivot);
@@ -2333,24 +2530,24 @@ function createStickFigure(g, color, isOni) {
     return { pivot, lowerPivot };
   }
 
-  const leftArm = createLimb(armGeo, 0.2, -0.12);
-  const rightArm = createLimb(armGeo, 0.2, 0.12);
+  const leftArm = createLimb(armGeo, 0.25, -0.12);
+  const rightArm = createLimb(armGeo, 0.25, 0.12);
 
-  // Legs
-  const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.4, 8);
+  // Legs — §9.2: CylinderGeometry(0.04, 0.04, 0.45, 8) × 太もも+すね
+  const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.45, 8);
   g.geometries.push(legGeo);
 
   function createLeg(offsetX) {
     const pivot = new THREE.Object3D();
     pivot.position.set(offsetX, -0.25, 0);
     const mesh = new THREE.Mesh(legGeo, mat);
-    mesh.position.y = -0.2;
+    mesh.position.y = -0.225; // half of 0.45
     mesh.castShadow = true;
     pivot.add(mesh);
     const kneePivot = new THREE.Object3D();
-    kneePivot.position.y = -0.4;
+    kneePivot.position.y = -0.45; // full length of thigh
     const lowerLeg = new THREE.Mesh(legGeo, mat);
-    lowerLeg.position.y = -0.2;
+    lowerLeg.position.y = -0.225; // half of 0.45
     lowerLeg.castShadow = true;
     kneePivot.add(lowerLeg);
     pivot.add(kneePivot);
@@ -2408,7 +2605,7 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
   }
 
   // Reset
-  fig.body.position.y = 1.05;
+  fig.body.position.y = 1.15;
   fig.body.rotation.x = 0;
   fig.leftArm.pivot.rotation.x = 0;
   fig.rightArm.pivot.rotation.x = 0;
@@ -2423,7 +2620,7 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
 
   switch (fig.state) {
     case 'idle':
-      fig.body.position.y = 1.05 + Math.sin(t * 2) * 0.02;
+      fig.body.position.y = 1.15 + Math.sin(t * 2) * 0.02;
       fig.leftArm.pivot.rotation.x = 5 * deg;
       fig.rightArm.pivot.rotation.x = 5 * deg;
       break;
@@ -2455,7 +2652,7 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
       break;
     }
     case 'crouch': {
-      fig.body.position.y = 0.65;
+      fig.body.position.y = 0.75; // 1.15 - 0.40 = 0.75
       fig.leftLeg.pivot.rotation.x = -45 * deg;
       fig.rightLeg.pivot.rotation.x = -45 * deg;
       fig.leftLeg.kneePivot.rotation.x = 90 * deg;
@@ -2704,6 +2901,21 @@ function updatePlayer(g, dt) {
   fig.group.rotation.y = ctrl.rotation;
   updateStickAnimation(fig, dt, ctrl.moveSpeed, ctrl.isCrouching, ctrl.isDashing);
 
+  // Footstep SE
+  if (ctrl.moveSpeed > 0.5 && !ctrl.isCrouching) {
+    SoundManager.playFootstep(ctrl.moveSpeed);
+  }
+
+  // Heartbeat SE when oni is close
+  let closestOniDist = Infinity;
+  if (g.onis) {
+    for (const oni of g.onis) {
+      const d = ctrl.position.distanceTo(oni.position);
+      if (d < closestOniDist) closestOniDist = d;
+    }
+  }
+  SoundManager.playHeartbeatIfClose(closestOniDist);
+
   // Stay timer (camp prevention)
   if (ctrl.position.distanceTo(ctrl.stayPos) > 5) {
     ctrl.stayTimer = 0;
@@ -2780,9 +2992,9 @@ function updateCamera(g, dt) {
   const yaw = ctrl.cameraYaw;
   const pitch = ctrl.cameraPitch;
 
-  const targetX = ctrl.position.x - Math.sin(yaw) * camDist * Math.cos(pitch) + Math.cos(yaw) * shoulderOffset;
+  const targetX = ctrl.position.x + Math.sin(yaw) * camDist * Math.cos(pitch) + Math.cos(yaw) * shoulderOffset;
   const targetY = ctrl.position.y + camHeight + Math.sin(pitch) * camDist;
-  const targetZ = ctrl.position.z - Math.cos(yaw) * camDist * Math.cos(pitch) - Math.sin(yaw) * shoulderOffset;
+  const targetZ = ctrl.position.z + Math.cos(yaw) * camDist * Math.cos(pitch) - Math.sin(yaw) * shoulderOffset;
 
   // Wall collision (raycast from player to desired camera position)
   const playerHead = new THREE.Vector3(ctrl.position.x, ctrl.position.y + 1.5, ctrl.position.z);
@@ -2938,6 +3150,7 @@ function updateOni(g, oni, dt) {
         oni.foundName = gameState.username || 'Player';
         oni.stateTimer = 0;
         showNotification('見つけた！ ' + oni.foundName);
+        SoundManager.playGameSE('found');
       }
       // Lost target - return to patrol after searching
       const cDist = Math.sqrt(
@@ -3089,6 +3302,7 @@ function capturePlayer(g) {
   // Constrain near can
   g.player.position.set(g.can.homePos.x + 3, 0, g.can.homePos.z);
   showNotification('見つけた！ ' + (gameState.username || 'Player'));
+  SoundManager.playGameSE('capture');
 
   // Check game over
   const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
@@ -3164,9 +3378,7 @@ function performCanKick(g, power) {
   }
 
   // Play kick SE
-  if (SoundManager.seEnabled) {
-    SoundManager.playSE('click');
-  }
+  SoundManager.playGameSE('kick');
 }
 
 function updateCanPhysics(g, dt) {
@@ -3187,11 +3399,13 @@ function updateCanPhysics(g, dt) {
     g.can.velocity.y *= -0.3; // Bounce
     g.can.velocity.x *= 0.7; // Friction
     g.can.velocity.z *= 0.7;
+    SoundManager.playGameSE('can_bounce');
 
     // Stop if very slow
     if (Math.abs(g.can.velocity.y) < 0.5 && g.can.velocity.length() < 0.5) {
       g.can.isFlying = false;
       g.can.velocity.set(0, 0, 0);
+      SoundManager.playGameSE('can_land');
 
       // Transition phases
       if (g.gamePhase === 'kick') {
@@ -3226,13 +3440,14 @@ function freeAllCaptured(g) {
     }
   }
   showNotification('全員解放！');
+  SoundManager.playGameSE('free');
 }
 
 function performHit(g, interactable) {
   g._hitCooldown = true;
   setTimeout(() => { g._hitCooldown = false; }, 5000);
   showNotification(interactable.label);
-  if (SoundManager.seEnabled) SoundManager.playSE('click');
+  SoundManager.playGameSE('hit');
 
   // Alert nearest oni
   let nearest = null, nearestDist = Infinity;
@@ -3343,9 +3558,11 @@ function updateGamePhases(g, dt) {
         g.gamePhase = 'seek';
         showHideCountdown(g, false);
         showNotification('鬼が動き出した！');
-        // Oni starts moving
+        SoundManager.playGameSE('notify');
+        // Oni starts seeking — 3s look-around delay before active patrol
         for (const oni of g.onis) {
           oni.state = 'patrol';
+          oni.restTimer = 3; // 見回し時間
         }
       }
       // Oni walks to can during hide phase
@@ -3415,6 +3632,7 @@ function togglePause(g) {
 
 function endGame(g, playerWon) {
   g.gamePhase = 'result';
+  stopBGM();
   if (document.pointerLockElement) document.exitPointerLock();
 
   const overlay = document.getElementById('result-overlay');
@@ -3623,6 +3841,7 @@ function startGame(stageNum, mode) {
   // Show game screen
   showScreen('game-screen');
   stopBGM();
+  playBGM('stage' + stageNum);
 
   // Create scene
   G = createGameScene(config);
@@ -3653,11 +3872,12 @@ function startGame(stageNum, mode) {
   // Create player controller
   G.player = createPlayerController(G);
 
-  // Create initial oni
+  // Create initial oni — spawn at map edge so player has time to hide
   for (let i = 0; i < config.initialOni; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const dist = config.size / 3;
+    const dist = config.size / 2 - 3; // マップ端付近
     const oni = createOni(G, Math.cos(angle) * dist, Math.sin(angle) * dist);
+    oni.state = 'patrol'; // Will walk to can during hide phase
     G.onis.push(oni);
   }
 
