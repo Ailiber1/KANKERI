@@ -587,6 +587,10 @@ html, body {
 #hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
 @keyframes promptPulse { 0%,100% { box-shadow: 0 0 8px rgba(85,153,255,0.3); } 50% { box-shadow: 0 0 20px rgba(85,153,255,0.6); } }
 #hud-peek-prompt { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #00e5ff; background: rgba(0,0,0,0.6); border: 1px solid rgba(0,229,255,0.4); padding: 6px 16px; border-radius: 6px; text-align: center; white-space: nowrap; }
+#hud-captured-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 40; background: rgba(0,0,0,0.3); }
+#hud-captured-text { font-family: 'Share Tech Mono', monospace; font-size: 36px; color: #ff4444; text-shadow: 0 0 20px rgba(255,68,68,0.8); letter-spacing: 4px; animation: capturedPulse 2s ease-in-out infinite; }
+#hud-captured-sub { font-family: 'Noto Sans JP', sans-serif; font-size: 16px; color: #ffaa44; margin-top: 12px; text-shadow: 0 0 10px rgba(255,170,68,0.5); }
+@keyframes capturedPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 #hud-minimap { position: absolute; bottom: 12px; right: 12px; width: 150px; height: 150px; border: 1px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden; }
 #minimap-canvas { width: 100%; height: 100%; }
 #danger-vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-shadow: inset 0 0 80px rgba(255,0,64,0); transition: box-shadow 0.3s; }
@@ -607,6 +611,14 @@ html, body {
 #hide-countdown-time { font-family: 'Share Tech Mono', monospace; font-size: 64px; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.4); }
 #pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .pause-panel { max-width: 300px; width: 90%; padding: 30px; }
+#controls-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 55; }
+.controls-panel { width: 90%; padding: 24px; }
+#controls-table { width: 100%; border-collapse: collapse; font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ccc; }
+#controls-table th { color: #5599ff; text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(85,153,255,0.3); }
+#controls-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+#controls-table td:nth-child(2) { color: #ffcc00; text-align: right; }
+#controls-rules { font-family: 'Noto Sans JP', sans-serif; font-size: 13px; color: #aaa; padding-left: 18px; line-height: 1.8; }
+#controls-rules li { margin-bottom: 2px; }
 #result-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .result-panel { max-width: 400px; width: 90%; padding: 30px; }
 /* Mobile game controls */
@@ -827,6 +839,10 @@ html, body {
     </div>
     <div id="hud-action-prompt" style="display:none;"></div>
     <div id="hud-peek-prompt" style="display:none;"></div>
+    <div id="hud-captured-overlay" style="display:none;">
+      <div id="hud-captured-text">捕まった！</div>
+      <div id="hud-captured-sub">味方が缶を蹴るまで待て…</div>
+    </div>
     <div id="hud-minimap"><canvas id="minimap-canvas" width="150" height="150"></canvas></div>
     <div id="danger-vignette"></div>
     <div id="kick-gauge-wrap" style="display:none;">
@@ -856,7 +872,33 @@ html, body {
       <div class="corner-bl"></div><div class="corner-br"></div>
       <h2 style="font-family:'Cinzel Decorative',serif;color:#5599ff;text-align:center;margin-bottom:20px;">PAUSED</h2>
       <button id="btn-resume" class="btn btn-neon" style="width:100%;margin-bottom:10px;">RESUME</button>
+      <button id="btn-controls" class="btn btn-neon" style="width:100%;margin-bottom:10px;">操作説明</button>
       <button id="btn-quit-game" class="btn btn-neon" style="width:100%;">QUIT TO TITLE</button>
+    </div>
+  </div>
+  <div id="controls-overlay" style="display:none;">
+    <div class="controls-panel ui-panel" style="max-width:420px;max-height:80vh;overflow-y:auto;">
+      <div class="corner-bl"></div><div class="corner-br"></div>
+      <h2 style="font-family:'Cinzel Decorative',serif;color:#5599ff;text-align:center;margin-bottom:16px;font-size:20px;">操作説明</h2>
+      <table id="controls-table">
+        <tr><th>操作</th><th>キー</th></tr>
+        <tr><td>移動</td><td>W A S D</td></tr>
+        <tr><td>視点回転</td><td>マウス移動</td></tr>
+        <tr><td>しゃがむ</td><td>C</td></tr>
+        <tr><td>ダッシュ</td><td>Shift</td></tr>
+        <tr><td>蹴る / アクション</td><td>F</td></tr>
+        <tr><td>覗き（左 / 右）</td><td>Q / E</td></tr>
+        <tr><td>ポーズ</td><td>Esc</td></tr>
+      </table>
+      <h3 style="color:#ff3366;margin:14px 0 8px;font-size:14px;">ルール</h3>
+      <ul id="controls-rules">
+        <li>制限時間まで隠れ続ければ勝利</li>
+        <li>鬼に見つかったらタッチされる前に逃げろ</li>
+        <li>捕まった味方は缶を蹴れば全員解放</li>
+        <li>物体を蹴って音を立てると鬼の気を引ける</li>
+        <li>しゃがむと足音が消え、鬼に見つかりにくくなる</li>
+      </ul>
+      <button id="btn-controls-back" class="btn btn-neon" style="width:100%;margin-top:16px;">戻る</button>
     </div>
   </div>
   <div id="result-overlay" style="display:none;">
@@ -3223,7 +3265,19 @@ function createPlayerController(g) {
 
 function updatePlayer(g, dt) {
   const ctrl = g.player;
-  if (ctrl.captured) return;
+
+  if (ctrl.captured) {
+    // Captured: frozen in place, only camera rotation works (via pointermove listener)
+    ctrl.moveSpeed = 0;
+    ctrl.isCrouching = false;
+    ctrl.isDashing = false;
+    ctrl.isPeeking = 'none';
+    ctrl.position.y = getGroundHeight(g, ctrl.position.x, ctrl.position.z);
+    const fig = g.playerFig;
+    fig.group.position.copy(ctrl.position);
+    updateStickAnimation(fig, dt, 0, false, false);
+    return;
+  }
 
   const keys = ctrl.keys;
 
@@ -4333,10 +4387,15 @@ function capturePlayer(g, oni) {
   g.playerFig.mat.emissive.setHex(0x333333);
   // Constrain near can
   g.player.position.set(g.can.homePos.x + 3, 0, g.can.homePos.z);
+  g.playerFig.group.position.copy(g.player.position);
   showNotification('捕まった！ ' + (gameState.username || 'Player'));
   SoundManager.playGameSE('capture');
 
-  // Check game over
+  // Show captured overlay
+  const capOv = document.getElementById('hud-captured-overlay');
+  if (capOv) capOv.style.display = 'flex';
+
+  // Check game over — only if ALL players captured
   const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false); // Oni wins
@@ -4487,6 +4546,9 @@ function freeAllCaptured(g) {
   g.player.captured = false;
   g.playerFig.mat.color.setHex(0x4488ff);
   g.playerFig.mat.emissive.setHex(0x4488ff);
+  // Hide captured overlay
+  const capOv = document.getElementById('hud-captured-overlay');
+  if (capOv) capOv.style.display = 'none';
   // Free CPU allies too
   if (g.cpuAllies) {
     for (const ally of g.cpuAllies) {
@@ -4739,6 +4801,9 @@ function endGame(g, playerWon) {
   g.gamePhase = 'result';
   stopBGM();
   if (document.pointerLockElement) document.exitPointerLock();
+  // Hide captured overlay
+  const capOv = document.getElementById('hud-captured-overlay');
+  if (capOv) capOv.style.display = 'none';
 
   const overlay = document.getElementById('result-overlay');
   const title = document.getElementById('result-title');
@@ -5074,6 +5139,16 @@ function startGame(stageNum, mode) {
   // Pause/Resume/Quit buttons
   const resumeBtn = document.getElementById('btn-resume');
   if (resumeBtn) resumeBtn.onclick = () => togglePause(G);
+  const controlsBtn = document.getElementById('btn-controls');
+  if (controlsBtn) controlsBtn.onclick = () => {
+    const cov = document.getElementById('controls-overlay');
+    if (cov) cov.style.display = 'flex';
+  };
+  const controlsBackBtn = document.getElementById('btn-controls-back');
+  if (controlsBackBtn) controlsBackBtn.onclick = () => {
+    const cov = document.getElementById('controls-overlay');
+    if (cov) cov.style.display = 'none';
+  };
   const quitBtn = document.getElementById('btn-quit-game');
   if (quitBtn) quitBtn.onclick = () => cleanupGame();
   const retryBtn = document.getElementById('btn-retry');
@@ -5163,6 +5238,10 @@ function cleanupGame() {
   if (canWrap) canWrap.style.display = 'none';
   const hideCD = document.getElementById('hide-countdown');
   if (hideCD) hideCD.style.display = 'none';
+  const capOv2 = document.getElementById('hud-captured-overlay');
+  if (capOv2) capOv2.style.display = 'none';
+  const ctrlOv = document.getElementById('controls-overlay');
+  if (ctrlOv) ctrlOv.style.display = 'none';
 
   G = null;
 
