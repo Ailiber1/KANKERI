@@ -4044,7 +4044,7 @@ function updateOni(g, oni, dt) {
     for (const ally of g.cpuAllies) {
       if (ally.captured || ally.isCrouching) continue;
       const aDist = oni.position.distanceTo(ally.position);
-      const allyFootRange = ally.moveSpeed > 4 ? 8 * 1.5 : 8; // Running = louder
+      const allyFootRange = ally.moveSpeed > 5 ? 8 * 1.3 : 6; // Running = louder, walking = quieter
       if (ally.moveSpeed > 0.5 && aDist < allyFootRange && aDist < loudestFootDist) {
         loudestFootDist = aDist;
         loudestFootTarget = ally.position.clone();
@@ -4322,8 +4322,8 @@ function createCpuAlly(g, name, level, spawnX, spawnZ, colorIndex) {
     state: 'idle', // idle, sneak, hiding, relocate, tryKick, captured
     targetPos: null,
     hideSpot: null,
-    sneakSpeed: level === 'strong' ? 4.0 : (level === 'normal' ? 3.5 : 3.0),
-    sprintSpeed: level === 'strong' ? 8.0 : (level === 'normal' ? 7.0 : 5.5),
+    sneakSpeed: level === 'strong' ? 4.5 : (level === 'normal' ? 4.0 : 3.5),
+    sprintSpeed: level === 'strong' ? 8.5 : (level === 'normal' ? 7.5 : 6.5),
     moveSpeed: 0,
     stateTimer: 0,
     kickCheckTimer: 0,
@@ -4418,8 +4418,8 @@ function findHideSpot(g, ally) {
     pool = valid;
   }
 
-  // Pick from top candidates with slight randomness
-  const pickRange = ally.level === 'strong' ? 2 : (ally.level === 'normal' ? 3 : 3);
+  // Pick from top candidates with slight randomness (all levels pick well now)
+  const pickRange = ally.level === 'strong' ? 2 : (ally.level === 'normal' ? 2 : 3);
   const pick = pool[Math.floor(Math.random() * Math.min(pickRange, pool.length))];
   if (pick) {
     return new THREE.Vector3(pick.x, 0, pick.z);
@@ -4505,8 +4505,8 @@ function moveCpuAlly(ally, targetX, targetZ, speed, dt, g) {
 
 function cpuPerformKick(g, ally) {
   // CPU ally kicks the can — similar to performCanKick but simulated
-  const power = ally.level === 'strong' ? 75 + Math.random() * 25
-    : (ally.level === 'normal' ? 50 + Math.random() * 35 : 35 + Math.random() * 30);
+  const power = ally.level === 'strong' ? 80 + Math.random() * 20
+    : (ally.level === 'normal' ? 60 + Math.random() * 30 : 45 + Math.random() * 30);
 
   let quality, hideTime;
   if (power >= 80) { quality = 'PERFECT'; hideTime = 15; }
@@ -4595,6 +4595,14 @@ function updateCpuAlly(g, ally, dt) {
     case 'sneak': {
       // Crouch-walk to hiding spot (quiet, slow, stealthy)
       ally.isCrouching = true;
+
+      // FREEZE if oni is very close and facing us — don't move, don't make sound
+      if (oniDist < 6 && oniFacingAlly) {
+        ally.moveSpeed = 0;
+        // Stay frozen until oni turns away or moves past
+        break;
+      }
+
       if (ally.targetPos) {
         moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, ally.sneakSpeed, dt, g);
         const dist = ally.position.distanceTo(ally.targetPos);
@@ -4603,8 +4611,8 @@ function updateCpuAlly(g, ally, dt) {
           ally.state = 'hiding';
           ally.stateTimer = 0;
         }
-        // Stuck detection: if no progress after 5s, pick new spot
-        if (ally.stateTimer > 5 && dist > 2) {
+        // Stuck detection: if no progress after 7s, pick new spot
+        if (ally.stateTimer > 7 && dist > 2) {
           ally.state = 'idle';
           ally.stateTimer = 0;
         }
@@ -4631,10 +4639,10 @@ function updateCpuAlly(g, ally, dt) {
         if (segLen > 0.5) {
           const nx = dx / segLen, nz = dz / segLen;
           for (const col of g.colliders) {
-            if (col.h < 1.0) continue; // too short to hide behind
+            if (col.h < 1.0) continue;
             const cx = col.x - ox, cz = col.z - oz;
             const proj = cx * nx + cz * nz;
-            if (proj < 0.5 || proj > segLen - 0.5) continue; // not between
+            if (proj < 0.5 || proj > segLen - 0.5) continue;
             const perpX = cx - nx * proj, perpZ = cz - nz * proj;
             const perpDist = Math.sqrt(perpX * perpX + perpZ * perpZ);
             const blockRadius = col.type === 'cylinder' ? col.r : Math.max(col.hw, col.hd);
@@ -4643,33 +4651,77 @@ function updateCpuAlly(g, ally, dt) {
         }
       }
 
+      // --- NEW: Predict if oni is HEADING TOWARD ally (not just facing) ---
+      let oniApproaching = false;
+      let oniApproachETA = Infinity; // seconds until oni reaches ally
+      if (closestOni) {
+        // Check oni's current waypoint target direction
+        const wp = g.config.waypoints[closestOni.targetWaypoint];
+        if (wp) {
+          // Is oni's patrol path going to bring it close to ally?
+          const oniToWpX = wp.x - closestOni.position.x;
+          const oniToWpZ = wp.z - closestOni.position.z;
+          const oniToAllyX = ally.position.x - closestOni.position.x;
+          const oniToAllyZ = ally.position.z - closestOni.position.z;
+          const wpDist = Math.sqrt(oniToWpX * oniToWpX + oniToWpZ * oniToWpZ);
+          if (wpDist > 0.5) {
+            const wpNX = oniToWpX / wpDist, wpNZ = oniToWpZ / wpDist;
+            // Project ally position onto oni's travel direction
+            const proj = oniToAllyX * wpNX + oniToAllyZ * wpNZ;
+            // Perpendicular distance from ally to oni's travel line
+            const perpX = oniToAllyX - wpNX * proj;
+            const perpZ = oniToAllyZ - wpNZ * proj;
+            const perpDist = Math.sqrt(perpX * perpX + perpZ * perpZ);
+            // If oni will pass within 5m of ally AND ally is ahead of oni
+            if (proj > 0 && proj < wpDist + 3 && perpDist < 5) {
+              oniApproaching = true;
+              oniApproachETA = proj / (closestOni.speed || 3.5);
+            }
+          }
+        }
+        // Also check if oni is in chase mode heading toward us
+        if (closestOni.state === 'chase' || closestOni.state === 'footSound') {
+          if (oniFacingAlly && oniDist < 15) {
+            oniApproaching = true;
+            oniApproachETA = oniDist / 5.0;
+          }
+        }
+      }
+
+      // --- Proactive relocation: oni approaching before it gets too close ---
+      const proactiveThresh = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 10 : 8);
+      if (oniApproaching && oniDist < proactiveThresh && oniApproachETA < 4 && !hasCoverFromOni) {
+        // Oni is heading our way and we have no cover — relocate NOW before detected
+        ally.state = 'relocate';
+        ally.stateTimer = 0;
+        ally.targetPos = null; // will find new spot in relocate state
+        break;
+      }
+
       // --- Core principle: STAY HIDDEN. React situationally ---
       if (oniDist < 8 && oniFacingAlly) {
         if (hasCoverFromOni) {
-          // Cover exists → stay completely still, don't move
-          // (moving would make noise and draw attention)
+          // Cover exists → stay completely still
           break;
-        } else if (oniDist < 3) {
-          // Very close, no cover, facing us → sidestep behind nearest cover
+        } else if (oniDist < 4) {
+          // Close, no cover, facing us → sidestep behind nearest cover
           let bestCover = null, bestScore = Infinity;
           for (const col of g.colliders) {
             if (col.h < 1.0) continue;
             const cdx = col.x - ally.position.x;
             const cdz = col.z - ally.position.z;
             const coverDist = Math.sqrt(cdx * cdx + cdz * cdz);
-            if (coverDist < 1 || coverDist > 10) continue;
-            // Prefer cover that puts collider between us and oni
+            if (coverDist < 1 || coverDist > 12) continue;
             const toOniX = closestOni.position.x - col.x;
             const toOniZ = closestOni.position.z - col.z;
             const toAllyX = ally.position.x - col.x;
             const toAllyZ = ally.position.z - col.z;
             const dot = toOniX * toAllyX + toOniZ * toAllyZ;
-            if (dot > 0) continue; // ally and oni on same side of cover
+            if (dot > 0) continue;
             const score = coverDist;
             if (score < bestScore) { bestScore = score; bestCover = col; }
           }
           if (bestCover) {
-            // Sidestep to the far side of the nearest cover
             const hideAngle = Math.atan2(bestCover.x - closestOni.position.x, bestCover.z - closestOni.position.z);
             const half = g.config.size / 2 - 2;
             ally.targetPos = new THREE.Vector3(
@@ -4679,37 +4731,61 @@ function updateCpuAlly(g, ally, dt) {
             );
             ally.state = 'relocate';
             ally.stateTimer = 0;
-          } else {
-            // No nearby cover → crouch and stay (moving in the open is worse)
           }
           break;
         }
-        // 3~8m, facing us, no cover → stay still and hope oni turns away
-        // (running would guarantee detection via footstep sounds)
+        // 4~8m, facing us, no cover → stay still (running = worse)
+      }
+
+      // --- Periodic re-evaluation: is current spot still safe? ---
+      if (ally.stateTimer > 8 && !hasCoverFromOni && oniDist < 15) {
+        // We've been hiding for 8+ sec, no cover, and oni is somewhat close
+        // Find a better spot with actual cover
+        const betterSpot = findHideSpot(g, ally);
+        if (betterSpot) {
+          const bDist = betterSpot.distanceTo(ally.position);
+          if (bDist > 3) { // only move if significantly different
+            ally.hideSpot = betterSpot;
+            ally.targetPos = betterSpot;
+            ally.state = 'sneak';
+            ally.stateTimer = 0;
+            break;
+          }
+        }
       }
 
       // --- Rescue logic: if allies are captured, look for safe opportunity to kick ---
       if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
-        const kickInterval = ally.level === 'strong' ? 5 : (ally.level === 'normal' ? 8 : 14);
-        const safeOniFromCan = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 16 : 20);
-        const safeOniFromAlly = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 16 : 20);
+        const kickInterval = ally.level === 'strong' ? 3 : (ally.level === 'normal' ? 5 : 8);
+        const safeOniFromCan = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 13 : 16);
+        const safeOniFromAlly = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 13 : 16);
 
         // Key insight: can ally reach the can BEFORE oni does?
-        // ally sprints at sprintSpeed, oni chases at ~5-6
         const allyTimeTocan = canDist / ally.sprintSpeed;
         const oniTimeToCan = canToOniDist / 5.5;
         const timeAdvantage = oniTimeToCan - allyTimeTocan;
-        // Need at least 1-2s advantage to kick safely
-        const minAdvantage = ally.level === 'strong' ? 1.0 : (ally.level === 'normal' ? 1.5 : 2.5);
+        // Need time advantage to kick safely (reduced thresholds)
+        const minAdvantage = ally.level === 'strong' ? 0.5 : (ally.level === 'normal' ? 1.0 : 1.5);
+
+        // Also check: is oni facing AWAY from can? (extra safe)
+        let oniFacingAwayCan = false;
+        if (closestOni) {
+          const toCanAngle = Math.atan2(canPos.x - closestOni.position.x, canPos.z - closestOni.position.z);
+          let canAngleDiff = toCanAngle - closestOni.rotation;
+          while (canAngleDiff > Math.PI) canAngleDiff -= Math.PI * 2;
+          while (canAngleDiff < -Math.PI) canAngleDiff += Math.PI * 2;
+          oniFacingAwayCan = Math.abs(canAngleDiff) > Math.PI * 0.6; // >108° away
+        }
+
+        const safeEnough = (canToOniDist > safeOniFromCan && oniDist > safeOniFromAlly)
+          || (oniFacingAwayCan && canToOniDist > safeOniFromCan * 0.6);
 
         if (ally.kickCheckTimer > kickInterval
-          && canToOniDist > safeOniFromCan
-          && oniDist > safeOniFromAlly
+          && safeEnough
           && !oniFacingAlly
           && timeAdvantage > minAdvantage) {
           ally.kickCheckTimer = 0;
-          // Higher chance only when conditions are very favorable
-          const kickChance = ally.level === 'strong' ? 0.7 : (ally.level === 'normal' ? 0.45 : 0.25);
+          const kickChance = ally.level === 'strong' ? 0.8 : (ally.level === 'normal' ? 0.6 : 0.4);
           if (Math.random() < kickChance) {
             ally.state = 'tryKick';
             ally.stateTimer = 0;
@@ -4722,8 +4798,9 @@ function updateCpuAlly(g, ally, dt) {
     }
 
     case 'relocate': {
-      // Crouch-walk away from oni to a new hiding spot (not panic sprint)
-      ally.isCrouching = true;
+      // Smart escape: crouch when oni is far, sprint when oni is dangerously close
+      const urgentEscape = oniDist < 6 && oniFacingAlly;
+      ally.isCrouching = !urgentEscape;
 
       // Find new spot if we don't have one yet
       if (!ally.targetPos) {
@@ -4731,22 +4808,26 @@ function updateCpuAlly(g, ally, dt) {
         if (ally.hideSpot) {
           ally.targetPos = ally.hideSpot;
         } else {
-          // No spot found — sneak away from oni
+          // No spot found — escape perpendicular to oni's approach (harder to chase)
           if (closestOni) {
             const awayAngle = Math.atan2(ally.position.x - closestOni.position.x, ally.position.z - closestOni.position.z);
+            // Add 60-90° offset for perpendicular escape (not directly away)
+            const perpOffset = (Math.random() > 0.5 ? 1 : -1) * (Math.PI * 0.3 + Math.random() * Math.PI * 0.2);
+            const escapeAngle = awayAngle + perpOffset;
             const half = g.config.size / 2 - 2;
             ally.targetPos = new THREE.Vector3(
-              Math.max(-half, Math.min(half, ally.position.x + Math.sin(awayAngle) * 8)),
+              Math.max(-half, Math.min(half, ally.position.x + Math.sin(escapeAngle) * 10)),
               0,
-              Math.max(-half, Math.min(half, ally.position.z + Math.cos(awayAngle) * 8))
+              Math.max(-half, Math.min(half, ally.position.z + Math.cos(escapeAngle) * 10))
             );
           }
         }
       }
 
       if (ally.targetPos) {
-        // Use slightly faster sneak when relocating (urgency)
-        moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, ally.sneakSpeed * 1.3, dt, g);
+        // Speed: sprint if urgent, fast sneak otherwise
+        const relocSpeed = urgentEscape ? ally.sprintSpeed * 0.8 : ally.sneakSpeed * 1.5;
+        moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, relocSpeed, dt, g);
         const dist = ally.position.distanceTo(ally.targetPos);
         if (dist < 1.0) {
           ally.moveSpeed = 0;
@@ -4757,7 +4838,7 @@ function updateCpuAlly(g, ally, dt) {
       }
 
       // Timeout — just hide where we are
-      if (ally.stateTimer > 8) {
+      if (ally.stateTimer > 6) {
         ally.state = 'hiding';
         ally.stateTimer = 0;
         ally.moveSpeed = 0;
@@ -4778,13 +4859,17 @@ function updateCpuAlly(g, ally, dt) {
         break;
       }
 
-      // Abort check: can we still reach the can before oni catches us?
+      // Abort check: smarter — consider if we can still make it
       const allyTimeToCan = canDist / ally.sprintSpeed;
       const oniTimeToAlly = oniDist / 5.5;
-      const oniAbortDist = ally.level === 'strong' ? 5 : (ally.level === 'normal' ? 7 : 9);
+      const oniAbortDist = ally.level === 'strong' ? 4 : (ally.level === 'normal' ? 5.5 : 7);
 
-      // Abort if: oni is close, or oni will catch us before we reach the can
-      if (oniDist < oniAbortDist && oniFacingAlly && oniTimeToAlly < allyTimeToCan + 0.5) {
+      // Only abort if: oni is very close AND facing us AND will catch us before kick
+      // Strong allies are more committed — they only abort in extreme danger
+      const shouldAbort = oniDist < oniAbortDist && oniFacingAlly && oniTimeToAlly < allyTimeToCan + 0.3;
+      // If almost at the can, DON'T abort — commit to the kick
+      const almostThere = canDist < 4;
+      if (shouldAbort && !almostThere) {
         ally.state = 'idle';
         ally.stateTimer = 0;
         ally.targetPos = null;
