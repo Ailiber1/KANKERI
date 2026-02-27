@@ -246,26 +246,26 @@ html, body {
    ============================================================ */
 .ui-panel {
   background: var(--bg-panel);
-  border: 1px solid #00aa2a;
+  border: 1px solid var(--neon-pink-dim);
   padding: 24px 28px;
   position: relative;
   z-index: 10;
   width: min(420px, 90%);
   margin: 10px auto;
-  box-shadow: 0 0 12px rgba(0,255,65,0.1), inset 0 0 8px rgba(0,255,65,0.03);
+  box-shadow: 0 0 12px rgba(255,51,102,0.1), inset 0 0 8px rgba(255,51,102,0.03);
 }
 .ui-panel::before,
 .ui-panel::after {
   content: ''; position: absolute;
   width: 14px; height: 14px;
-  border-color: #00ff41;
+  border-color: var(--neon-pink);
   border-style: solid;
 }
 .ui-panel::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
 .ui-panel::after  { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
 .corner-bl, .corner-br {
   position: absolute; width: 14px; height: 14px;
-  border-color: #00ff41;
+  border-color: var(--neon-pink);
   border-style: solid;
 }
 .corner-bl { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
@@ -273,24 +273,24 @@ html, body {
 
 /* Input */
 .input-label {
-  font-size: 11px; color: #00cc33;
+  font-size: 11px; color: var(--text-secondary);
   letter-spacing: 3px; margin-bottom: 6px;
 }
 .neon-input {
   width: 100%; padding: 10px 14px;
-  background: rgba(0,20,10,0.6);
-  border: 1px solid #00aa2a;
-  color: #00ff41;
+  background: rgba(20,0,5,0.6);
+  border: 1px solid var(--neon-pink-dim);
+  color: var(--neon-pink);
   font-family: 'Share Tech Mono', monospace;
   font-size: 15px;
   outline: none;
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 .neon-input:focus {
-  border-color: #00ff41;
-  box-shadow: 0 0 8px rgba(0,255,65,0.6), inset 0 0 8px rgba(0,255,65,0.05);
+  border-color: var(--neon-pink);
+  box-shadow: 0 0 8px var(--neon-pink-glow), inset 0 0 8px rgba(255,51,102,0.05);
 }
-.neon-input::placeholder { color: rgba(0,255,65,0.35); }
+.neon-input::placeholder { color: rgba(255,51,102,0.35); }
 .input-error-msg {
   font-size: 11px; color: var(--neon-red);
   min-height: 16px; margin-top: 4px;
@@ -324,24 +324,24 @@ html, body {
 .btn:active { transform: translateY(0); }
 
 .btn-neon {
-  border: 1px solid #00ff41;
-  color: #00ff41;
+  border: 1px solid var(--neon-pink);
+  color: var(--neon-pink);
 }
-.btn-neon::before { background: rgba(0,255,65,0.1); }
+.btn-neon::before { background: var(--neon-pink-dim); }
 .btn-neon:hover {
-  background: rgba(0,255,65,0.08);
-  box-shadow: 0 0 16px rgba(0,255,65,0.6), inset 0 0 16px rgba(0,255,65,0.08);
+  background: var(--neon-pink-dim);
+  box-shadow: 0 0 20px var(--neon-pink-glow), inset 0 0 20px var(--neon-pink-dim);
 }
 .btn-neon:hover::before { height: 100%; }
 
 .btn-thin {
-  border: 1px solid rgba(0,170,42,0.4);
-  color: rgba(0,255,65,0.7);
+  border: 1px solid rgba(255,51,102,0.3);
+  color: rgba(255,51,102,0.7);
 }
 .btn-thin:hover {
-  border-color: #00ff41;
-  color: #00ff41;
-  box-shadow: 0 0 10px rgba(0,255,65,0.3);
+  border-color: var(--neon-pink);
+  color: var(--neon-pink);
+  box-shadow: 0 0 10px var(--neon-pink-dim);
 }
 
 .btn-gold {
@@ -359,7 +359,7 @@ html, body {
 .panel-footer {
   display: flex; align-items: center; justify-content: center;
   gap: 10px; margin-top: 16px; padding-top: 14px;
-  border-top: 1px solid rgba(0,170,42,0.2);
+  border-top: 1px solid rgba(255,51,102,0.15);
 }
 .lang-btn {
   background: transparent; border: 1px solid transparent;
@@ -368,16 +368,16 @@ html, body {
   transition: all 0.3s;
 }
 .lang-btn.active {
-  color: #00ff41; border-color: #00aa2a;
+  color: var(--neon-pink); border-color: var(--neon-pink-dim);
 }
-.lang-btn:hover { color: #00ff41; }
+.lang-btn:hover { color: var(--neon-pink); }
 .footer-divider { color: var(--text-dim); font-size: 14px; }
 .bgm-btn {
   background: transparent; border: 1px solid transparent;
   font-size: 13px; padding: 4px 10px; cursor: pointer;
   transition: all 0.3s; font-family: 'Share Tech Mono', monospace;
 }
-.bgm-btn.bgm-on { color: #00ff41; border-color: #00aa2a; }
+.bgm-btn.bgm-on { color: var(--neon-pink); border-color: var(--neon-pink-dim); }
 .bgm-btn.bgm-off { color: var(--text-dim); text-decoration: line-through; }
 
 /* ============================================================
