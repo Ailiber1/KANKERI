@@ -83,14 +83,13 @@ html, body {
   font-family: 'Cinzel Decorative', serif;
   font-weight: 900;
   font-size: clamp(40px, 12vw, 100px);
-  color: var(--neon-pink);
+  background: linear-gradient(to bottom, #ffffff 0%, #ffe0e8 50%, #f0b8c8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   opacity: 0;
   letter-spacing: 8px;
-  text-shadow:
-    0 0 10px var(--neon-pink),
-    0 0 30px var(--neon-pink-glow),
-    0 0 60px rgba(255,51,102,0.4),
-    0 0 100px rgba(255,51,102,0.2);
+  filter: drop-shadow(0 0 10px rgba(255,51,102,0.5)) drop-shadow(0 0 30px rgba(255,51,102,0.25));
   position: relative;
 }
 
