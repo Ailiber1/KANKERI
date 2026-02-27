@@ -900,6 +900,86 @@ function toggleBGM() {
 }
 
 // ============================================================
+// SECTION: SOUND MANAGER (SE)
+// ============================================================
+const SoundManager = {
+  seEnabled: true,
+  audioCtx: null,
+
+  getCtx() {
+    if (!this.audioCtx) {
+      try {
+        this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (e) {
+        console.warn('Web Audio API not supported');
+        return null;
+      }
+    }
+    if (this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume();
+    }
+    return this.audioCtx;
+  },
+
+  playSE(name) {
+    if (!this.seEnabled) return;
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const se = SE_DEFS[name];
+    if (!se) return;
+    se(ctx);
+  }
+};
+
+const SE_DEFS = {
+  hover: function(ctx) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 1200;
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.03);
+  },
+
+  click: function(ctx) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 800;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.05);
+  },
+
+  error: function(ctx) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.value = 300;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.1);
+  }
+};
+
+function initUISounds() {
+  document.querySelectorAll('.btn, .lang-btn, .bgm-btn, .neon-input, .neon-select').forEach(el => {
+    el.addEventListener('mouseenter', () => SoundManager.playSE('hover'));
+    el.addEventListener('click', () => SoundManager.playSE('click'));
+  });
+}
+
+// ============================================================
 // SECTION: MATRIX RAIN
 // ============================================================
 function createMatrixBg() {
@@ -1526,6 +1606,7 @@ function init() {
   // Init UI
   initSettingRows();
   initButtonHandlers();
+  initUISounds();
   initResize();
 
   // Prevent default touch behaviors
