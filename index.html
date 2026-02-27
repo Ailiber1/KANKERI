@@ -2504,21 +2504,49 @@ function buildTerrain(g) {
   groundGeo.computeVertexNormals();
   groundGeo.rotateX(-Math.PI / 2);
 
-  // PBR Material with procedural textures (2048 for ground, 8 repeats for crisp detail)
-  const grassTex = makeTexSet('grass', 2048, 8);
-  const groundMat = new THREE.MeshStandardMaterial({
-    map: grassTex.diff,
-    normalMap: grassTex.nor,
-    normalScale: new THREE.Vector2(2.0, 2.0),
-    roughnessMap: grassTex.rough,
-    roughness: 0.85,
-    aoMap: grassTex.ao,
-    aoMapIntensity: 1.2,
-    metalness: 0.0,
-    envMapIntensity: 0.3
-  });
-  // AO needs uv2
+  // PBR Material — try external photo-based textures, fallback to procedural
+  const useExternalTex = true; // false に変更するとプロシージャル版に戻る
+  let groundMat;
   groundGeo.setAttribute('uv2', groundGeo.attributes.uv);
+
+  if (useExternalTex) {
+    const loader = new THREE.TextureLoader();
+    const setRepeat = (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(10, 10);
+      tex.anisotropy = 4;
+      return tex;
+    };
+    const gDiff = setRepeat(loader.load('textures/grass_diff.jpg'));
+    const gNor  = setRepeat(loader.load('textures/grass_nor.jpg'));
+    const gRough = setRepeat(loader.load('textures/grass_rough.jpg'));
+    const gAo   = setRepeat(loader.load('textures/grass_ao.jpg'));
+    g.textures.push(gDiff, gNor, gRough, gAo);
+    groundMat = new THREE.MeshStandardMaterial({
+      map: gDiff,
+      normalMap: gNor,
+      normalScale: new THREE.Vector2(1.5, 1.5),
+      roughnessMap: gRough,
+      roughness: 0.85,
+      aoMap: gAo,
+      aoMapIntensity: 1.0,
+      metalness: 0.0
+    });
+  } else {
+    // Fallback: procedural textures
+    const grassTex = makeTexSet('grass', 2048, 8);
+    groundMat = new THREE.MeshStandardMaterial({
+      map: grassTex.diff,
+      normalMap: grassTex.nor,
+      normalScale: new THREE.Vector2(2.0, 2.0),
+      roughnessMap: grassTex.rough,
+      roughness: 0.85,
+      aoMap: grassTex.ao,
+      aoMapIntensity: 1.2,
+      metalness: 0.0
+    });
+    Object.values(grassTex).forEach(t => g.textures.push(t));
+  }
 
   const groundMesh = new THREE.Mesh(groundGeo, groundMat);
   groundMesh.receiveShadow = true;
@@ -2527,7 +2555,6 @@ function buildTerrain(g) {
   g.groundGeo = groundGeo;
   g.geometries.push(groundGeo);
   g.materials.push(groundMat);
-  Object.values(grassTex).forEach(t => g.textures.push(t));
 
   // Asphalt paths (cross shape) — PBR enhanced
   const pathGeo = new THREE.PlaneGeometry(2.5, size * 0.7, 1, 1);
