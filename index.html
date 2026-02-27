@@ -708,12 +708,23 @@ html, body {
       <div class="rule-step"><span class="step-num">3</span><span data-i18n="RULE_3">鬼がフィールドを探索。見つかったら捕獲される</span></div>
       <div class="rule-step"><span class="step-num">4</span><span data-i18n="RULE_4">味方が缶を蹴れば捕獲された仲間を全員解放！</span></div>
 
-      <h3 data-i18n="RULES_H2">操作</h3>
+      <h3 data-i18n="RULES_H2">操作（逃げ側）</h3>
       <div class="rule-step"><span class="step-num">W</span><span data-i18n="RULE_MOVE">移動（WASD / ←↑→↓ / 左スティック）</span></div>
       <div class="rule-step"><span class="step-num">⇧</span><span data-i18n="RULE_DASH">Shift = ダッシュ（スタミナ消費）</span></div>
       <div class="rule-step"><span class="step-num">C</span><span data-i18n="RULE_CROUCH">C = しゃがみ（足音を消す）</span></div>
       <div class="rule-step"><span class="step-num">Q</span><span data-i18n="RULE_PEEK">Q = 壁から覗く（安全に偵察）</span></div>
-      <div class="rule-step"><span class="step-num">F</span><span data-i18n="RULE_KICK">F = 缶を蹴る（缶の近くで） / 物を叩く（壁・看板・石など近くの物体を叩いて音を出し、鬼の注意を引く）</span></div>
+      <div class="rule-step"><span class="step-num">F</span><span data-i18n="RULE_KICK">F = 缶を蹴る（缶の近くで） / 物を叩く（壁・看板・石など、鬼の注意を引く）</span></div>
+
+      <h3 data-i18n="RULES_H4">操作（鬼側 — チーム戦）</h3>
+      <div class="rule-step"><span class="step-num">W</span><span data-i18n="RULE_ONI_MOVE">移動（逃げ側と同じ）※ダッシュはスタミナ無限</span></div>
+      <div class="rule-step"><span class="step-num">🖱</span><span data-i18n="RULE_ONI_LOCK">左クリック = ロックオン（画面中央のレティクルで対象を照準）</span></div>
+      <div class="rule-step"><span class="step-num">␣</span><span data-i18n="RULE_ONI_TOUCH">Space = 缶タッチ（発見後、缶に戻ってタッチで捕獲確定）</span></div>
+      <div class="rule-step"><span class="step-num">␣</span><span data-i18n="RULE_ONI_PICKUP">Space = 缶の回収（蹴り飛ばされた缶を拾って定位置に戻す）</span></div>
+
+      <h3 data-i18n="RULES_H5">マルチプレイモード</h3>
+      <div class="rule-step"><span class="step-num">⚔</span><span data-i18n="RULE_MP_FFA">個人戦 — 全員が逃げ側 vs AI鬼。最後まで生き残れ</span></div>
+      <div class="rule-step"><span class="step-num">👥</span><span data-i18n="RULE_MP_TEAM">チーム戦 — 鬼チーム vs 逃げチーム。ラウンド交代で公平に</span></div>
+      <div class="rule-step"><span class="step-num">🤝</span><span data-i18n="RULE_MP_COOP">協力プレイ — 全員で逃げ側。ステージを順に攻略</span></div>
 
       <h3 data-i18n="RULES_H3">コツ</h3>
       <div class="rule-step"><span class="step-num">💡</span><span data-i18n="RULE_TIP1">砂利の上は足音が大きい。しゃがんで移動しよう</span></div>
@@ -1325,12 +1336,21 @@ const I18N = {
     RULE_2: '鬼が缶を拾いに行く間に隠れる',
     RULE_3: '鬼がフィールドを探索。見つかったら捕獲される',
     RULE_4: '味方が缶を蹴れば捕獲された仲間を全員解放！',
-    RULES_H2: '操作',
+    RULES_H2: '操作（逃げ側）',
     RULE_MOVE: '移動（WASD / ←↑→↓ / 左スティック）',
     RULE_DASH: 'Shift = ダッシュ（スタミナ消費）',
     RULE_CROUCH: 'C = しゃがみ（足音を消す）',
     RULE_PEEK: 'Q = 壁から覗く（安全に偵察）',
-    RULE_KICK: 'F = 缶を蹴る（缶の近くで） / 物を叩く（壁・看板・石など近くの物体を叩いて音を出し、鬼の注意を引く）',
+    RULE_KICK: 'F = 缶を蹴る（缶の近くで） / 物を叩く（壁・看板・石など、鬼の注意を引く）',
+    RULES_H4: '操作（鬼側 — チーム戦）',
+    RULE_ONI_MOVE: '移動（逃げ側と同じ）※ダッシュはスタミナ無限',
+    RULE_ONI_LOCK: '左クリック = ロックオン（画面中央のレティクルで対象を照準）',
+    RULE_ONI_TOUCH: 'Space = 缶タッチ（発見後、缶に戻ってタッチで捕獲確定）',
+    RULE_ONI_PICKUP: 'Space = 缶の回収（蹴り飛ばされた缶を拾って定位置に戻す）',
+    RULES_H5: 'マルチプレイモード',
+    RULE_MP_FFA: '個人戦 — 全員が逃げ側 vs AI鬼。最後まで生き残れ',
+    RULE_MP_TEAM: 'チーム戦 — 鬼チーム vs 逃げチーム。ラウンド交代で公平に',
+    RULE_MP_COOP: '協力プレイ — 全員で逃げ側。ステージを順に攻略',
     RULES_H3: 'コツ',
     RULE_TIP1: '砂利の上は足音が大きい。しゃがんで移動しよう',
     RULE_TIP2: '物を叩いて鬼の注意を逸らせる（陽動）',
@@ -1369,12 +1389,21 @@ const I18N = {
     RULE_2: 'Hide while the "it" retrieves the can',
     RULE_3: 'The "it" searches the field. If found, you\'re captured!',
     RULE_4: 'An ally kicks the can to free ALL captured players!',
-    RULES_H2: 'Controls',
+    RULES_H2: 'Controls (Runner)',
     RULE_MOVE: 'Move (WASD / Arrow Keys / Left Stick)',
     RULE_DASH: 'Shift = Dash (uses stamina)',
     RULE_CROUCH: 'C = Crouch (silent movement)',
     RULE_PEEK: 'Q = Peek around corners',
-    RULE_KICK: 'F = Kick the can (when near) / Hit objects (walls, signs, rocks — make noise to lure the "it")',
+    RULE_KICK: 'F = Kick the can (when near) / Hit objects (walls, signs, rocks — lure the "it")',
+    RULES_H4: 'Controls (Oni — Team Battle)',
+    RULE_ONI_MOVE: 'Move (same as runner) ※ Dash has unlimited stamina',
+    RULE_ONI_LOCK: 'Left Click = Lock-on (aim reticle at target)',
+    RULE_ONI_TOUCH: 'Space = Can Touch (return to can after spotting to confirm capture)',
+    RULE_ONI_PICKUP: 'Space = Pick up can (retrieve kicked can and return to base)',
+    RULES_H5: 'Multiplayer Modes',
+    RULE_MP_FFA: 'Free For All — All runners vs AI oni. Last one standing wins',
+    RULE_MP_TEAM: 'Team Battle — Oni team vs Runner team. Rounds swap for fairness',
+    RULE_MP_COOP: 'Co-op — All players as runners. Clear stages together',
     RULES_H3: 'Tips',
     RULE_TIP1: 'Gravel makes loud footsteps. Crouch to move quietly!',
     RULE_TIP2: 'Hit objects to create diversions and distract the "it"',
