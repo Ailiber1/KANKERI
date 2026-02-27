@@ -586,6 +586,7 @@ html, body {
 #hud-can-dir { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #00e5ff; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
 #hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
 @keyframes promptPulse { 0%,100% { box-shadow: 0 0 8px rgba(85,153,255,0.3); } 50% { box-shadow: 0 0 20px rgba(85,153,255,0.6); } }
+#hud-peek-prompt { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #00e5ff; background: rgba(0,0,0,0.6); border: 1px solid rgba(0,229,255,0.4); padding: 6px 16px; border-radius: 6px; text-align: center; white-space: nowrap; }
 #hud-minimap { position: absolute; bottom: 12px; right: 12px; width: 150px; height: 150px; border: 1px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden; }
 #minimap-canvas { width: 100%; height: 100%; }
 #danger-vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-shadow: inset 0 0 80px rgba(255,0,64,0); transition: box-shadow 0.3s; }
@@ -709,12 +710,7 @@ html, body {
     </div>
     <div class="setting-note" data-i18n="CPU_NOTE">※ 0人 = 自分1人で挑戦</div>
 
-    <div class="setting-label" data-i18n="CPU_LEVEL">● CPUレベル</div>
-    <div class="setting-row" id="cpu-level-row">
-      <button class="setting-btn" data-val="weak" data-i18n="LEVEL_WEAK">弱</button>
-      <button class="setting-btn active" data-val="normal" data-i18n="LEVEL_NORMAL">中</button>
-      <button class="setting-btn" data-val="strong" data-i18n="LEVEL_STRONG">強</button>
-    </div>
+    <div id="cpu-level-container"></div>
 
     <div class="btn-group" style="margin-top:20px">
       <button class="btn btn-neon" id="btn-story-start" data-i18n="BTN_START">ゲーム開始</button>
@@ -830,12 +826,13 @@ html, body {
       <div id="hud-can-dir"></div>
     </div>
     <div id="hud-action-prompt" style="display:none;"></div>
+    <div id="hud-peek-prompt" style="display:none;"></div>
     <div id="hud-minimap"><canvas id="minimap-canvas" width="150" height="150"></canvas></div>
     <div id="danger-vignette"></div>
     <div id="kick-gauge-wrap" style="display:none;">
       <div id="kick-gauge-title">缶を蹴れ！</div>
       <div id="kick-gauge-track"><div id="kick-gauge-fill"></div><div id="kick-gauge-marker">▲</div></div>
-      <div id="kick-gauge-hint">Space / タップ</div>
+      <div id="kick-gauge-hint">F / タップ</div>
     </div>
     <div id="can-placement-wrap" style="display:none;">
       <div id="placement-title">缶の配置を選択 <span id="placement-timer">15</span>秒</div>
@@ -929,7 +926,7 @@ const gameState = {
   storySettings: {
     stage: 1,
     cpuCount: 0,
-    cpuLevel: 'normal'
+    cpuLevels: ['normal', 'normal', 'normal']
   },
   clearedStages: [1],
   audioResumed: false
@@ -1763,6 +1760,9 @@ function setLanguage(lang) {
 
   // Update HTML lang
   document.documentElement.lang = lang === 'ja' ? 'ja' : 'en';
+
+  // Refresh dynamic CPU level UI
+  if (typeof updateCpuLevelUI === 'function') updateCpuLevelUI();
 }
 
 function t(key) {
@@ -1780,15 +1780,7 @@ function initSettingRows() {
       document.querySelectorAll('#cpu-count-row .setting-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       gameState.storySettings.cpuCount = parseInt(btn.dataset.val);
-    });
-  });
-
-  // CPU level
-  document.querySelectorAll('#cpu-level-row .setting-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#cpu-level-row .setting-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      gameState.storySettings.cpuLevel = btn.dataset.val;
+      updateCpuLevelUI();
     });
   });
 
@@ -1796,6 +1788,67 @@ function initSettingRows() {
   document.getElementById('story-stage-select').addEventListener('change', (e) => {
     gameState.storySettings.stage = parseInt(e.target.value);
   });
+
+  // Initialize CPU level UI
+  updateCpuLevelUI();
+}
+
+function updateCpuLevelUI() {
+  const container = document.getElementById('cpu-level-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const count = gameState.storySettings.cpuCount || 0;
+  if (count === 0) return;
+
+  const lang = gameState.language || 'ja';
+  const dict = I18N[lang] || I18N.ja;
+  const allyNames = lang === 'en'
+    ? ['Ally 1', 'Ally 2', 'Ally 3']
+    : ['味方1', '味方2', '味方3'];
+  const levelLabels = [
+    { val: 'weak', label: dict.LEVEL_WEAK || '弱' },
+    { val: 'normal', label: dict.LEVEL_NORMAL || '中' },
+    { val: 'strong', label: dict.LEVEL_STRONG || '強' }
+  ];
+
+  const titleLabel = document.createElement('div');
+  titleLabel.className = 'setting-label';
+  titleLabel.textContent = dict.CPU_LEVEL || '● CPUレベル';
+  container.appendChild(titleLabel);
+
+  for (let i = 0; i < count; i++) {
+    const rowWrap = document.createElement('div');
+    rowWrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.style.cssText = 'color:var(--neon-cyan);font-size:13px;min-width:50px;';
+    nameSpan.textContent = allyNames[i] + ':';
+    rowWrap.appendChild(nameSpan);
+
+    const row = document.createElement('div');
+    row.className = 'setting-row';
+    row.style.cssText = 'flex:1;margin:0;';
+
+    for (const lvl of levelLabels) {
+      const btn = document.createElement('button');
+      btn.className = 'setting-btn';
+      btn.dataset.val = lvl.val;
+      btn.textContent = lvl.label;
+      if (gameState.storySettings.cpuLevels[i] === lvl.val) {
+        btn.classList.add('active');
+      }
+      btn.addEventListener('click', () => {
+        row.querySelectorAll('.setting-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        gameState.storySettings.cpuLevels[i] = lvl.val;
+      });
+      row.appendChild(btn);
+    }
+
+    rowWrap.appendChild(row);
+    container.appendChild(rowWrap);
+  }
 }
 
 // ============================================================
@@ -1921,7 +1974,12 @@ const STAGE_CONFIGS = {
     ],
     interactables: [
       { type:'swing_chain', x:-5, z:-8, radius:25, label:'ブランコの鎖', sound:'metal' },
-      { type:'trashcan', x:14, z:0, radius:20, label:'ゴミ箱', sound:'thud' }
+      { type:'trashcan', x:14, z:0, radius:20, label:'ゴミ箱', sound:'thud' },
+      { type:'jungle_gym', x:6, z:-5, radius:20, label:'ジャングルジム', sound:'metal' },
+      { type:'bench', x:12, z:8, radius:15, label:'ベンチ', sound:'thud' },
+      { type:'shed_wall', x:-16, z:-12, radius:20, label:'小屋の壁', sound:'thud' },
+      { type:'rock', x:12, z:-4, radius:15, label:'大きな岩', sound:'thud' },
+      { type:'streetlight', x:-3, z:-14, radius:20, label:'街灯の柱', sound:'metal' }
     ]
   }
 };
@@ -3197,8 +3255,8 @@ function updatePlayer(g, dt) {
     }
   }
 
-  // Speed
-  let speed = ctrl.isCrouching ? ctrl.crouchSpeed : (ctrl.isDashing ? ctrl.dashSpeed : ctrl.speed);
+  // Speed (peeking blocks movement)
+  let speed = ctrl.isPeeking !== 'none' ? 0 : (ctrl.isCrouching ? ctrl.crouchSpeed : (ctrl.isDashing ? ctrl.dashSpeed : ctrl.speed));
 
   // Stamina
   if (ctrl.isDashing) {
@@ -3285,6 +3343,37 @@ function updatePlayer(g, dt) {
     ctrl.stayTimer += dt;
   }
 
+  // --- Peek (Q/E) near walls ---
+  ctrl.nearWall = false;
+  for (const col of g.colliders) {
+    let dist;
+    if (col.type === 'box') {
+      const dx = Math.abs(ctrl.position.x - col.x) - col.hw;
+      const dz = Math.abs(ctrl.position.z - col.z) - col.hd;
+      dist = Math.max(dx, dz);
+    } else {
+      const dx = ctrl.position.x - col.x;
+      const dz = ctrl.position.z - col.z;
+      dist = Math.sqrt(dx*dx + dz*dz) - (col.r || 0);
+    }
+    if (dist < 1.8 && dist > 0) { ctrl.nearWall = true; break; }
+  }
+
+  const canPeek = ctrl.nearWall && !ctrl.isDashing && (g.gamePhase === 'seek' || g.gamePhase === 'hide');
+  if (canPeek && keys['KeyQ']) {
+    ctrl.isPeeking = 'left';
+  } else if (canPeek && keys['KeyE']) {
+    ctrl.isPeeking = 'right';
+  } else {
+    ctrl.isPeeking = 'none';
+  }
+
+  // Peek body tilt animation
+  const peekTiltTarget = ctrl.isPeeking === 'left' ? 0.26 : (ctrl.isPeeking === 'right' ? -0.26 : 0);
+  ctrl._peekTilt = ctrl._peekTilt || 0;
+  ctrl._peekTilt += (peekTiltTarget - ctrl._peekTilt) * Math.min(10 * dt, 1);
+  if (fig.body) fig.body.rotation.z = ctrl._peekTilt;
+
   // Check can proximity
   const canDist = ctrl.position.distanceTo(g.can.group.position);
   ctrl.canKick = canDist < 2.5 && g.can.isAtHome && !g.can.isFlying;
@@ -3295,7 +3384,7 @@ function updatePlayer(g, dt) {
     for (const inter of g.config.interactables) {
       const dx = ctrl.position.x - inter.x;
       const dz = ctrl.position.z - inter.z;
-      if (Math.sqrt(dx*dx + dz*dz) < 1.5) {
+      if (Math.sqrt(dx*dx + dz*dz) < 2.5) {
         ctrl.canHit = inter;
         break;
       }
@@ -3347,7 +3436,10 @@ function updateCamera(g, dt) {
   let camDist = 3.0, camHeight = 1.5, shoulderOffset = 0.5;
   let targetFOV = 60;
 
-  if (ctrl.isCrouching) {
+  if (ctrl.isPeeking !== 'none') {
+    camDist = 2.0; camHeight = 1.3; targetFOV = 40;
+    shoulderOffset = ctrl.isPeeking === 'left' ? -0.6 : 0.6;
+  } else if (ctrl.isCrouching) {
     camDist = 2.5; camHeight = 1.0;
   } else if (ctrl.isDashing) {
     camDist = 3.5; targetFOV = 65;
@@ -3428,6 +3520,8 @@ function createOni(g, spawnX, spawnZ) {
     restTimer: 0,
     stateTimer: 0,
     foundName: null,
+    foundTarget: null,
+    chaseTarget: null,
     distractionPos: null
   };
 }
@@ -3463,46 +3557,105 @@ function updateOni(g, oni, dt) {
   let viewDist = oni.viewDist;
   if (timeOfDay === 'night') viewDist = 15;
 
+  // --- Multi-target vision check (player + CPU allies) ---
+  const oniEyePos = new THREE.Vector3(oni.position.x, oni.position.y + 1.5, oni.position.z);
+
+  // Helper: check if a target position is visible to the oni
+  function checkTargetVisibility(targetPos, targetIsCrouching, targetCaptured, targetFig) {
+    if (targetCaptured) return false;
+    const tDir = new THREE.Vector2(targetPos.x - oni.position.x, targetPos.z - oni.position.z);
+    const tDist = tDir.length();
+    const tAngle = Math.atan2(tDir.x, tDir.y);
+    let tAngleDiff = tAngle - oni.rotation;
+    while (tAngleDiff > Math.PI) tAngleDiff -= Math.PI * 2;
+    while (tAngleDiff < -Math.PI) tAngleDiff += Math.PI * 2;
+    tAngleDiff = Math.abs(tAngleDiff);
+
+    if (tDist >= viewDist || tAngleDiff >= oni.viewAngle / 2) return false;
+    const effectiveDist = targetIsCrouching ? viewDist * 0.5 : viewDist;
+    if (tDist >= effectiveDist) return false;
+
+    // Line of sight raycast
+    const targetCenter = new THREE.Vector3(targetPos.x, targetPos.y + (targetIsCrouching ? 0.6 : 1.0), targetPos.z);
+    const dir3d = targetCenter.clone().sub(oniEyePos).normalize();
+    const ray = new THREE.Raycaster(oniEyePos, dir3d, 0, tDist);
+    const hits = ray.intersectObjects(g.scene.children, true);
+    for (const hit of hits) {
+      if (hit.object === g.ground) continue;
+      if (hit.object.material && hit.object.material.transparent && hit.object.material.opacity < 0.5) continue;
+      if (hit.object.material && hit.object.material.wireframe) continue;
+      if (hit.object.type === 'Line' || hit.object.type === 'Sprite') continue;
+      let isCharacter = false;
+      hit.object.traverseAncestors(p => {
+        if (p === g.playerFig.group) isCharacter = true;
+        for (const o of g.onis) { if (p === o.fig.group) isCharacter = true; }
+        if (g.cpuAllies) {
+          for (const a of g.cpuAllies) { if (p === a.fig.group) isCharacter = true; }
+        }
+      });
+      if (isCharacter) continue;
+      if (hit.distance < tDist - 0.5) return false;
+    }
+    return true;
+  }
+
+  // Check visibility for human player
   const playerPos = g.player.position;
   const pDir = new THREE.Vector2(playerPos.x - oni.position.x, playerPos.z - oni.position.z);
   const pDist = pDir.length();
-  const pAngle = Math.atan2(pDir.x, pDir.y);
-  // Robust angle diff (handles JS negative modulo)
-  let angleDiff = pAngle - oni.rotation;
-  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-  angleDiff = Math.abs(angleDiff);
+  // Peeking reduces detection distance to 8m (spec §11.7)
+  const peekBlocked = g.player.isPeeking !== 'none' && pDist > 8;
+  const canSeePlayer = !peekBlocked && checkTargetVisibility(playerPos, g.player.isCrouching, g.player.captured, g.playerFig);
 
-  // Can player be seen? (distance + angle + crouching cover + line of sight)
-  let canSee = false;
-  if (pDist < viewDist && angleDiff < oni.viewAngle / 2 && !g.player.captured) {
-    // Crouching behind obstacles reduces effective view distance
-    const effectiveDist = g.player.isCrouching ? viewDist * 0.5 : viewDist;
-    if (pDist < effectiveDist) {
-      // Line of sight raycast — check if obstacles block the view
-      const oniEye = new THREE.Vector3(oni.position.x, oni.position.y + 1.5, oni.position.z);
-      const playerCenter = new THREE.Vector3(playerPos.x, playerPos.y + (g.player.isCrouching ? 0.6 : 1.0), playerPos.z);
-      const dir3d = playerCenter.clone().sub(oniEye).normalize();
-      const ray = new THREE.Raycaster(oniEye, dir3d, 0, pDist);
-      const hits = ray.intersectObjects(g.scene.children, true);
-      let blocked = false;
-      for (const hit of hits) {
-        // Skip ground, shadows, non-blocking objects
-        if (hit.object === g.ground) continue;
-        if (hit.object.material && hit.object.material.transparent && hit.object.material.opacity < 0.5) continue;
-        if (hit.object.material && hit.object.material.wireframe) continue;
-        if (hit.object.type === 'Line' || hit.object.type === 'Sprite') continue;
-        // Skip stick figure meshes (player & oni)
-        let isCharacter = false;
-        hit.object.traverseAncestors(p => {
-          if (p === g.playerFig.group) isCharacter = true;
-          for (const o of g.onis) { if (p === o.fig.group) isCharacter = true; }
-        });
-        if (isCharacter) continue;
-        // Actual blocker found
-        if (hit.distance < pDist - 0.5) { blocked = true; break; }
+  // Check visibility for all CPU allies & find closest visible target
+  let closestVisibleTarget = null; // null = no target, 'player' = human, or ally object
+  let closestVisibleDist = Infinity;
+  let closestVisiblePos = null;
+  let closestVisibleName = null;
+
+  if (canSeePlayer && pDist < closestVisibleDist) {
+    closestVisibleTarget = 'player';
+    closestVisibleDist = pDist;
+    closestVisiblePos = playerPos.clone();
+    closestVisibleName = gameState.username || 'Player';
+  }
+
+  if (g.cpuAllies) {
+    for (const ally of g.cpuAllies) {
+      if (ally.captured) continue;
+      const aDir = new THREE.Vector2(ally.position.x - oni.position.x, ally.position.z - oni.position.z);
+      const aDist = aDir.length();
+      const canSeeAlly = checkTargetVisibility(ally.position, ally.isCrouching, ally.captured, ally.fig);
+      if (canSeeAlly && aDist < closestVisibleDist) {
+        closestVisibleTarget = ally;
+        closestVisibleDist = aDist;
+        closestVisiblePos = ally.position.clone();
+        closestVisibleName = ally.name;
       }
-      canSee = !blocked;
+    }
+  }
+
+  const canSeeAny = closestVisibleTarget !== null;
+
+  // Also check foot sounds from CPU allies
+  let loudestFootTarget = null;
+  let loudestFootDist = Infinity;
+  // Player foot sound check
+  const footRange = getFootSoundRange(g);
+  if (pDist < footRange && g.player.moveSpeed > 0.5 && !g.player.captured) {
+    loudestFootDist = pDist;
+    loudestFootTarget = playerPos.clone();
+  }
+  // CPU ally foot sound check (allies running make sound too)
+  if (g.cpuAllies) {
+    for (const ally of g.cpuAllies) {
+      if (ally.captured || ally.isCrouching) continue;
+      const aDist = oni.position.distanceTo(ally.position);
+      const allyFootRange = ally.moveSpeed > 4 ? 8 * 1.5 : 8; // Running = louder
+      if (ally.moveSpeed > 0.5 && aDist < allyFootRange && aDist < loudestFootDist) {
+        loudestFootDist = aDist;
+        loudestFootTarget = ally.position.clone();
+      }
     }
   }
 
@@ -3517,38 +3670,66 @@ function updateOni(g, oni, dt) {
       }
       const speed = oni.speed * fatigueMult;
       moveOni(oni, wp.x, wp.z, speed, dt, g);
-      // Check vision
-      if (canSee) {
+      // Check vision — chase closest visible target
+      if (canSeeAny) {
         oni.state = 'chase';
-        oni.chasedPlayer = playerPos.clone();
+        oni.chasedPlayer = closestVisiblePos;
+        oni.chaseTarget = closestVisibleTarget;
         oni.stateTimer = 0;
       }
       // Check footsound
-      if (pDist < getFootSoundRange(g) && g.player.moveSpeed > 0.5) {
+      if (loudestFootTarget && !canSeeAny) {
         oni.stateTimer += dt;
         if (oni.stateTimer > 3) {
           oni.state = 'footSound';
-          oni.targetPos = playerPos.clone();
+          oni.targetPos = loudestFootTarget;
           oni.stateTimer = 0;
         }
-      } else {
+      } else if (!canSeeAny) {
         oni.stateTimer = 0;
       }
       break;
     }
     case 'chase': {
-      if (canSee) {
-        oni.chasedPlayer = playerPos.clone();
+      // Re-check if we can still see the current chase target
+      let canSeeChaseTarget = false;
+      if (oni.chaseTarget === 'player') {
+        canSeeChaseTarget = canSeePlayer;
+      } else if (oni.chaseTarget && typeof oni.chaseTarget === 'object') {
+        canSeeChaseTarget = checkTargetVisibility(oni.chaseTarget.position, oni.chaseTarget.isCrouching, oni.chaseTarget.captured, oni.chaseTarget.fig);
+      }
+      // If we see a closer target, switch
+      if (canSeeAny && closestVisibleDist < (oni.chaseTarget === 'player' ? pDist : Infinity) * 0.8) {
+        oni.chasedPlayer = closestVisiblePos;
+        oni.chaseTarget = closestVisibleTarget;
+      } else if (canSeeChaseTarget) {
+        // Update chase position
+        if (oni.chaseTarget === 'player') {
+          oni.chasedPlayer = playerPos.clone();
+        } else if (oni.chaseTarget && typeof oni.chaseTarget === 'object') {
+          oni.chasedPlayer = oni.chaseTarget.position.clone();
+        }
+      }
+
+      if (canSeeChaseTarget || canSeeAny) {
         oni.seeTimer = (oni.seeTimer || 0) + dt;
       } else {
         oni.seeTimer = 0;
       }
       const speed = oni.chaseSpeed * fatigueMult;
       moveOni(oni, oni.chasedPlayer.x, oni.chasedPlayer.z, speed, dt, g);
+
+      // Determine distance to chase target
+      let chaseTargetDist = pDist;
+      if (oni.chaseTarget && typeof oni.chaseTarget === 'object') {
+        chaseTargetDist = oni.position.distanceTo(oni.chaseTarget.position);
+      }
+
       // If continuously seeing for 1.5s and close enough → go to can touch
-      if (canSee && oni.seeTimer > 1.5 && pDist < viewDist) {
+      if ((canSeeChaseTarget || canSeeAny) && oni.seeTimer > 1.5 && chaseTargetDist < viewDist) {
         oni.state = 'canTouch';
-        oni.foundName = gameState.username || 'Player';
+        oni.foundTarget = oni.chaseTarget || closestVisibleTarget;
+        oni.foundName = (oni.chaseTarget === 'player') ? (gameState.username || 'Player') : (oni.chaseTarget && oni.chaseTarget.name ? oni.chaseTarget.name : closestVisibleName);
         oni.stateTimer = 0;
         showNotification('見つけた！ ' + oni.foundName);
         SoundManager.playGameSE('found');
@@ -3558,11 +3739,12 @@ function updateOni(g, oni, dt) {
         (oni.position.x - oni.chasedPlayer.x)**2 +
         (oni.position.z - oni.chasedPlayer.z)**2
       );
-      if (cDist < 2 && !canSee) {
+      if (cDist < 2 && !canSeeChaseTarget && !canSeeAny) {
         oni.stateTimer += dt;
         if (oni.stateTimer > 4) {
           oni.state = 'patrol';
           oni.stateTimer = 0;
+          oni.chaseTarget = null;
         }
       }
       break;
@@ -3576,16 +3758,20 @@ function updateOni(g, oni, dt) {
         (oni.position.x - canPos.x)**2 + (oni.position.z - canPos.z)**2
       );
       if (cDist < 2.5 && g.can.isAtHome) {
-        // Capture!
-        capturePlayer(g);
+        // Capture the found target!
+        capturePlayer(g, oni);
         oni.state = 'patrol';
         oni.restTimer = 2; // Post-capture pause
         oni.stateTimer = 0;
+        oni.foundTarget = null;
+        oni.chaseTarget = null;
       }
       // If can was kicked while running
       if (!g.can.isAtHome || g.can.isFlying) {
         oni.state = 'recovery';
         oni.stateTimer = 0;
+        oni.foundTarget = null;
+        oni.chaseTarget = null;
       }
       break;
     }
@@ -3603,9 +3789,10 @@ function updateOni(g, oni, dt) {
           }
         }
       }
-      if (canSee) {
+      if (canSeeAny) {
         oni.state = 'chase';
-        oni.chasedPlayer = playerPos.clone();
+        oni.chasedPlayer = closestVisiblePos;
+        oni.chaseTarget = closestVisibleTarget;
       }
       break;
     }
@@ -3623,9 +3810,10 @@ function updateOni(g, oni, dt) {
           }
         }
       }
-      if (canSee) {
+      if (canSeeAny) {
         oni.state = 'chase';
-        oni.chasedPlayer = playerPos.clone();
+        oni.chasedPlayer = closestVisiblePos;
+        oni.chaseTarget = closestVisibleTarget;
       }
       break;
     }
@@ -3694,7 +3882,444 @@ function getFootSoundRange(g) {
   return baseRange * mult;
 }
 
-function capturePlayer(g) {
+// ============================================================
+// SECTION: CPU ALLY SYSTEM
+// ============================================================
+
+// Player color palette (non-red, non-blue, mutually distinct)
+const ALLY_COLORS = [0xffcc00, 0x00e5aa, 0xaa44ff]; // Yellow, Cyan, Purple
+const ALLY_COLOR_CSS = ['#ffcc00', '#00e5aa', '#aa44ff'];
+
+function createCpuAlly(g, name, level, spawnX, spawnZ, colorIndex) {
+  const color = ALLY_COLORS[colorIndex % ALLY_COLORS.length];
+  const fig = createStickFigure(g, color, false);
+  fig.group.position.set(spawnX, 0, spawnZ);
+  g.scene.add(fig.group);
+
+  // Name sprite above head
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0)';
+  ctx.fillRect(0, 0, 128, 32);
+  ctx.font = 'bold 18px "Noto Sans JP", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = ALLY_COLOR_CSS[colorIndex % ALLY_COLOR_CSS.length];
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeText(name, 64, 22);
+  ctx.fillText(name, 64, 22);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  g.textures.push(tex);
+  const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  g.materials.push(spriteMat);
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(1.2, 0.3, 1);
+  sprite.position.y = 1.6;
+  fig.group.add(sprite);
+
+  return {
+    fig, name, level, sprite,
+    originalColor: color,
+    position: new THREE.Vector3(spawnX, 0, spawnZ),
+    rotation: 0,
+    captured: false,
+    state: 'idle', // idle, hide, flee, tryKick, captured
+    targetPos: null,
+    hideSpot: null,
+    speed: level === 'strong' ? 4.5 : (level === 'normal' ? 3.8 : 3.0),
+    fleeSpeed: level === 'strong' ? 5.5 : (level === 'normal' ? 4.5 : 3.5),
+    moveSpeed: 0,
+    stateTimer: 0,
+    kickCheckTimer: 0,
+    isCrouching: false,
+    decisionTimer: 0
+  };
+}
+
+function findHideSpot(g, ally) {
+  // Use colliders as potential hiding spots
+  const spots = g.colliders.filter(c => c.h >= 1.0); // Only tall enough cover
+  if (spots.length === 0) return null;
+
+  const level = ally.level;
+  const half = g.config.size / 2 - 2;
+
+  if (level === 'weak') {
+    // Nearest hiding spot
+    let best = null, bestDist = Infinity;
+    for (const s of spots) {
+      const dx = s.x - ally.position.x;
+      const dz = s.z - ally.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < bestDist) { bestDist = dist; best = s; }
+    }
+    if (best) {
+      // Position behind the collider (offset from center)
+      const offsetAngle = Math.atan2(best.x - ally.position.x, best.z - ally.position.z);
+      const ox = best.x - Math.sin(offsetAngle) * 1.5;
+      const oz = best.z - Math.cos(offsetAngle) * 1.5;
+      return new THREE.Vector3(
+        Math.max(-half, Math.min(half, ox)), 0,
+        Math.max(-half, Math.min(half, oz))
+      );
+    }
+  } else if (level === 'strong') {
+    // Farthest from oni start (center of map)
+    let best = null, bestDist = -1;
+    for (const s of spots) {
+      const dist = Math.sqrt(s.x * s.x + s.z * s.z);
+      if (dist > bestDist) { bestDist = dist; best = s; }
+    }
+    if (best) {
+      const offsetAngle = Math.random() * Math.PI * 2;
+      const ox = best.x + Math.sin(offsetAngle) * 1.5;
+      const oz = best.z + Math.cos(offsetAngle) * 1.5;
+      return new THREE.Vector3(
+        Math.max(-half, Math.min(half, ox)), 0,
+        Math.max(-half, Math.min(half, oz))
+      );
+    }
+  } else {
+    // Normal: random hiding spot
+    const idx = Math.floor(Math.random() * spots.length);
+    const s = spots[idx];
+    const offsetAngle = Math.random() * Math.PI * 2;
+    const ox = s.x + Math.sin(offsetAngle) * 1.5;
+    const oz = s.z + Math.cos(offsetAngle) * 1.5;
+    return new THREE.Vector3(
+      Math.max(-half, Math.min(half, ox)), 0,
+      Math.max(-half, Math.min(half, oz))
+    );
+  }
+  return null;
+}
+
+function getClosestOniDist(g, pos) {
+  let minDist = Infinity;
+  let closestOni = null;
+  for (const oni of g.onis) {
+    const dx = oni.position.x - pos.x;
+    const dz = oni.position.z - pos.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < minDist) { minDist = dist; closestOni = oni; }
+  }
+  return { dist: minDist, oni: closestOni };
+}
+
+function getCapturedAllyCount(g) {
+  let count = 0;
+  if (g.player.captured) count++;
+  for (const a of g.cpuAllies) {
+    if (a.captured) count++;
+  }
+  return count;
+}
+
+function moveCpuAlly(ally, targetX, targetZ, speed, dt, g) {
+  const dx = targetX - ally.position.x;
+  const dz = targetZ - ally.position.z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  if (dist < 0.3) {
+    ally.moveSpeed = 0;
+    return;
+  }
+
+  const moveAmount = Math.min(speed * dt, dist);
+  let newX = ally.position.x + (dx / dist) * moveAmount;
+  let newZ = ally.position.z + (dz / dist) * moveAmount;
+
+  // Boundary
+  const half = g.config.size / 2 - 0.5;
+  newX = Math.max(-half, Math.min(half, newX));
+  newZ = Math.max(-half, Math.min(half, newZ));
+
+  // Simple collider avoidance
+  for (const col of g.colliders) {
+    if (col.type === 'box') {
+      if (Math.abs(newX - col.x) < col.hw + 0.4 && Math.abs(newZ - col.z) < col.hd + 0.4) {
+        const cdx = newX - col.x;
+        const cdz = newZ - col.z;
+        if (Math.abs(cdx) / col.hw > Math.abs(cdz) / col.hd) {
+          newX = col.x + Math.sign(cdx) * (col.hw + 0.4);
+        } else {
+          newZ = col.z + Math.sign(cdz) * (col.hd + 0.4);
+        }
+      }
+    } else if (col.type === 'cylinder') {
+      const cdx = newX - col.x;
+      const cdz = newZ - col.z;
+      const cdist = Math.sqrt(cdx * cdx + cdz * cdz);
+      if (cdist < col.r + 0.4) {
+        const push = col.r + 0.4 - cdist;
+        if (cdist > 0.01) {
+          newX += (cdx / cdist) * push;
+          newZ += (cdz / cdist) * push;
+        }
+      }
+    }
+  }
+
+  ally.position.x = newX;
+  ally.position.z = newZ;
+  ally.position.y = getGroundHeight(g, newX, newZ);
+  ally.rotation = Math.atan2(dx, dz);
+  ally.moveSpeed = speed;
+
+  // Update mesh
+  ally.fig.group.position.copy(ally.position);
+  ally.fig.group.rotation.y = ally.rotation;
+}
+
+function cpuPerformKick(g, ally) {
+  // CPU ally kicks the can — similar to performCanKick but simulated
+  const power = ally.level === 'strong' ? 70 + Math.random() * 25
+    : (ally.level === 'normal' ? 40 + Math.random() * 40 : 20 + Math.random() * 30);
+
+  let quality, hideTime;
+  if (power >= 80) { quality = 'PERFECT'; hideTime = 15; }
+  else if (power >= 60) { quality = 'GREAT'; hideTime = 10; }
+  else if (power >= 30) { quality = 'GOOD'; hideTime = 6; }
+  else { quality = 'MISS'; hideTime = 3; }
+
+  showNotification(ally.name + ' が缶を蹴った！ ' + quality + '!');
+  SoundManager.playGameSE('kick');
+
+  // Can physics
+  const kickAngle = ally.rotation + (Math.random() - 0.5) * 0.5;
+  const strength = power / 100;
+  g.can.velocity.set(
+    Math.sin(kickAngle) * strength * 12,
+    strength * 6,
+    Math.cos(kickAngle) * strength * 12
+  );
+  g.can.isFlying = true;
+  g.can.isAtHome = false;
+
+  // Free all captured (rescue kick during seek phase)
+  if (g.gamePhase === 'seek' && g.capturedCount > 0) {
+    freeAllCaptured(g);
+  }
+
+  // Reset oni to recovery mode
+  for (const oni of g.onis) {
+    oni.state = 'recovery';
+    oni.stateTimer = 0;
+    oni.foundTarget = null;
+    oni.foundName = null;
+  }
+
+  // Ally flees after kicking
+  ally.state = 'flee';
+  ally.stateTimer = 0;
+  ally.targetPos = null;
+}
+
+function updateCpuAlly(g, ally, dt) {
+  if (ally.captured) {
+    // Stay near can when captured
+    ally.moveSpeed = 0;
+    ally.isCrouching = false;
+    updateStickAnimation(ally.fig, dt, 0, false, false);
+    return;
+  }
+
+  const { dist: oniDist, oni: closestOni } = getClosestOniDist(g, ally.position);
+  const canPos = g.can.group.position;
+  const canDist = ally.position.distanceTo(canPos);
+  const capturedCount = getCapturedAllyCount(g);
+
+  // Distance from can to closest oni
+  let canToOniDist = Infinity;
+  if (closestOni) {
+    canToOniDist = canPos.distanceTo(closestOni.position);
+  }
+
+  ally.stateTimer += dt;
+  ally.kickCheckTimer += dt;
+
+  switch (ally.state) {
+    case 'idle': {
+      // Initial state — find a hiding spot
+      ally.hideSpot = findHideSpot(g, ally);
+      if (ally.hideSpot) {
+        ally.state = 'hide';
+        ally.targetPos = ally.hideSpot;
+      }
+      break;
+    }
+
+    case 'hide': {
+      // Move to hiding spot
+      if (ally.targetPos) {
+        moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, ally.speed, dt, g);
+        const dist = ally.position.distanceTo(ally.targetPos);
+        if (dist < 1.0) {
+          // Arrived at hiding spot — crouch and wait
+          ally.isCrouching = true;
+          ally.moveSpeed = 0;
+          ally.state = 'hiding';
+          ally.stateTimer = 0;
+        }
+      } else {
+        ally.state = 'idle';
+      }
+      break;
+    }
+
+    case 'hiding': {
+      // Crouching at hiding spot
+      ally.isCrouching = true;
+      ally.moveSpeed = 0;
+
+      if (g.gamePhase !== 'seek') break; // Don't do anything during hide phase
+
+      // Behavior by level
+      if (ally.level === 'weak') {
+        // Weak: Just stay. Never flee, never kick.
+        // (no action)
+      } else if (ally.level === 'normal') {
+        // Normal: If oni < 10m, flee
+        if (oniDist < 10) {
+          ally.state = 'flee';
+          ally.stateTimer = 0;
+          ally.isCrouching = false;
+          ally.targetPos = null;
+          break;
+        }
+        // Normal: If allies captured AND can > 15m from oni AND ally < 15m from can, maybe kick
+        if (capturedCount > 0 && canToOniDist > 15 && canDist < 15 && g.can.isAtHome && !g.can.isFlying) {
+          if (ally.kickCheckTimer > 10) {
+            ally.kickCheckTimer = 0;
+            if (Math.random() < 0.5) {
+              ally.state = 'tryKick';
+              ally.stateTimer = 0;
+              ally.isCrouching = false;
+              ally.targetPos = canPos.clone();
+            }
+          }
+        }
+      } else if (ally.level === 'strong') {
+        // Strong: If oni < 8m, flee
+        if (oniDist < 8) {
+          ally.state = 'flee';
+          ally.stateTimer = 0;
+          ally.isCrouching = false;
+          ally.targetPos = null;
+          break;
+        }
+        // Strong: Actively try to kick if allies captured and opportunity exists
+        if (capturedCount > 0 && canToOniDist > 10 && g.can.isAtHome && !g.can.isFlying) {
+          if (ally.kickCheckTimer > 5) {
+            ally.kickCheckTimer = 0;
+            ally.state = 'tryKick';
+            ally.stateTimer = 0;
+            ally.isCrouching = false;
+            ally.targetPos = canPos.clone();
+          }
+        }
+      }
+      break;
+    }
+
+    case 'flee': {
+      // Fleeing from oni
+      ally.isCrouching = false;
+      if (closestOni) {
+        // Run away from oni
+        const fleeAngle = Math.atan2(
+          ally.position.x - closestOni.position.x,
+          ally.position.z - closestOni.position.z
+        );
+        // Add some randomness to avoid running in straight lines
+        const jitter = (Math.random() - 0.5) * 0.8;
+        const fleeX = ally.position.x + Math.sin(fleeAngle + jitter) * 8;
+        const fleeZ = ally.position.z + Math.cos(fleeAngle + jitter) * 8;
+        const half = g.config.size / 2 - 2;
+        const clampedX = Math.max(-half, Math.min(half, fleeX));
+        const clampedZ = Math.max(-half, Math.min(half, fleeZ));
+        moveCpuAlly(ally, clampedX, clampedZ, ally.fleeSpeed, dt, g);
+      }
+
+      // After fleeing for a bit, find a new hiding spot
+      if (ally.stateTimer > 3 || oniDist > 15) {
+        ally.hideSpot = findHideSpot(g, ally);
+        if (ally.hideSpot) {
+          ally.state = 'hide';
+          ally.targetPos = ally.hideSpot;
+          ally.stateTimer = 0;
+        } else {
+          ally.state = 'idle';
+        }
+      }
+      break;
+    }
+
+    case 'tryKick': {
+      // Move toward the can to kick it
+      ally.isCrouching = false;
+      if (!ally.targetPos) ally.targetPos = canPos.clone();
+
+      // If oni gets too close, abort and flee
+      const abortDist = ally.level === 'strong' ? 6 : 8;
+      if (oniDist < abortDist) {
+        ally.state = 'flee';
+        ally.stateTimer = 0;
+        ally.targetPos = null;
+        break;
+      }
+
+      // If can was kicked by someone else or isn't at home, go back to hiding
+      if (!g.can.isAtHome || g.can.isFlying) {
+        ally.state = 'idle';
+        ally.stateTimer = 0;
+        break;
+      }
+
+      // Move toward can
+      ally.targetPos.copy(canPos);
+      moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, ally.fleeSpeed, dt, g);
+
+      // Check if close enough to kick
+      const kickRange = 2.5;
+      if (canDist < kickRange) {
+        cpuPerformKick(g, ally);
+      }
+
+      // Timeout - give up after 10s
+      if (ally.stateTimer > 10) {
+        ally.state = 'idle';
+        ally.stateTimer = 0;
+      }
+      break;
+    }
+  }
+
+  // Animation update
+  updateStickAnimation(ally.fig, dt, ally.moveSpeed, ally.isCrouching, ally.moveSpeed > 4);
+}
+
+function updateAllCpuAllies(g, dt) {
+  if (!g.cpuAllies) return;
+  for (const ally of g.cpuAllies) {
+    updateCpuAlly(g, ally, dt);
+  }
+}
+
+function capturePlayer(g, oni) {
+  // Check if oni was targeting a CPU ally
+  if (oni && oni.foundTarget && oni.foundTarget !== 'player') {
+    const ally = oni.foundTarget;
+    if (ally && !ally.captured) {
+      captureAlly(g, ally);
+      oni.foundTarget = null;
+      return;
+    }
+  }
+  // Default: capture the human player
+  if (g.player.captured) return; // Already captured
   g.player.captured = true;
   g.capturedCount++;
   // Grey out player
@@ -3702,7 +4327,34 @@ function capturePlayer(g) {
   g.playerFig.mat.emissive.setHex(0x333333);
   // Constrain near can
   g.player.position.set(g.can.homePos.x + 3, 0, g.can.homePos.z);
-  showNotification('見つけた！ ' + (gameState.username || 'Player'));
+  showNotification('捕まった！ ' + (gameState.username || 'Player'));
+  SoundManager.playGameSE('capture');
+
+  // Check game over
+  const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+  if (g.capturedCount >= totalPlayers) {
+    endGame(g, false); // Oni wins
+  }
+}
+
+function captureAlly(g, ally) {
+  if (ally.captured) return;
+  ally.captured = true;
+  ally.state = 'captured';
+  ally.moveSpeed = 0;
+  ally.isCrouching = false;
+  g.capturedCount++;
+
+  // Grey out ally figure
+  ally.fig.mat.color.setHex(0x666666);
+  ally.fig.mat.emissive.setHex(0x333333);
+
+  // Place captured ally near can
+  const offset = g.cpuAllies.indexOf(ally);
+  ally.position.set(g.can.homePos.x - 2 - offset * 1.5, 0, g.can.homePos.z);
+  ally.fig.group.position.copy(ally.position);
+
+  showNotification(ally.name + ' が捕まった！');
   SoundManager.playGameSE('capture');
 
   // Check game over
@@ -3834,10 +4486,21 @@ function freeAllCaptured(g) {
     for (const ally of g.cpuAllies) {
       if (ally.captured) {
         ally.captured = false;
+        ally.state = 'idle'; // Reset to idle so they find a new hiding spot
+        ally.stateTimer = 0;
+        ally.kickCheckTimer = 0;
         if (ally.fig && ally.fig.mat) {
-          ally.fig.mat.color.setHex(0x4488ff);
-          ally.fig.mat.emissive.setHex(0x4488ff);
+          ally.fig.mat.color.setHex(ally.originalColor || 0x44aa66);
+          ally.fig.mat.emissive.setHex(ally.originalColor || 0x44aa66);
         }
+        // Scatter freed allies away from can
+        const scatterAngle = Math.random() * Math.PI * 2;
+        const scatterDist = 5 + Math.random() * 5;
+        const half = g.config.size / 2 - 2;
+        ally.position.x = Math.max(-half, Math.min(half, g.can.homePos.x + Math.sin(scatterAngle) * scatterDist));
+        ally.position.z = Math.max(-half, Math.min(half, g.can.homePos.z + Math.cos(scatterAngle) * scatterDist));
+        ally.position.y = getGroundHeight(g, ally.position.x, ally.position.z);
+        ally.fig.group.position.copy(ally.position);
       }
     }
   }
@@ -3848,8 +4511,20 @@ function freeAllCaptured(g) {
 function performHit(g, interactable) {
   g._hitCooldown = true;
   setTimeout(() => { g._hitCooldown = false; }, 5000);
-  showNotification(interactable.label);
+  showNotification('💥 ' + interactable.label + ' を叩いた！');
   SoundManager.playGameSE('hit');
+
+  // Hit animation (swing arm)
+  const fig = g.playerFig;
+  if (fig && fig.rightArm && fig.rightArm.pivot) {
+    fig.rightArm.pivot.rotation.x = -2.5;
+    setTimeout(() => {
+      if (fig.rightArm) fig.rightArm.pivot.rotation.x = -1.0;
+      setTimeout(() => {
+        if (fig.rightArm) fig.rightArm.pivot.rotation.x = 0;
+      }, 100);
+    }, 200);
+  }
 
   // Alert nearest oni
   let nearest = null, nearestDist = Infinity;
@@ -3986,9 +4661,14 @@ function updateGamePhases(g, dt) {
       }
       // Oni spawn at time thresholds
       checkOniSpawn(g);
-      // Check win (timer runs out)
-      if (g.gameTimer <= 0 && !g.player.captured) {
-        endGame(g, true); // Player survived
+      // Check win (timer runs out — win if at least one player/ally is free)
+      if (g.gameTimer <= 0) {
+        const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+        if (g.capturedCount < totalPlayers) {
+          endGame(g, true); // At least one survived
+        } else {
+          endGame(g, false); // All captured
+        }
       }
       break;
   }
@@ -4021,7 +4701,7 @@ function confirmCanPlacement(g) {
   g.player.position.set(pos.x, 0, pos.z + 2);
   g.playerFig.group.position.copy(g.player.position);
 
-  showNotification('缶を蹴れ！ (Space)');
+  showNotification('缶を蹴れ！ (F)');
   startKickGauge(g);
 }
 
@@ -4053,11 +4733,21 @@ function endGame(g, playerWon) {
     const survived = g.config.timeLimit - g.gameTimer;
     const mm = Math.floor(survived / 60);
     const ss = Math.floor(survived % 60);
-    stats.innerHTML = `
+    const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+    let html = `
       逃げ切り: ${playerWon ? '✓ YES' : '✗ NO'}<br>
       生存時間: ${mm}:${String(ss).padStart(2,'0')}<br>
-      捕獲された数: ${g.capturedCount}
+      捕獲された数: ${g.capturedCount}/${totalPlayers}
     `;
+    // Show individual ally status
+    if (g.cpuAllies && g.cpuAllies.length > 0) {
+      html += '<br><span style="color:var(--neon-cyan);font-size:12px">── 味方CPU ──</span><br>';
+      for (const ally of g.cpuAllies) {
+        const status = ally.captured ? '<span style="color:#ff4444">捕獲</span>' : '<span style="color:#44ffaa">生存</span>';
+        html += `${escapeHTML(ally.name)}: ${status}<br>`;
+      }
+    }
+    stats.innerHTML = html;
   }
 
   if (overlay) overlay.style.display = 'flex';
@@ -4116,6 +4806,26 @@ function updateHUD(g) {
     }
   }
 
+  // Peek prompt (Q/E near walls)
+  const peekEl = document.getElementById('hud-peek-prompt');
+  if (peekEl) {
+    if (g.player.nearWall && !g.player.isDashing && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
+      if (g.player.isPeeking === 'left') {
+        peekEl.textContent = '◀ Q 覗き中...';
+        peekEl.style.color = '#ffcc00';
+      } else if (g.player.isPeeking === 'right') {
+        peekEl.textContent = '覗き中... E ▶';
+        peekEl.style.color = '#ffcc00';
+      } else {
+        peekEl.textContent = 'Q◀ 覗き ▶E';
+        peekEl.style.color = '#00e5ff';
+      }
+      peekEl.style.display = 'block';
+    } else {
+      peekEl.style.display = 'none';
+    }
+  }
+
   // Danger vignette (based on nearest oni distance)
   const vignetteEl = document.getElementById('danger-vignette');
   if (vignetteEl && g.onis.length > 0) {
@@ -4162,6 +4872,17 @@ function updateMinimap(g) {
   ctx.beginPath();
   ctx.arc(cp.x, cp.y, 3, 0, Math.PI*2);
   ctx.fill();
+
+  // CPU Allies
+  if (g.cpuAllies) {
+    for (const ally of g.cpuAllies) {
+      const ap = toMap(ally.position.x, ally.position.z);
+      ctx.fillStyle = ally.captured ? '#666666' : '#44ffaa';
+      ctx.beginPath();
+      ctx.arc(ap.x, ap.y, 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
 
   // Oni direction arrows (don't show exact position, just direction)
   for (const oni of g.onis) {
@@ -4220,6 +4941,7 @@ function gameLoop(timestamp) {
 
   // Update systems
   updatePlayer(G, dt);
+  updateAllCpuAllies(G, dt);
   updateCamera(G, dt);
   updateCanPhysics(G, dt);
   updateCanEffects(G, dt);
@@ -4281,6 +5003,16 @@ function startGame(stageNum, mode) {
     const oni = createOni(G, Math.cos(angle) * dist, Math.sin(angle) * dist);
     oni.state = 'patrol'; // Will walk to can during hide phase
     G.onis.push(oni);
+  }
+
+  // Create CPU allies
+  const cpuCount = gameState.storySettings.cpuCount || 0;
+  const cpuLevels = gameState.storySettings.cpuLevels || ['normal', 'normal', 'normal'];
+  const allyNames = ['味方A', '味方B', '味方C'];
+  for (let i = 0; i < cpuCount; i++) {
+    const angle = (i + 1) * Math.PI * 2 / (cpuCount + 1);
+    const ally = createCpuAlly(G, allyNames[i], cpuLevels[i], Math.sin(angle) * 5, Math.cos(angle) * 5 - 10, i);
+    G.cpuAllies.push(ally);
   }
 
   // Show can placement UI
