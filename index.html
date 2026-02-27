@@ -2260,37 +2260,55 @@ function createProceduralTexture(type, size) {
   const d = imgData.data;
 
   if (type === 'grass_diff') {
+    const sn3 = new SimplexNoise2D(271);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const idx = (y * w + x) * 4;
       const nx = x / w, ny = y / h;
-      // Multi-octave noise for natural variation
-      const n1 = sn.noise2D(nx*4, ny*4) * 0.3;
-      const n2 = sn.noise2D(nx*12, ny*12) * 0.15;
-      const n3 = sn2.noise2D(nx*24, ny*24) * 0.08;
-      const n = n1 + n2 + n3;
-      // Blade-like variation
-      const blade = sn2.noise2D(nx*40, ny*40) * 0.1;
-      // Richer green tones with brown patches
-      const brown = Math.max(0, sn.noise2D(nx*2, ny*2) - 0.4) * 0.6;
-      d[idx]   = Math.min(255, Math.max(0, 40 + n*45 + brown*80 + blade*30 + Math.random()*8));
-      d[idx+1] = Math.min(255, Math.max(0, 95 + n*65 - brown*30 + blade*20 + Math.random()*10));
-      d[idx+2] = Math.min(255, Math.max(0, 25 + n*20 + brown*20 + Math.random()*5));
+      // Multi-octave noise — 5 layers for photorealistic detail
+      const n1 = sn.noise2D(nx*3, ny*3) * 0.25;
+      const n2 = sn.noise2D(nx*8, ny*8) * 0.15;
+      const n3 = sn2.noise2D(nx*18, ny*18) * 0.10;
+      const n4 = sn3.noise2D(nx*35, ny*35) * 0.06;
+      const n5 = sn2.noise2D(nx*60, ny*60) * 0.03;
+      const n = n1 + n2 + n3 + n4 + n5;
+      // Individual grass blade streaks (vertical direction)
+      const blade = sn3.noise2D(nx*80, ny*6) * 0.08;
+      // Brown/dry patches (irregular shapes)
+      const brown = Math.max(0, sn.noise2D(nx*2.5, ny*2.5) - 0.35) * 0.7;
+      // Darker clump areas (moss/shadow between grass)
+      const dark = Math.max(0, -sn2.noise2D(nx*5, ny*5) - 0.2) * 0.4;
+      // Subtle yellow/olive variation
+      const warm = sn3.noise2D(nx*4, ny*4) * 0.1;
+      // Sub-pixel noise for grain
+      const grain = (Math.random() - 0.5) * 6;
+      const r = 45 + n*40 + brown*90 + blade*25 + warm*30 - dark*40 + grain;
+      const g = 85 + n*55 - brown*25 + blade*15 + warm*10 - dark*50 + grain;
+      const b = 28 + n*15 + brown*15 - dark*20 + grain * 0.5;
+      d[idx]   = Math.min(255, Math.max(0, r));
+      d[idx+1] = Math.min(255, Math.max(0, g));
+      d[idx+2] = Math.min(255, Math.max(0, b));
       d[idx+3] = 255;
     }
   } else if (type === 'grass_nor') {
-    // High-detail normal map with grass blade patterns
+    // High-detail normal map — 4 frequency layers + blade patterns
+    const sn3 = new SimplexNoise2D(271);
+    const eps = 0.008;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const idx = (y * w + x) * 4;
       const nx = x / w, ny = y / h;
-      // Multiple frequency layers for fine detail
-      const dx1 = sn.noise2D(nx*8+0.01, ny*8) - sn.noise2D(nx*8-0.01, ny*8);
-      const dy1 = sn.noise2D(nx*8, ny*8+0.01) - sn.noise2D(nx*8, ny*8-0.01);
-      const dx2 = sn2.noise2D(nx*20+0.01, ny*20) - sn2.noise2D(nx*20-0.01, ny*20);
-      const dy2 = sn2.noise2D(nx*20, ny*20+0.01) - sn2.noise2D(nx*20, ny*20-0.01);
-      // Blade-like vertical strokes
-      const blade = sn.noise2D(nx*50, ny*3) * 0.15;
-      d[idx]   = Math.min(255, Math.max(0, 128 + (dx1*80 + dx2*40 + blade*40)));
-      d[idx+1] = Math.min(255, Math.max(0, 128 + (dy1*80 + dy2*40)));
+      // Layer 1: broad terrain undulation
+      const dx1 = sn.noise2D(nx*6+eps, ny*6) - sn.noise2D(nx*6-eps, ny*6);
+      const dy1 = sn.noise2D(nx*6, ny*6+eps) - sn.noise2D(nx*6, ny*6-eps);
+      // Layer 2: medium clumps
+      const dx2 = sn2.noise2D(nx*16+eps, ny*16) - sn2.noise2D(nx*16-eps, ny*16);
+      const dy2 = sn2.noise2D(nx*16, ny*16+eps) - sn2.noise2D(nx*16, ny*16-eps);
+      // Layer 3: fine grass detail
+      const dx3 = sn3.noise2D(nx*40+eps, ny*40) - sn3.noise2D(nx*40-eps, ny*40);
+      const dy3 = sn3.noise2D(nx*40, ny*40+eps) - sn3.noise2D(nx*40, ny*40-eps);
+      // Layer 4: individual blade strokes (elongated in Y)
+      const blade = sn.noise2D(nx*70, ny*5) * 0.12;
+      d[idx]   = Math.min(255, Math.max(0, 128 + (dx1*70 + dx2*35 + dx3*18 + blade*35)));
+      d[idx+1] = Math.min(255, Math.max(0, 128 + (dy1*70 + dy2*35 + dy3*18)));
       d[idx+2] = 255;
       d[idx+3] = 255;
     }
@@ -2412,7 +2430,7 @@ function createGameScene(stageConfig) {
   // Scene
   g.scene = new THREE.Scene();
   g.scene.background = new THREE.Color(0x87ceeb);
-  g.scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
+  g.scene.fog = new THREE.FogExp2(0x9ad4e8, 0.015);
 
   // Camera (TPS)
   g.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -2422,8 +2440,8 @@ function createGameScene(stageConfig) {
   g.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x404020, 0.6);
   g.scene.add(g.hemiLight);
 
-  g.sunLight = new THREE.DirectionalLight(0xfff5e6, 0.8);
-  g.sunLight.position.set(20, 30, 10);
+  g.sunLight = new THREE.DirectionalLight(0xfff0d8, 0.9);
+  g.sunLight.position.set(18, 35, 12);
   g.sunLight.castShadow = true;
   g.sunLight.shadow.mapSize.width = 2048;
   g.sunLight.shadow.mapSize.height = 2048;
@@ -2510,65 +2528,6 @@ function buildTerrain(g) {
   g.geometries.push(groundGeo);
   g.materials.push(groundMat);
   Object.values(grassTex).forEach(t => g.textures.push(t));
-
-  // --- Grass blades (InstancedMesh for volume) ---
-  const bladeGeo = new THREE.PlaneGeometry(0.12, 0.35);
-  bladeGeo.translate(0, 0.175, 0); // pivot at base
-  const bladeMat = new THREE.MeshStandardMaterial({
-    color: 0x3a8a2a, side: THREE.DoubleSide, transparent: true, opacity: 0.85,
-    roughness: 0.9, metalness: 0.0
-  });
-  g.geometries.push(bladeGeo);
-  g.materials.push(bladeMat);
-  const bladeCount = 120;
-  const blades = new THREE.InstancedMesh(bladeGeo, bladeMat, bladeCount);
-  const bladeDummy = new THREE.Object3D();
-  const grassNoise = new SimplexNoise2D(999);
-  g._bladeData = [];
-  for (let i = 0; i < bladeCount; i++) {
-    const bx = (Math.random() - 0.5) * (size - 4);
-    const bz = (Math.random() - 0.5) * (size - 4);
-    // Skip paths and sandbox
-    if (Math.abs(bx + 3) < 1.5 && Math.abs(bz) < size * 0.35) continue;
-    if (Math.abs(bz - 5) < 1.5 && Math.abs(bx) < size * 0.25) continue;
-    if (Math.sqrt(bx * bx + (bz - 2) * (bz - 2)) < 4) continue;
-    const by = getGroundHeight(g, bx, bz) || 0;
-    bladeDummy.position.set(bx, by, bz);
-    bladeDummy.rotation.set(0, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.3);
-    const sc = 0.6 + Math.random() * 0.8;
-    bladeDummy.scale.set(sc, sc + Math.random() * 0.5, sc);
-    bladeDummy.updateMatrix();
-    blades.setMatrixAt(i, bladeDummy.matrix);
-    g._bladeData.push({ idx: i, x: bx, z: bz, baseRot: bladeDummy.rotation.z, phase: Math.random() * Math.PI * 2 });
-  }
-  blades.instanceMatrix.needsUpdate = true;
-  g.scene.add(blades);
-  g._blades = blades;
-  g._bladeDummy = bladeDummy;
-
-  // --- Small wildflowers (scattered color accents) ---
-  const flowerColors = [0xffee44, 0xff88aa, 0xffffff, 0xbb88ff];
-  for (const fc of flowerColors) {
-    const fGeo = new THREE.SphereGeometry(0.04, 4, 4);
-    const fMat = new THREE.MeshStandardMaterial({ color: fc, roughness: 0.7, emissive: fc, emissiveIntensity: 0.1 });
-    g.geometries.push(fGeo);
-    g.materials.push(fMat);
-    const fCount = 8;
-    const flowers = new THREE.InstancedMesh(fGeo, fMat, fCount);
-    const fd = new THREE.Object3D();
-    for (let i = 0; i < fCount; i++) {
-      const fx = (Math.random() - 0.5) * (size - 6);
-      const fz = (Math.random() - 0.5) * (size - 6);
-      if (Math.sqrt(fx * fx + (fz - 2) * (fz - 2)) < 4) continue;
-      const fy = getGroundHeight(g, fx, fz) || 0;
-      fd.position.set(fx, fy + 0.2 + Math.random() * 0.15, fz);
-      fd.scale.setScalar(0.8 + Math.random());
-      fd.updateMatrix();
-      flowers.setMatrixAt(i, fd.matrix);
-    }
-    flowers.instanceMatrix.needsUpdate = true;
-    g.scene.add(flowers);
-  }
 
   // Asphalt paths (cross shape) — PBR enhanced
   const pathGeo = new THREE.PlaneGeometry(2.5, size * 0.7, 1, 1);
@@ -5168,28 +5127,6 @@ function updateRollingPebbles(g, dt) {
   }
 }
 
-// --- GRASS WIND ANIMATION ---
-function updateGrassWind(g, dt) {
-  if (!g._blades || !g._bladeData || !g._bladeDummy) return;
-  g._windTime = (g._windTime || 0) + dt;
-  const t = g._windTime;
-  const dummy = g._bladeDummy;
-  let changed = false;
-  for (const bd of g._bladeData) {
-    // Gentle wind sway using sin wave with per-blade phase offset
-    const wind = Math.sin(t * 1.8 + bd.phase + bd.x * 0.15) * 0.15
-               + Math.sin(t * 3.2 + bd.phase * 2 + bd.z * 0.1) * 0.08;
-    g._blades.getMatrixAt(bd.idx, dummy.matrix);
-    dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
-    dummy.rotation.setFromQuaternion(dummy.quaternion);
-    dummy.rotation.z = bd.baseRot + wind;
-    dummy.updateMatrix();
-    g._blades.setMatrixAt(bd.idx, dummy.matrix);
-    changed = true;
-  }
-  if (changed) g._blades.instanceMatrix.needsUpdate = true;
-}
-
 // --- DAY/NIGHT CYCLE ---
 function createDayNightCycle(g) {
   g.dayNight = {
@@ -5598,7 +5535,6 @@ function gameLoop(timestamp) {
     ['updateSwings', () => updateSwings(G, dt)],
     ['updateDayNight', () => updateDayNight(G, dt)],
     ['updateRollingPebbles', () => updateRollingPebbles(G, dt)],
-    ['updateGrassWind', () => updateGrassWind(G, dt)],
     ['updateGamePhases', () => updateGamePhases(G, dt)],
     ['updateHUD', () => updateHUD(G)]
   ];
