@@ -2409,6 +2409,7 @@ function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
 
   // Reset
   fig.body.position.y = 1.05;
+  fig.body.rotation.x = 0;
   fig.leftArm.pivot.rotation.x = 0;
   fig.rightArm.pivot.rotation.x = 0;
   fig.leftArm.lowerPivot.rotation.x = 0;
@@ -2923,21 +2924,26 @@ function updateOni(g, oni, dt) {
       break;
     }
     case 'chase': {
-      if (canSee) oni.chasedPlayer = playerPos.clone();
-      oni.stateTimer += dt;
+      if (canSee) {
+        oni.chasedPlayer = playerPos.clone();
+        oni.seeTimer = (oni.seeTimer || 0) + dt;
+      } else {
+        oni.seeTimer = 0;
+      }
       const speed = oni.chaseSpeed * fatigueMult;
       moveOni(oni, oni.chasedPlayer.x, oni.chasedPlayer.z, speed, dt, g);
+      // If continuously seeing for 1.5s and close enough → go to can touch
+      if (canSee && oni.seeTimer > 1.5 && pDist < viewDist) {
+        oni.state = 'canTouch';
+        oni.foundName = gameState.username || 'Player';
+        oni.stateTimer = 0;
+        showNotification('見つけた！ ' + oni.foundName);
+      }
+      // Lost target - return to patrol after searching
       const cDist = Math.sqrt(
         (oni.position.x - oni.chasedPlayer.x)**2 +
         (oni.position.z - oni.chasedPlayer.z)**2
       );
-      // If close enough and can see → go to can touch
-      if (canSee && pDist < viewDist) {
-        oni.state = 'canTouch';
-        oni.foundName = gameState.username || 'Player';
-        oni.stateTimer = 0;
-      }
-      // Lost target
       if (cDist < 2 && !canSee) {
         oni.stateTimer += dt;
         if (oni.stateTimer > 4) {
@@ -3207,6 +3213,18 @@ function freeAllCaptured(g) {
   g.player.captured = false;
   g.playerFig.mat.color.setHex(0x4488ff);
   g.playerFig.mat.emissive.setHex(0x4488ff);
+  // Free CPU allies too
+  if (g.cpuAllies) {
+    for (const ally of g.cpuAllies) {
+      if (ally.captured) {
+        ally.captured = false;
+        if (ally.fig && ally.fig.mat) {
+          ally.fig.mat.color.setHex(0x4488ff);
+          ally.fig.mat.emissive.setHex(0x4488ff);
+        }
+      }
+    }
+  }
   showNotification('全員解放！');
 }
 
