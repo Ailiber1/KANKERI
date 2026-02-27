@@ -563,6 +563,56 @@ html, body {
   .pc-only { display: none !important; }
 }
 
+/* ============================================================
+   SECTION: GAME SCREEN & HUD
+   ============================================================ */
+#game-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; background: #000; }
+#game-container { width: 100%; height: 100%; }
+#game-container canvas { display: block; width: 100%; height: 100%; }
+#game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+#game-hud > * { pointer-events: auto; }
+#hud-top-bar { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; }
+#hud-timer { font-family: 'Share Tech Mono', monospace; font-size: 28px; color: #fff; text-shadow: 0 0 10px rgba(85,153,255,0.6); background: rgba(0,0,0,0.5); padding: 4px 14px; border: 1px solid rgba(85,153,255,0.4); border-radius: 4px; }
+#hud-timer.warning { color: #ff4444; animation: timerBlink 0.5s infinite alternate; }
+@keyframes timerBlink { to { opacity: 0.4; } }
+#hud-stage-name { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: rgba(255,255,255,0.6); background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 4px; }
+#hud-stamina-wrap { position: absolute; top: 52px; left: 12px; width: 180px; }
+#hud-stamina-label { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: rgba(0,229,255,0.7); margin-bottom: 2px; }
+#hud-stamina-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,229,255,0.3); border-radius: 4px; overflow: hidden; }
+#hud-stamina-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #00e5ff, #00b8d4); transition: width 0.15s; border-radius: 4px; }
+#hud-stamina-fill.low { background: linear-gradient(90deg, #ff4444, #ff8800); }
+#hud-info-bar { position: absolute; bottom: 60px; left: 12px; display: flex; gap: 16px; align-items: center; }
+#hud-capture { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ff3366; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
+#hud-can-dir { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #00e5ff; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
+#hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
+@keyframes promptPulse { 0%,100% { box-shadow: 0 0 8px rgba(85,153,255,0.3); } 50% { box-shadow: 0 0 20px rgba(85,153,255,0.6); } }
+#hud-minimap { position: absolute; bottom: 12px; right: 12px; width: 150px; height: 150px; border: 1px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden; }
+#minimap-canvas { width: 100%; height: 100%; }
+#danger-vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-shadow: inset 0 0 80px rgba(255,0,64,0); transition: box-shadow 0.3s; }
+#kick-gauge-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; background: rgba(0,0,0,0.8); border: 1px solid #5599ff; border-radius: 8px; padding: 20px 30px; min-width: 300px; }
+#kick-gauge-title { font-family: 'Cinzel Decorative', serif; font-size: 22px; color: #ff3366; text-shadow: 0 0 15px rgba(255,51,102,0.5); margin-bottom: 14px; }
+#kick-gauge-track { position: relative; width: 100%; height: 24px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; overflow: visible; }
+#kick-gauge-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff4444, #ffaa00, #00ff41, #00e5ff); border-radius: 12px; transition: none; }
+#kick-gauge-marker { position: absolute; bottom: -8px; left: 0%; transform: translateX(-50%); color: #fff; font-size: 14px; transition: none; }
+#kick-gauge-hint { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 10px; animation: promptPulse 1s infinite; }
+#can-placement-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; background: rgba(0,0,0,0.85); border: 1px solid #5599ff; border-radius: 8px; padding: 24px 30px; min-width: 320px; }
+#placement-title { font-family: 'Share Tech Mono', monospace; font-size: 18px; color: #5599ff; margin-bottom: 14px; }
+#placement-timer { color: #ffd700; }
+#placement-options { display: flex; flex-direction: column; gap: 8px; }
+.placement-opt { font-family: 'Share Tech Mono', monospace; background: rgba(85,153,255,0.1); border: 1px solid rgba(85,153,255,0.3); color: #fff; padding: 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+.placement-opt:hover, .placement-opt.selected { background: rgba(85,153,255,0.3); border-color: #5599ff; box-shadow: 0 0 10px rgba(85,153,255,0.3); }
+#hide-countdown { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; }
+#hide-countdown-text { font-family: 'Cinzel Decorative', serif; font-size: 36px; color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,0.5); }
+#hide-countdown-time { font-family: 'Share Tech Mono', monospace; font-size: 64px; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.4); }
+#pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.pause-panel { max-width: 300px; width: 90%; padding: 30px; }
+#result-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.result-panel { max-width: 400px; width: 90%; padding: 30px; }
+/* Mobile game controls */
+#mobile-joystick { position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.3); }
+#mobile-buttons { position: absolute; bottom: 30px; right: 12px; display: flex; flex-direction: column; gap: 10px; }
+#mobile-buttons button { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #fff; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 12px 16px; }
+
 /* Scrollbar for modals */
 .modal-box::-webkit-scrollbar { width: 4px; }
 .modal-box::-webkit-scrollbar-track { background: transparent; }
@@ -761,6 +811,70 @@ html, body {
   <div class="loading-bar"><div class="loading-bar-fill" id="loading-fill"></div></div>
 </div>
 
+<!-- ============================================================
+     SECTION: GAME SCREEN
+     ============================================================ -->
+<div id="game-screen" class="screen">
+  <div id="game-container"></div>
+  <div id="game-hud">
+    <div id="hud-top-bar">
+      <div id="hud-timer">1:30</div>
+      <div id="hud-stage-name">Stage 1 — 児童公園</div>
+    </div>
+    <div id="hud-stamina-wrap">
+      <div id="hud-stamina-label">STAMINA</div>
+      <div id="hud-stamina-bar"><div id="hud-stamina-fill"></div></div>
+    </div>
+    <div id="hud-info-bar">
+      <div id="hud-capture">捕獲: 0/0</div>
+      <div id="hud-can-dir"></div>
+    </div>
+    <div id="hud-action-prompt" style="display:none;"></div>
+    <div id="hud-minimap"><canvas id="minimap-canvas" width="150" height="150"></canvas></div>
+    <div id="danger-vignette"></div>
+    <div id="kick-gauge-wrap" style="display:none;">
+      <div id="kick-gauge-title">缶を蹴れ！</div>
+      <div id="kick-gauge-track"><div id="kick-gauge-fill"></div><div id="kick-gauge-marker">▲</div></div>
+      <div id="kick-gauge-hint">Space / タップ</div>
+    </div>
+    <div id="can-placement-wrap" style="display:none;">
+      <div id="placement-title">缶の配置を選択 <span id="placement-timer">15</span>秒</div>
+      <div id="placement-options"></div>
+      <div id="placement-confirm" class="btn btn-neon" style="margin-top:12px;">決定</div>
+    </div>
+    <div id="hide-countdown" style="display:none;">
+      <div id="hide-countdown-text">隠れろ！</div>
+      <div id="hide-countdown-time">10</div>
+    </div>
+    <!-- Mobile controls -->
+    <div id="mobile-joystick" class="mobile-only" style="display:none;"></div>
+    <div id="mobile-buttons" class="mobile-only" style="display:none;">
+      <button id="mob-dash">DASH</button>
+      <button id="mob-crouch">CROUCH</button>
+      <button id="mob-action" style="display:none;">KICK</button>
+    </div>
+  </div>
+  <div id="pause-overlay" style="display:none;">
+    <div class="pause-panel ui-panel">
+      <div class="corner-bl"></div><div class="corner-br"></div>
+      <h2 style="font-family:'Cinzel Decorative',serif;color:#5599ff;text-align:center;margin-bottom:20px;">PAUSED</h2>
+      <button id="btn-resume" class="btn btn-neon" style="width:100%;margin-bottom:10px;">RESUME</button>
+      <button id="btn-quit-game" class="btn btn-neon" style="width:100%;">QUIT TO TITLE</button>
+    </div>
+  </div>
+  <div id="result-overlay" style="display:none;">
+    <div class="result-panel ui-panel">
+      <div class="corner-bl"></div><div class="corner-br"></div>
+      <h2 id="result-title" style="font-family:'Cinzel Decorative',serif;text-align:center;margin-bottom:16px;font-size:28px;"></h2>
+      <div id="result-stats" style="font-family:'Share Tech Mono',monospace;color:#ccc;line-height:2;"></div>
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
+        <button id="btn-retry" class="btn btn-neon" style="width:100%;">RETRY</button>
+        <button id="btn-to-title" class="btn btn-neon" style="width:100%;">TITLE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Overlays (always present) -->
 <div class="scanlines"></div>
 <div class="vignette"></div>
@@ -770,6 +884,7 @@ html, body {
      ============================================================ -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script>
 // ============================================================
 // SECTION: CONSTANTS
@@ -893,6 +1008,15 @@ function playBGM(key) {
 
 function setBGMVolume(vol) {
   if (currentBGM) currentBGM.volume = vol;
+}
+
+function stopBGM() {
+  if (bgmFadeInterval) { clearInterval(bgmFadeInterval); bgmFadeInterval = null; }
+  if (currentBGM) {
+    currentBGM.pause();
+    currentBGM.currentTime = 0;
+    currentBGM = null;
+  }
 }
 
 function toggleBGM() {
@@ -1556,16 +1680,14 @@ function initButtonHandlers() {
   document.getElementById('btn-story-start').addEventListener('click', () => {
     closeModal('story-modal');
     resumeAudioContext();
-    showNotification('Stage ' + gameState.storySettings.stage + ' — Loading...');
-    // TODO: Phase 2 — 3Dゲーム画面へ遷移
+    startGame(gameState.storySettings.stage, 'story');
   });
 
   // Score attack start
   document.getElementById('btn-score-start').addEventListener('click', () => {
     closeModal('score-modal');
     resumeAudioContext();
-    showNotification('Score Attack — Loading...');
-    // TODO: Phase 2 — 3Dゲーム画面へ遷移
+    showNotification('Score Attack — Coming Soon...');
   });
 
   // Close modals on overlay click
@@ -1580,6 +1702,2060 @@ function initButtonHandlers() {
   // Resume audio on first interaction
   document.addEventListener('click', () => resumeAudioContext(), { once: true });
   document.addEventListener('touchstart', () => resumeAudioContext(), { once: true });
+}
+
+// ============================================================
+// SECTION: STAGE 1 — GAME ENGINE
+// ============================================================
+
+// --- STAGE CONFIGS ---
+const STAGE_CONFIGS = {
+  1: {
+    name: '児童公園', nameEn: "Children's Park", size: 40, timeLimit: 90,
+    initialOni: 1, maxOni: 2, oniAddAt: [null, 67.5],
+    startPhase: 0, cycleDuration: 60,
+    canPositions: [
+      { x: 0, z: 2, label: '① 砂場の中央', labelEn: '① Sandbox Center' },
+      { x: -10, z: -6, label: '② 滑り台の横', labelEn: '② Near Slide' },
+      { x: 12, z: 8, label: '③ ベンチ付近', labelEn: '③ Near Bench' }
+    ],
+    waypoints: [
+      {x:-12,z:-12},{x:12,z:-12},{x:12,z:12},{x:-12,z:12},
+      {x:0,z:0},{x:-6,z:6},{x:8,z:-4},{x:-8,z:-8},{x:6,z:10}
+    ],
+    interactables: [
+      { type:'swing_chain', x:-5, z:-8, radius:25, label:'ブランコの鎖', sound:'metal' },
+      { type:'trashcan', x:14, z:0, radius:20, label:'ゴミ箱', sound:'thud' }
+    ]
+  }
+};
+
+// --- GAME GLOBALS ---
+let G = null; // game instance
+
+// --- SIMPLEX NOISE 2D ---
+const SimplexNoise2D = (function(){
+  const F2=0.5*(Math.sqrt(3)-1), G2=(3-Math.sqrt(3))/6;
+  const grad3=[[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+  function SN(seed){
+    this.p=new Uint8Array(512);
+    const p=new Uint8Array(256);
+    for(let i=0;i<256;i++) p[i]=i;
+    let s=seed||0;
+    for(let i=255;i>0;i--){s=(s*16807+1)&0x7fffffff;const j=s%(i+1);[p[i],p[j]]=[p[j],p[i]];}
+    for(let i=0;i<512;i++) this.p[i]=p[i&255];
+  }
+  SN.prototype.noise2D=function(x,y){
+    const s=(x+y)*F2, i=Math.floor(x+s), j=Math.floor(y+s);
+    const t=(i+j)*G2, x0=x-(i-t), y0=y-(j-t);
+    const i1=x0>y0?1:0, j1=x0>y0?0:1;
+    const x1=x0-i1+G2, y1=y0-j1+G2, x2=x0-1+2*G2, y2=y0-1+2*G2;
+    const ii=i&255, jj=j&255;
+    const gi0=this.p[ii+this.p[jj]]%8, gi1=this.p[ii+i1+this.p[jj+j1]]%8, gi2=this.p[ii+1+this.p[jj+1]]%8;
+    let n0=0,n1=0,n2=0;
+    let t0=0.5-x0*x0-y0*y0; if(t0>0){t0*=t0;n0=t0*t0*(grad3[gi0][0]*x0+grad3[gi0][1]*y0);}
+    let t1=0.5-x1*x1-y1*y1; if(t1>0){t1*=t1;n1=t1*t1*(grad3[gi1][0]*x1+grad3[gi1][1]*y1);}
+    let t2=0.5-x2*x2-y2*y2; if(t2>0){t2*=t2;n2=t2*t2*(grad3[gi2][0]*x2+grad3[gi2][1]*y2);}
+    return 70*(n0+n1+n2);
+  };
+  return SN;
+})();
+
+// --- PROCEDURAL TEXTURES (Canvas2D) ---
+function createProceduralTexture(type, size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size || 512;
+  const ctx = c.getContext('2d');
+  const sn = new SimplexNoise2D(type === 'grass' ? 42 : type === 'sand' ? 77 : 123);
+
+  if (type === 'grass_diff') {
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const n = sn.noise2D(x*0.02, y*0.02)*0.3 + sn.noise2D(x*0.08, y*0.08)*0.15;
+      const r = 45 + n*40 + Math.random()*15;
+      const g = 100 + n*60 + Math.random()*20;
+      const b = 30 + n*20 + Math.random()*10;
+      ctx.fillStyle = `rgb(${r|0},${g|0},${b|0})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  } else if (type === 'grass_nor') {
+    ctx.fillStyle = '#8080ff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const n = sn.noise2D(x*0.05, y*0.05);
+      const r = 128 + n * 40 + (Math.random()-0.5)*20;
+      const g = 128 + sn.noise2D(x*0.05+100, y*0.05)*40 + (Math.random()-0.5)*20;
+      ctx.fillStyle = `rgb(${r|0},${g|0},255)`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  } else if (type === 'grass_rough') {
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const v = 160 + sn.noise2D(x*0.03, y*0.03)*40 + Math.random()*20;
+      ctx.fillStyle = `rgb(${v|0},${v|0},${v|0})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  } else if (type === 'grass_ao') {
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const v = 220 + sn.noise2D(x*0.04, y*0.04)*30 - Math.random()*10;
+      ctx.fillStyle = `rgb(${v|0},${v|0},${v|0})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  } else if (type === 'sand_diff') {
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const n = sn.noise2D(x*0.03, y*0.03)*0.2 + sn.noise2D(x*0.1, y*0.1)*0.1;
+      const r = 200 + n*40 + Math.random()*15;
+      const g = 180 + n*35 + Math.random()*12;
+      const b = 130 + n*25 + Math.random()*10;
+      ctx.fillStyle = `rgb(${Math.min(r,255)|0},${Math.min(g,255)|0},${Math.min(b,255)|0})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  } else if (type === 'asphalt_diff') {
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const n = sn.noise2D(x*0.02, y*0.02)*0.15 + Math.random()*0.05;
+      const v = 70 + n*80 + Math.random()*12;
+      ctx.fillStyle = `rgb(${v|0},${v|0},${v+5|0})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function makeTexSet(type) {
+  const diff = createProceduralTexture(type + '_diff', 512);
+  diff.repeat.set(8, 8);
+  const nor = createProceduralTexture(type === 'grass' ? 'grass_nor' : 'grass_nor', 512);
+  nor.repeat.set(8, 8);
+  const rough = createProceduralTexture(type === 'grass' ? 'grass_rough' : 'grass_rough', 512);
+  rough.repeat.set(8, 8);
+  const ao = createProceduralTexture(type === 'grass' ? 'grass_ao' : 'grass_ao', 512);
+  ao.repeat.set(8, 8);
+  return { diff, nor, rough, ao };
+}
+
+// --- THREE.JS SCENE SETUP ---
+function createGameScene(stageConfig) {
+  const g = {};
+  g.config = stageConfig;
+  g.disposed = false;
+  g.textures = [];
+  g.geometries = [];
+  g.materials = [];
+
+  // Renderer
+  g.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  g.renderer.setSize(window.innerWidth, window.innerHeight);
+  g.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  g.renderer.shadowMap.enabled = true;
+  g.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  g.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  g.renderer.toneMappingExposure = 0.9;
+  g.renderer.outputEncoding = THREE.sRGBEncoding;
+  const container = document.getElementById('game-container');
+  container.innerHTML = '';
+  container.appendChild(g.renderer.domElement);
+
+  // Scene
+  g.scene = new THREE.Scene();
+  g.scene.background = new THREE.Color(0x87ceeb);
+  g.scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
+
+  // Camera (TPS)
+  g.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+  g.camera.position.set(0, 3, 8);
+
+  // Lights
+  g.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x404020, 0.6);
+  g.scene.add(g.hemiLight);
+
+  g.sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  g.sunLight.position.set(20, 30, 10);
+  g.sunLight.castShadow = true;
+  g.sunLight.shadow.mapSize.width = 2048;
+  g.sunLight.shadow.mapSize.height = 2048;
+  g.sunLight.shadow.camera.near = 0.5;
+  g.sunLight.shadow.camera.far = 80;
+  g.sunLight.shadow.camera.left = -25;
+  g.sunLight.shadow.camera.right = 25;
+  g.sunLight.shadow.camera.top = 25;
+  g.sunLight.shadow.camera.bottom = -25;
+  g.sunLight.shadow.bias = -0.001;
+  g.scene.add(g.sunLight);
+
+  g.ambLight = new THREE.AmbientLight(0x303050, 0.3);
+  g.scene.add(g.ambLight);
+
+  // Street lights (will be created in buildStage)
+  g.streetLights = [];
+
+  return g;
+}
+
+// --- TERRAIN GENERATION ---
+function buildTerrain(g) {
+  const size = g.config.size;
+  const segments = 128;
+  const noise = new SimplexNoise2D(42);
+
+  // Main ground
+  const groundGeo = new THREE.PlaneGeometry(size, size, segments, segments);
+  const verts = groundGeo.attributes.position.array;
+
+  // Apply displacement
+  for (let i = 0; i < verts.length; i += 3) {
+    const x = verts[i], y = verts[i+1];
+    // Large gentle undulation
+    let h = noise.noise2D(x * 0.04, y * 0.04) * 0.15;
+    // Fine detail
+    h += noise.noise2D(x * 0.15, y * 0.15) * 0.04;
+
+    // Hill (x:8, z:12, height 1.5m, radius ~4m)
+    const hx = x - 8, hy = y - 12;
+    const hillDist = Math.sqrt(hx*hx + hy*hy);
+    if (hillDist < 5) {
+      h += Math.max(0, 1.5 * Math.cos(hillDist / 5 * Math.PI * 0.5));
+    }
+
+    // Sandbox depression (centered near origin, radius ~3m)
+    const sdist = Math.sqrt(x*x + (y-2)*(y-2));
+    if (sdist < 3.5) {
+      h -= 0.25 * Math.max(0, Math.cos(sdist / 3.5 * Math.PI * 0.5));
+    }
+
+    verts[i+2] = h;
+  }
+  groundGeo.computeVertexNormals();
+  groundGeo.rotateX(-Math.PI / 2);
+
+  // PBR Material with procedural textures
+  const grassTex = makeTexSet('grass');
+  const groundMat = new THREE.MeshStandardMaterial({
+    map: grassTex.diff,
+    normalMap: grassTex.nor,
+    normalScale: new THREE.Vector2(1.0, 1.0),
+    roughnessMap: grassTex.rough,
+    roughness: 0.85,
+    aoMap: grassTex.ao,
+    aoMapIntensity: 0.8,
+    metalness: 0.0
+  });
+  // AO needs uv2
+  groundGeo.setAttribute('uv2', groundGeo.attributes.uv);
+
+  const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+  groundMesh.receiveShadow = true;
+  g.scene.add(groundMesh);
+  g.ground = groundMesh;
+  g.groundGeo = groundGeo;
+  g.geometries.push(groundGeo);
+  g.materials.push(groundMat);
+  Object.values(grassTex).forEach(t => g.textures.push(t));
+
+  // Asphalt paths (cross shape)
+  const pathGeo = new THREE.PlaneGeometry(2.5, size * 0.7, 1, 1);
+  const aspTex = createProceduralTexture('asphalt_diff', 256);
+  aspTex.repeat.set(1, 8);
+  const pathMat = new THREE.MeshStandardMaterial({ map: aspTex, roughness: 0.6, metalness: 0.0 });
+  g.textures.push(aspTex);
+  g.materials.push(pathMat);
+  g.geometries.push(pathGeo);
+
+  const path1 = new THREE.Mesh(pathGeo, pathMat);
+  path1.rotation.x = -Math.PI/2;
+  path1.position.set(-3, 0.02, 0);
+  path1.receiveShadow = true;
+  g.scene.add(path1);
+
+  const pathGeo2 = new THREE.PlaneGeometry(size * 0.5, 2.5, 1, 1);
+  g.geometries.push(pathGeo2);
+  const path2 = new THREE.Mesh(pathGeo2, pathMat);
+  path2.rotation.x = -Math.PI/2;
+  path2.position.set(0, 0.02, 5);
+  path2.receiveShadow = true;
+  g.scene.add(path2);
+
+  // Sandbox (circle)
+  const sandGeo = new THREE.CircleGeometry(3, 32);
+  const sandTex = createProceduralTexture('sand_diff', 256);
+  sandTex.repeat.set(3, 3);
+  const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, roughness: 0.95, metalness: 0 });
+  g.textures.push(sandTex);
+  g.materials.push(sandMat);
+  g.geometries.push(sandGeo);
+
+  const sandbox = new THREE.Mesh(sandGeo, sandMat);
+  sandbox.rotation.x = -Math.PI/2;
+  sandbox.position.set(0, 0.03, 2);
+  sandbox.receiveShadow = true;
+  g.scene.add(sandbox);
+
+  // Sandbox rim
+  const rimGeo = new THREE.TorusGeometry(3, 0.15, 8, 32);
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
+  g.geometries.push(rimGeo);
+  g.materials.push(rimMat);
+  const rim = new THREE.Mesh(rimGeo, rimMat);
+  rim.rotation.x = -Math.PI/2;
+  rim.position.set(0, 0.05, 2);
+  rim.castShadow = true;
+  g.scene.add(rim);
+
+  // Boundary fence (invisible walls + visual wire fence)
+  const half = size / 2;
+  const fenceGeo = new THREE.BoxGeometry(size + 2, 2, 0.1);
+  const fenceMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8, transparent: true, opacity: 0.3, wireframe: true });
+  g.geometries.push(fenceGeo);
+  g.materials.push(fenceMat);
+
+  [{ x:0, z:-half, ry:0 }, { x:0, z:half, ry:0 }, { x:-half, z:0, ry:Math.PI/2 }, { x:half, z:0, ry:Math.PI/2 }].forEach(f => {
+    const m = new THREE.Mesh(fenceGeo, fenceMat);
+    m.position.set(f.x, 1, f.z);
+    m.rotation.y = f.ry;
+    g.scene.add(m);
+  });
+
+  // Store collision objects
+  g.colliders = [];
+}
+
+// --- PARK OBJECTS ---
+function buildParkObjects(g) {
+  const objMat = (color, emissive) => {
+    const m = new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.2 });
+    if (emissive) { m.emissive = new THREE.Color(emissive); m.emissiveIntensity = 0.1; }
+    g.materials.push(m);
+    return m;
+  };
+  const addGeo = (geo) => { g.geometries.push(geo); return geo; };
+
+  // --- Slide ---
+  const slideGroup = new THREE.Group();
+  slideGroup.position.set(-10, 0, -6);
+  // Slide surface
+  const slideGeo = addGeo(new THREE.BoxGeometry(1.2, 0.05, 3.5));
+  const slideMesh = new THREE.Mesh(slideGeo, objMat(0xcc4444));
+  slideMesh.position.set(0, 1.5, 0);
+  slideMesh.rotation.x = 0.35;
+  slideMesh.castShadow = true;
+  slideGroup.add(slideMesh);
+  // Slide legs
+  for (const sx of [-0.5, 0.5]) {
+    const legGeo = addGeo(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 8));
+    const leg = new THREE.Mesh(legGeo, objMat(0x888888));
+    leg.position.set(sx, 1.1, -1.2);
+    leg.castShadow = true;
+    slideGroup.add(leg);
+  }
+  // Slide platform
+  const platGeo = addGeo(new THREE.BoxGeometry(1.4, 0.1, 1.0));
+  const plat = new THREE.Mesh(platGeo, objMat(0x666666));
+  plat.position.set(0, 2.15, -1.5);
+  plat.castShadow = true;
+  slideGroup.add(plat);
+  // Ladder
+  const ladderGeo = addGeo(new THREE.BoxGeometry(0.8, 0.04, 0.04));
+  for (let i = 0; i < 5; i++) {
+    const rung = new THREE.Mesh(ladderGeo, objMat(0x888888));
+    rung.position.set(0, 0.4 + i*0.4, -2.0);
+    slideGroup.add(rung);
+  }
+  g.scene.add(slideGroup);
+  g.colliders.push({ type: 'box', x: -10, z: -6, hw: 1.5, hd: 2.5, h: 2.5 });
+
+  // --- Swings ---
+  const swingGroup = new THREE.Group();
+  swingGroup.position.set(-5, 0, -8);
+  // Frame
+  const frameGeo = addGeo(new THREE.CylinderGeometry(0.05, 0.05, 3, 8));
+  const frameMat = objMat(0x777777);
+  const topGeo = addGeo(new THREE.CylinderGeometry(0.04, 0.04, 4, 8));
+  for (const sx of [-1.8, 1.8]) {
+    const pole = new THREE.Mesh(frameGeo, frameMat);
+    pole.position.set(sx, 1.5, 0);
+    pole.castShadow = true;
+    swingGroup.add(pole);
+  }
+  const topBar = new THREE.Mesh(topGeo, frameMat);
+  topBar.rotation.z = Math.PI/2;
+  topBar.position.set(0, 3, 0);
+  topBar.castShadow = true;
+  swingGroup.add(topBar);
+  // Swing seats (2)
+  g.swingSeats = [];
+  for (const sx of [-0.7, 0.7]) {
+    const chainGeo = addGeo(new THREE.CylinderGeometry(0.01, 0.01, 2.2, 4));
+    const chain1 = new THREE.Mesh(chainGeo, objMat(0xaaaaaa));
+    chain1.position.set(sx - 0.15, 1.9, 0);
+    swingGroup.add(chain1);
+    const chain2 = new THREE.Mesh(chainGeo, objMat(0xaaaaaa));
+    chain2.position.set(sx + 0.15, 1.9, 0);
+    swingGroup.add(chain2);
+    const seatGeo = addGeo(new THREE.BoxGeometry(0.5, 0.03, 0.2));
+    const seat = new THREE.Mesh(seatGeo, objMat(0x333333));
+    seat.position.set(sx, 0.8, 0);
+    swingGroup.add(seat);
+    g.swingSeats.push({ chains: [chain1, chain2], seat, baseY: 0.8, sx });
+  }
+  g.scene.add(swingGroup);
+  g.swingGroup = swingGroup;
+  g.colliders.push({ type: 'box', x: -5, z: -8, hw: 2.2, hd: 0.8, h: 3 });
+
+  // --- Jungle Gym ---
+  const jgGroup = new THREE.Group();
+  jgGroup.position.set(6, 0, -5);
+  const barGeo = addGeo(new THREE.CylinderGeometry(0.03, 0.03, 2.5, 6));
+  const barMat = objMat(0x4488cc);
+  // Vertical bars
+  for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) {
+    const bar = new THREE.Mesh(barGeo, barMat);
+    bar.position.set(x * 1.0, 1.25, z * 1.0);
+    bar.castShadow = true;
+    jgGroup.add(bar);
+  }
+  // Horizontal bars
+  const hBarGeo = addGeo(new THREE.CylinderGeometry(0.025, 0.025, 2.0, 6));
+  for (let y = 0.8; y <= 2.4; y += 0.8) {
+    for (let z = -1; z <= 1; z++) {
+      const hb = new THREE.Mesh(hBarGeo, barMat);
+      hb.rotation.z = Math.PI/2;
+      hb.position.set(0, y, z * 1.0);
+      jgGroup.add(hb);
+    }
+    for (let x = -1; x <= 1; x++) {
+      const hb = new THREE.Mesh(hBarGeo, barMat);
+      hb.rotation.x = Math.PI/2;
+      hb.position.set(x * 1.0, y, 0);
+      jgGroup.add(hb);
+    }
+  }
+  g.scene.add(jgGroup);
+  g.colliders.push({ type: 'box', x: 6, z: -5, hw: 1.5, hd: 1.5, h: 2.5 });
+
+  // --- Benches (2) ---
+  function createBench(px, pz, ry) {
+    const bench = new THREE.Group();
+    bench.position.set(px, 0, pz);
+    bench.rotation.y = ry || 0;
+    const seatGeo = addGeo(new THREE.BoxGeometry(1.5, 0.06, 0.45));
+    const seat = new THREE.Mesh(seatGeo, objMat(0x8B4513));
+    seat.position.y = 0.45;
+    seat.castShadow = true;
+    bench.add(seat);
+    const backGeo = addGeo(new THREE.BoxGeometry(1.5, 0.4, 0.05));
+    const back = new THREE.Mesh(backGeo, objMat(0x8B4513));
+    back.position.set(0, 0.7, -0.2);
+    back.castShadow = true;
+    bench.add(back);
+    const legGeo = addGeo(new THREE.BoxGeometry(0.06, 0.45, 0.4));
+    const legMat = objMat(0x555555);
+    for (const lx of [-0.6, 0.6]) {
+      const leg = new THREE.Mesh(legGeo, legMat);
+      leg.position.set(lx, 0.22, 0);
+      bench.add(leg);
+    }
+    g.scene.add(bench);
+    g.colliders.push({ type: 'box', x: px, z: pz, hw: 1.0, hd: 0.5, h: 0.9 });
+  }
+  createBench(12, 8, 0);
+  createBench(-14, 4, Math.PI/4);
+
+  // --- Trees (3) ---
+  function createTree(px, pz, scale) {
+    const s = scale || 1;
+    const tree = new THREE.Group();
+    tree.position.set(px, 0, pz);
+    const trunkGeo = addGeo(new THREE.CylinderGeometry(0.15*s, 0.2*s, 3*s, 8));
+    const trunk = new THREE.Mesh(trunkGeo, objMat(0x654321));
+    trunk.position.y = 1.5*s;
+    trunk.castShadow = true;
+    tree.add(trunk);
+    const canopyGeo = addGeo(new THREE.SphereGeometry(1.8*s, 12, 10));
+    const canopy = new THREE.Mesh(canopyGeo, objMat(0x2d7a2d, 0x1a4a1a));
+    canopy.position.y = 3.5*s;
+    canopy.castShadow = true;
+    tree.add(canopy);
+    g.scene.add(tree);
+    g.colliders.push({ type: 'cylinder', x: px, z: pz, r: 0.4*s, h: 4*s });
+  }
+  createTree(-15, -3, 1.2);
+  createTree(10, -12, 1.0);
+  createTree(-8, 14, 1.1);
+
+  // --- Trash Can ---
+  const trashGeo = addGeo(new THREE.CylinderGeometry(0.25, 0.3, 0.8, 12));
+  const trash = new THREE.Mesh(trashGeo, objMat(0x444444));
+  trash.position.set(14, 0.4, 0);
+  trash.castShadow = true;
+  g.scene.add(trash);
+  const trashLid = addGeo(new THREE.CylinderGeometry(0.28, 0.28, 0.05, 12));
+  const lid = new THREE.Mesh(trashLid, objMat(0x555555));
+  lid.position.set(14, 0.82, 0);
+  g.scene.add(lid);
+  g.colliders.push({ type: 'cylinder', x: 14, z: 0, r: 0.4, h: 0.8 });
+
+  // --- Street Lights (3) ---
+  function createStreetLight(px, pz) {
+    const pole = new THREE.Group();
+    pole.position.set(px, 0, pz);
+    const poleGeo = addGeo(new THREE.CylinderGeometry(0.05, 0.07, 4, 8));
+    const poleMesh = new THREE.Mesh(poleGeo, objMat(0x444444));
+    poleMesh.position.y = 2;
+    poleMesh.castShadow = true;
+    pole.add(poleMesh);
+    // Light fixture
+    const fixGeo = addGeo(new THREE.SphereGeometry(0.15, 8, 8));
+    const fixMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffffcc, emissiveIntensity: 0.5 });
+    g.materials.push(fixMat);
+    const fix = new THREE.Mesh(fixGeo, fixMat);
+    fix.position.y = 4.1;
+    pole.add(fix);
+    // SpotLight
+    const spot = new THREE.SpotLight(0xffeedd, 0, 15, Math.PI/4, 0.5, 1);
+    spot.position.y = 4.0;
+    spot.target.position.set(px, 0, pz);
+    spot.castShadow = true;
+    spot.shadow.mapSize.set(512, 512);
+    pole.add(spot);
+    pole.add(spot.target);
+    g.scene.add(pole);
+    g.streetLights.push({ spot, fixture: fix, fixMat });
+    g.colliders.push({ type: 'cylinder', x: px, z: pz, r: 0.15, h: 4 });
+  }
+  createStreetLight(-3, -14);
+  createStreetLight(10, 5);
+  createStreetLight(-12, 10);
+
+  // --- Small details (pebbles, leaves) via InstancedMesh ---
+  const pebbleGeo = addGeo(new THREE.SphereGeometry(0.05, 4, 4));
+  const pebbleMat = objMat(0x999999);
+  const pebbles = new THREE.InstancedMesh(pebbleGeo, pebbleMat, 20);
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < 20; i++) {
+    dummy.position.set((Math.random()-0.5)*30, 0.03, (Math.random()-0.5)*30);
+    dummy.scale.setScalar(0.5 + Math.random()*1.5);
+    dummy.updateMatrix();
+    pebbles.setMatrixAt(i, dummy.matrix);
+  }
+  g.scene.add(pebbles);
+}
+
+// --- CAN ---
+function createCan(g) {
+  const canGroup = new THREE.Group();
+  // Can body
+  const canGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.2, 16);
+  g.geometries.push(canGeo);
+  const canMat = new THREE.MeshStandardMaterial({
+    color: 0xcccccc, metalness: 0.8, roughness: 0.2,
+    emissive: 0x00e5ff, emissiveIntensity: 0.3
+  });
+  g.materials.push(canMat);
+  const canMesh = new THREE.Mesh(canGeo, canMat);
+  canMesh.castShadow = true;
+  canGroup.add(canMesh);
+
+  // Neon ring
+  const ringGeo = new THREE.TorusGeometry(0.3, 0.02, 8, 32);
+  g.geometries.push(ringGeo);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.6 });
+  g.materials.push(ringMat);
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI/2;
+  canGroup.add(ring);
+
+  // Point light on can
+  const canLight = new THREE.PointLight(0x00e5ff, 0.5, 5);
+  canLight.position.y = 0.3;
+  canGroup.add(canLight);
+
+  canGroup.position.set(0, 0.1, 2); // Default sandbox center
+  g.scene.add(canGroup);
+
+  g.can = {
+    group: canGroup, mesh: canMesh, ring, light: canLight,
+    homePos: new THREE.Vector3(0, 0.1, 2),
+    velocity: new THREE.Vector3(),
+    isFlying: false, isAtHome: true
+  };
+}
+
+// --- STICK FIGURE CHARACTER ---
+function createStickFigure(g, color, isOni) {
+  const c = new THREE.Color(color);
+  const mat = new THREE.MeshStandardMaterial({
+    color: c, emissive: c,
+    emissiveIntensity: isOni ? 0.5 : 0.3,
+    roughness: 0.7, metalness: 0.1
+  });
+  g.materials.push(mat);
+
+  const fig = new THREE.Group();
+
+  // Root (at feet level)
+  const body = new THREE.Group();
+  body.position.y = 1.05;
+  fig.add(body);
+
+  // Torso
+  const torsoGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8);
+  g.geometries.push(torsoGeo);
+  const torso = new THREE.Mesh(torsoGeo, mat);
+  body.add(torso);
+
+  // Head
+  const headGeo = new THREE.SphereGeometry(0.15, 16, 16);
+  g.geometries.push(headGeo);
+  const head = new THREE.Mesh(headGeo, mat);
+  head.position.y = 0.4;
+  head.castShadow = true;
+  body.add(head);
+
+  // Arms
+  const armGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.35, 8);
+  g.geometries.push(armGeo);
+
+  function createLimb(geo, parentY, offsetX) {
+    const pivot = new THREE.Object3D();
+    pivot.position.set(offsetX, parentY, 0);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = -0.175;
+    mesh.castShadow = true;
+    pivot.add(mesh);
+    // Lower limb pivot
+    const lowerPivot = new THREE.Object3D();
+    lowerPivot.position.y = -0.35;
+    const lowerMesh = new THREE.Mesh(geo, mat);
+    lowerMesh.position.y = -0.175;
+    lowerMesh.castShadow = true;
+    lowerPivot.add(lowerMesh);
+    pivot.add(lowerPivot);
+    body.add(pivot);
+    return { pivot, lowerPivot };
+  }
+
+  const leftArm = createLimb(armGeo, 0.2, -0.12);
+  const rightArm = createLimb(armGeo, 0.2, 0.12);
+
+  // Legs
+  const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.4, 8);
+  g.geometries.push(legGeo);
+
+  function createLeg(offsetX) {
+    const pivot = new THREE.Object3D();
+    pivot.position.set(offsetX, -0.25, 0);
+    const mesh = new THREE.Mesh(legGeo, mat);
+    mesh.position.y = -0.2;
+    mesh.castShadow = true;
+    pivot.add(mesh);
+    const kneePivot = new THREE.Object3D();
+    kneePivot.position.y = -0.4;
+    const lowerLeg = new THREE.Mesh(legGeo, mat);
+    lowerLeg.position.y = -0.2;
+    lowerLeg.castShadow = true;
+    kneePivot.add(lowerLeg);
+    pivot.add(kneePivot);
+    body.add(pivot);
+    return { pivot, kneePivot };
+  }
+
+  const leftLeg = createLeg(-0.06);
+  const rightLeg = createLeg(0.06);
+
+  // Foot shadow
+  const shadowGeo = new THREE.PlaneGeometry(0.6, 0.6);
+  g.geometries.push(shadowGeo);
+  const shadowCanvas = document.createElement('canvas');
+  shadowCanvas.width = shadowCanvas.height = 64;
+  const sctx = shadowCanvas.getContext('2d');
+  const grad = sctx.createRadialGradient(32,32,0,32,32,32);
+  grad.addColorStop(0, 'rgba(0,0,0,0.4)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  sctx.fillStyle = grad;
+  sctx.fillRect(0,0,64,64);
+  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
+  const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false });
+  g.materials.push(shadowMat);
+  g.textures.push(shadowTex);
+  const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+  shadow.rotation.x = -Math.PI/2;
+  shadow.position.y = 0.02;
+  fig.add(shadow);
+
+  fig.castShadow = true;
+
+  return {
+    group: fig, body, head, torso,
+    leftArm, rightArm, leftLeg, rightLeg,
+    shadow, mat,
+    animTime: 0, state: 'idle',
+    crouching: false, peeking: 'none'
+  };
+}
+
+// --- PROCEDURAL ANIMATION ---
+function updateStickAnimation(fig, dt, moveSpeed, isCrouching, isRunning) {
+  fig.animTime += dt;
+  const t = fig.animTime;
+
+  if (isCrouching) {
+    fig.state = 'crouch';
+  } else if (moveSpeed > 3) {
+    fig.state = 'run';
+  } else if (moveSpeed > 0.3) {
+    fig.state = 'walk';
+  } else {
+    fig.state = 'idle';
+  }
+
+  // Reset
+  fig.body.position.y = 1.05;
+  fig.leftArm.pivot.rotation.x = 0;
+  fig.rightArm.pivot.rotation.x = 0;
+  fig.leftArm.lowerPivot.rotation.x = 0;
+  fig.rightArm.lowerPivot.rotation.x = 0;
+  fig.leftLeg.pivot.rotation.x = 0;
+  fig.rightLeg.pivot.rotation.x = 0;
+  fig.leftLeg.kneePivot.rotation.x = 0;
+  fig.rightLeg.kneePivot.rotation.x = 0;
+
+  const deg = Math.PI / 180;
+
+  switch (fig.state) {
+    case 'idle':
+      fig.body.position.y = 1.05 + Math.sin(t * 2) * 0.02;
+      fig.leftArm.pivot.rotation.x = 5 * deg;
+      fig.rightArm.pivot.rotation.x = 5 * deg;
+      break;
+    case 'walk': {
+      const p = 0.8; // period
+      const phase = (t % p) / p * Math.PI * 2;
+      const swing = 20 * deg;
+      fig.leftLeg.pivot.rotation.x = Math.sin(phase) * swing;
+      fig.rightLeg.pivot.rotation.x = Math.sin(phase + Math.PI) * swing;
+      fig.leftArm.pivot.rotation.x = Math.sin(phase + Math.PI) * 15 * deg;
+      fig.rightArm.pivot.rotation.x = Math.sin(phase) * 15 * deg;
+      // Knee bend on back swing
+      fig.leftLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(phase)) * 20 * deg;
+      fig.rightLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(phase + Math.PI)) * 20 * deg;
+      break;
+    }
+    case 'run': {
+      const p = 0.4;
+      const phase = (t % p) / p * Math.PI * 2;
+      const swing = 35 * deg;
+      fig.leftLeg.pivot.rotation.x = Math.sin(phase) * swing;
+      fig.rightLeg.pivot.rotation.x = Math.sin(phase + Math.PI) * swing;
+      fig.leftArm.pivot.rotation.x = Math.sin(phase + Math.PI) * 30 * deg;
+      fig.rightArm.pivot.rotation.x = Math.sin(phase) * 30 * deg;
+      fig.leftLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(phase)) * 35 * deg;
+      fig.rightLeg.kneePivot.rotation.x = Math.max(0, -Math.sin(phase + Math.PI)) * 35 * deg;
+      // Body lean forward
+      fig.body.rotation.x = 10 * deg;
+      break;
+    }
+    case 'crouch': {
+      fig.body.position.y = 0.65;
+      fig.leftLeg.pivot.rotation.x = -45 * deg;
+      fig.rightLeg.pivot.rotation.x = -45 * deg;
+      fig.leftLeg.kneePivot.rotation.x = 90 * deg;
+      fig.rightLeg.kneePivot.rotation.x = 90 * deg;
+      if (moveSpeed > 0.3) {
+        const phase = (t % 1.0) / 1.0 * Math.PI * 2;
+        fig.leftLeg.pivot.rotation.x += Math.sin(phase) * 10 * deg;
+        fig.rightLeg.pivot.rotation.x += Math.sin(phase + Math.PI) * 10 * deg;
+      }
+      break;
+    }
+  }
+}
+
+// --- PLAYER CONTROLLER ---
+function createPlayerController(g) {
+  const ctrl = {
+    keys: {},
+    mouseX: 0, mouseY: 0,
+    cameraYaw: 0, cameraPitch: 0.3,
+    position: new THREE.Vector3(0, 0, -10),
+    velocity: new THREE.Vector3(),
+    rotation: 0, // Y rotation the character faces
+    speed: 4.0,
+    dashSpeed: 8.0,
+    crouchSpeed: 2.4,
+    stamina: 100,
+    maxStamina: 100,
+    staminaDrain: 20, // per second
+    staminaRegen: 15, // per second
+    isDashing: false,
+    isCrouching: false,
+    isPeeking: 'none',
+    canKick: false,
+    canHit: null,
+    isPointerLocked: false,
+    moveSpeed: 0,
+    captured: false,
+    stayTimer: 0,
+    stayPos: new THREE.Vector3()
+  };
+
+  // Keyboard
+  const onKeyDown = (e) => { ctrl.keys[e.code] = true; };
+  const onKeyUp = (e) => { ctrl.keys[e.code] = false; };
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+  g._keyDown = onKeyDown;
+  g._keyUp = onKeyUp;
+
+  // Mouse (pointer lock)
+  const canvas = g.renderer.domElement;
+  canvas.addEventListener('click', () => {
+    if (!ctrl.isPointerLocked && g.gamePhase === 'seek') {
+      canvas.requestPointerLock();
+    }
+  });
+  const onPointerLockChange = () => {
+    ctrl.isPointerLocked = document.pointerLockElement === canvas;
+  };
+  document.addEventListener('pointerlockchange', onPointerLockChange);
+  g._pointerLockChange = onPointerLockChange;
+
+  const onMouseMove = (e) => {
+    if (!ctrl.isPointerLocked) return;
+    ctrl.cameraYaw -= e.movementX * 0.003;
+    ctrl.cameraPitch = Math.max(-0.5, Math.min(1.2, ctrl.cameraPitch + e.movementY * 0.003));
+  };
+  document.addEventListener('mousemove', onMouseMove);
+  g._mouseMove = onMouseMove;
+
+  // Mobile joystick
+  const isMobile = 'ontouchstart' in window;
+  ctrl.isMobile = isMobile;
+  ctrl.joystickAngle = 0;
+  ctrl.joystickMag = 0;
+
+  if (isMobile) {
+    const jEl = document.getElementById('mobile-joystick');
+    const bEl = document.getElementById('mobile-buttons');
+    if (jEl) jEl.style.display = 'block';
+    if (bEl) bEl.style.display = 'flex';
+
+    let jTouch = null;
+    const jRect = { cx: 0, cy: 0 };
+    jEl.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      jTouch = t.identifier;
+      const r = jEl.getBoundingClientRect();
+      jRect.cx = r.left + r.width/2;
+      jRect.cy = r.top + r.height/2;
+    });
+    jEl.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        if (t.identifier === jTouch) {
+          const dx = t.clientX - jRect.cx;
+          const dy = t.clientY - jRect.cy;
+          const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 50);
+          ctrl.joystickMag = dist / 50;
+          ctrl.joystickAngle = Math.atan2(dx, -dy);
+        }
+      }
+    });
+    const endJoystick = () => { jTouch = null; ctrl.joystickMag = 0; };
+    jEl.addEventListener('touchend', endJoystick);
+    jEl.addEventListener('touchcancel', endJoystick);
+
+    // Camera swipe (right half)
+    let camTouch = null, camLastX = 0, camLastY = 0;
+    canvas.addEventListener('touchstart', (e) => {
+      const t = e.changedTouches[0];
+      if (t.clientX > window.innerWidth * 0.4) {
+        camTouch = t.identifier;
+        camLastX = t.clientX;
+        camLastY = t.clientY;
+      }
+    });
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        if (t.identifier === camTouch) {
+          ctrl.cameraYaw -= (t.clientX - camLastX) * 0.005;
+          ctrl.cameraPitch = Math.max(-0.5, Math.min(1.2, ctrl.cameraPitch + (t.clientY - camLastY) * 0.005));
+          camLastX = t.clientX;
+          camLastY = t.clientY;
+        }
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchend', (e) => {
+      for (const t of e.changedTouches) if (t.identifier === camTouch) camTouch = null;
+    });
+
+    // Dash/Crouch buttons
+    const dashBtn = document.getElementById('mob-dash');
+    if (dashBtn) {
+      dashBtn.addEventListener('touchstart', (e) => { e.preventDefault(); ctrl.keys['ShiftLeft'] = true; });
+      dashBtn.addEventListener('touchend', () => { ctrl.keys['ShiftLeft'] = false; });
+    }
+    const crouchBtn = document.getElementById('mob-crouch');
+    if (crouchBtn) {
+      crouchBtn.addEventListener('touchstart', (e) => { e.preventDefault(); ctrl.isCrouching = !ctrl.isCrouching; });
+    }
+  }
+
+  return ctrl;
+}
+
+function updatePlayer(g, dt) {
+  const ctrl = g.player;
+  if (ctrl.captured) return;
+
+  const keys = ctrl.keys;
+
+  // Crouching toggle
+  if (keys['KeyC'] && !ctrl._cPrev) ctrl.isCrouching = !ctrl.isCrouching;
+  ctrl._cPrev = keys['KeyC'];
+
+  // Dash
+  ctrl.isDashing = (keys['ShiftLeft'] || keys['ShiftRight']) && !ctrl.isCrouching && ctrl.stamina > 0;
+
+  // Movement input
+  let mx = 0, mz = 0;
+  if (ctrl.isMobile && ctrl.joystickMag > 0.1) {
+    mx = Math.sin(ctrl.joystickAngle + ctrl.cameraYaw) * ctrl.joystickMag;
+    mz = Math.cos(ctrl.joystickAngle + ctrl.cameraYaw) * ctrl.joystickMag;
+  } else {
+    if (keys['KeyW'] || keys['ArrowUp']) mz -= 1;
+    if (keys['KeyS'] || keys['ArrowDown']) mz += 1;
+    if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1;
+    if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+    if (mx !== 0 || mz !== 0) {
+      const len = Math.sqrt(mx*mx + mz*mz);
+      mx /= len; mz /= len;
+      // Rotate by camera yaw
+      const cos = Math.cos(ctrl.cameraYaw), sin = Math.sin(ctrl.cameraYaw);
+      const rmx = mx * cos - mz * sin;
+      const rmz = mx * sin + mz * cos;
+      mx = rmx; mz = rmz;
+    }
+  }
+
+  // Speed
+  let speed = ctrl.isCrouching ? ctrl.crouchSpeed : (ctrl.isDashing ? ctrl.dashSpeed : ctrl.speed);
+
+  // Stamina
+  if (ctrl.isDashing) {
+    ctrl.stamina = Math.max(0, ctrl.stamina - ctrl.staminaDrain * dt);
+    if (ctrl.stamina <= 0) ctrl.isDashing = false;
+  } else {
+    ctrl.stamina = Math.min(ctrl.maxStamina, ctrl.stamina + ctrl.staminaRegen * dt);
+  }
+
+  // Apply movement
+  const moveX = mx * speed * dt;
+  const moveZ = mz * speed * dt;
+  ctrl.moveSpeed = Math.sqrt(moveX*moveX + moveZ*moveZ) / dt;
+
+  const newX = ctrl.position.x + moveX;
+  const newZ = ctrl.position.z + moveZ;
+
+  // Boundary check
+  const half = g.config.size / 2 - 0.5;
+  ctrl.position.x = Math.max(-half, Math.min(half, newX));
+  ctrl.position.z = Math.max(-half, Math.min(half, newZ));
+
+  // Collider check
+  let blocked = false;
+  for (const col of g.colliders) {
+    if (col.type === 'box') {
+      if (Math.abs(ctrl.position.x - col.x) < col.hw + 0.3 &&
+          Math.abs(ctrl.position.z - col.z) < col.hd + 0.3) {
+        // Push out
+        const dx = ctrl.position.x - col.x;
+        const dz = ctrl.position.z - col.z;
+        if (Math.abs(dx) / col.hw > Math.abs(dz) / col.hd) {
+          ctrl.position.x = col.x + Math.sign(dx) * (col.hw + 0.3);
+        } else {
+          ctrl.position.z = col.z + Math.sign(dz) * (col.hd + 0.3);
+        }
+      }
+    } else if (col.type === 'cylinder') {
+      const dx = ctrl.position.x - col.x;
+      const dz = ctrl.position.z - col.z;
+      const dist = Math.sqrt(dx*dx + dz*dz);
+      if (dist < col.r + 0.3) {
+        const push = (col.r + 0.3 - dist);
+        ctrl.position.x += (dx / dist) * push;
+        ctrl.position.z += (dz / dist) * push;
+      }
+    }
+  }
+
+  // Get ground height at player position
+  ctrl.position.y = getGroundHeight(g, ctrl.position.x, ctrl.position.z);
+
+  // Face movement direction
+  if (ctrl.moveSpeed > 0.5) {
+    ctrl.rotation = Math.atan2(moveX, moveZ);
+  }
+
+  // Update figure
+  const fig = g.playerFig;
+  fig.group.position.copy(ctrl.position);
+  fig.group.rotation.y = ctrl.rotation;
+  updateStickAnimation(fig, dt, ctrl.moveSpeed, ctrl.isCrouching, ctrl.isDashing);
+
+  // Stay timer (camp prevention)
+  if (ctrl.position.distanceTo(ctrl.stayPos) > 5) {
+    ctrl.stayTimer = 0;
+    ctrl.stayPos.copy(ctrl.position);
+  } else {
+    ctrl.stayTimer += dt;
+  }
+
+  // Check can proximity
+  const canDist = ctrl.position.distanceTo(g.can.group.position);
+  ctrl.canKick = canDist < 2.5 && g.can.isAtHome && !g.can.isFlying;
+
+  // Check interactable proximity
+  ctrl.canHit = null;
+  if (!ctrl.canKick) {
+    for (const inter of g.config.interactables) {
+      const dx = ctrl.position.x - inter.x;
+      const dz = ctrl.position.z - inter.z;
+      if (Math.sqrt(dx*dx + dz*dz) < 1.5) {
+        ctrl.canHit = inter;
+        break;
+      }
+    }
+  }
+
+  // Space key action
+  if (keys['Space'] && !ctrl._spacePrev) {
+    if (ctrl.canKick && g.gamePhase === 'seek') {
+      startKickGauge(g);
+    } else if (ctrl.canHit && g.gamePhase === 'seek' && !g._hitCooldown) {
+      performHit(g, ctrl.canHit);
+    }
+  }
+  ctrl._spacePrev = keys['Space'];
+
+  // Pause
+  if (keys['Escape'] && !ctrl._escPrev && g.gamePhase !== 'result') {
+    togglePause(g);
+  }
+  ctrl._escPrev = keys['Escape'];
+}
+
+function getGroundHeight(g, x, z) {
+  // Sample from ground geometry (approximate)
+  const noise = g._noise || (g._noise = new SimplexNoise2D(42));
+  let h = noise.noise2D(x * 0.04, z * 0.04) * 0.15;
+  h += noise.noise2D(x * 0.15, z * 0.15) * 0.04;
+  // Hill
+  const hx = x - 8, hz = z - 12;
+  const hillDist = Math.sqrt(hx*hx + hz*hz);
+  if (hillDist < 5) h += Math.max(0, 1.5 * Math.cos(hillDist / 5 * Math.PI * 0.5));
+  // Sandbox
+  const sdist = Math.sqrt(x*x + (z-2)*(z-2));
+  if (sdist < 3.5) h -= 0.25 * Math.max(0, Math.cos(sdist / 3.5 * Math.PI * 0.5));
+  return h;
+}
+
+// --- TPS CAMERA ---
+function updateCamera(g, dt) {
+  const ctrl = g.player;
+  const fig = g.playerFig;
+
+  // Camera target distances based on state
+  let camDist = 3.0, camHeight = 1.5, shoulderOffset = 0.5;
+  let targetFOV = 60;
+
+  if (ctrl.isCrouching) {
+    camDist = 2.5; camHeight = 1.0;
+  } else if (ctrl.isDashing) {
+    camDist = 3.5; targetFOV = 65;
+  }
+
+  // Calculate camera position
+  const yaw = ctrl.cameraYaw;
+  const pitch = ctrl.cameraPitch;
+
+  const targetX = ctrl.position.x - Math.sin(yaw) * camDist * Math.cos(pitch) + Math.cos(yaw) * shoulderOffset;
+  const targetY = ctrl.position.y + camHeight + Math.sin(pitch) * camDist;
+  const targetZ = ctrl.position.z - Math.cos(yaw) * camDist * Math.cos(pitch) - Math.sin(yaw) * shoulderOffset;
+
+  // Wall collision (raycast from player to desired camera position)
+  const playerHead = new THREE.Vector3(ctrl.position.x, ctrl.position.y + 1.5, ctrl.position.z);
+  const camTarget = new THREE.Vector3(targetX, targetY, targetZ);
+  const dir = camTarget.clone().sub(playerHead).normalize();
+  const maxDist = playerHead.distanceTo(camTarget);
+
+  const raycaster = new THREE.Raycaster(playerHead, dir, 0, maxDist);
+  const hits = raycaster.intersectObjects(g.scene.children, true);
+  let finalDist = maxDist;
+  for (const hit of hits) {
+    if (hit.object === fig.shadow || hit.object.type === 'Line' || hit.object.isMesh === false) continue;
+    if (hit.distance < finalDist && hit.distance > 0.5) {
+      finalDist = hit.distance - 0.3;
+    }
+  }
+
+  const actualCam = playerHead.clone().add(dir.multiplyScalar(Math.max(0.5, finalDist)));
+
+  // Smooth interpolation
+  const lerpSpeed = 8 * dt;
+  g.camera.position.lerp(actualCam, Math.min(lerpSpeed, 1));
+
+  // Look at player head
+  const lookTarget = new THREE.Vector3(ctrl.position.x, ctrl.position.y + 1.2, ctrl.position.z);
+  g.camera.lookAt(lookTarget);
+
+  // FOV interpolation
+  g.camera.fov += (targetFOV - g.camera.fov) * 4 * dt;
+  g.camera.updateProjectionMatrix();
+}
+
+// --- ONI AI ---
+function createOni(g, spawnX, spawnZ) {
+  const fig = createStickFigure(g, 0xff2222, true);
+  fig.group.position.set(spawnX, 0, spawnZ);
+  g.scene.add(fig.group);
+
+  // Vision cone visualization (red fan on ground)
+  const coneGeo = new THREE.CircleGeometry(10, 16, -Math.PI/3, Math.PI*2/3);
+  g.geometries.push(coneGeo);
+  const coneMat = new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+  g.materials.push(coneMat);
+  const cone = new THREE.Mesh(coneGeo, coneMat);
+  cone.rotation.x = -Math.PI/2;
+  cone.position.y = 0.05;
+  fig.group.add(cone);
+
+  return {
+    fig, cone,
+    position: new THREE.Vector3(spawnX, 0, spawnZ),
+    rotation: 0,
+    state: 'patrol', // patrol, chase, canTouch, footSound, distraction, recovery
+    targetWaypoint: 0,
+    targetPos: null,
+    chasedPlayer: null,
+    speed: 3.5,
+    chaseSpeed: 5.0,
+    canTouchSpeed: 6.0,
+    viewAngle: 120 * Math.PI / 180,
+    viewDist: 20,
+    fatigue: 0,
+    fatigueRate: 3,
+    restTimer: 0,
+    stateTimer: 0,
+    foundName: null,
+    distractionPos: null
+  };
+}
+
+function updateOni(g, oni, dt) {
+  if (oni.restTimer > 0) {
+    oni.restTimer -= dt;
+    updateStickAnimation(oni.fig, dt, 0, false, false);
+    return;
+  }
+
+  // Fatigue management
+  if (oni.state === 'chase' || oni.state === 'canTouch') {
+    oni.fatigue = Math.min(100, oni.fatigue + oni.fatigueRate * dt);
+    if (oni.fatigue >= 100) {
+      oni.restTimer = 3;
+      oni.fatigue = 60;
+      oni.state = 'patrol';
+      return;
+    }
+  } else {
+    oni.fatigue = Math.max(0, oni.fatigue - 2 * dt);
+  }
+
+  // Speed modifier from fatigue
+  let fatigueMult = 1;
+  if (oni.fatigue > 80) fatigueMult = 0.7;
+  else if (oni.fatigue > 60) fatigueMult = 0.8;
+  else if (oni.fatigue > 30) fatigueMult = 0.9;
+
+  // Vision distance (night = shorter)
+  const timeOfDay = g.dayNight ? g.dayNight.phase : 'day';
+  let viewDist = oni.viewDist;
+  if (timeOfDay === 'night') viewDist = 15;
+
+  const playerPos = g.player.position;
+  const pDir = new THREE.Vector2(playerPos.x - oni.position.x, playerPos.z - oni.position.z);
+  const pDist = pDir.length();
+  const pAngle = Math.atan2(pDir.x, pDir.y);
+  const angleDiff = Math.abs(((pAngle - oni.rotation + Math.PI) % (Math.PI*2)) - Math.PI);
+
+  // Can player be seen?
+  const canSee = pDist < viewDist && angleDiff < oni.viewAngle / 2 && !g.player.captured;
+
+  switch (oni.state) {
+    case 'patrol': {
+      const wp = g.config.waypoints[oni.targetWaypoint];
+      const dx = wp.x - oni.position.x;
+      const dz = wp.z - oni.position.z;
+      const dist = Math.sqrt(dx*dx + dz*dz);
+      if (dist < 1.5) {
+        oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
+      }
+      const speed = oni.speed * fatigueMult;
+      moveOni(oni, wp.x, wp.z, speed, dt, g);
+      // Check vision
+      if (canSee) {
+        oni.state = 'chase';
+        oni.chasedPlayer = playerPos.clone();
+        oni.stateTimer = 0;
+      }
+      // Check footsound
+      if (pDist < getFootSoundRange(g) && g.player.moveSpeed > 0.5) {
+        oni.stateTimer += dt;
+        if (oni.stateTimer > 3) {
+          oni.state = 'footSound';
+          oni.targetPos = playerPos.clone();
+          oni.stateTimer = 0;
+        }
+      } else {
+        oni.stateTimer = 0;
+      }
+      break;
+    }
+    case 'chase': {
+      if (canSee) oni.chasedPlayer = playerPos.clone();
+      oni.stateTimer += dt;
+      const speed = oni.chaseSpeed * fatigueMult;
+      moveOni(oni, oni.chasedPlayer.x, oni.chasedPlayer.z, speed, dt, g);
+      const cDist = Math.sqrt(
+        (oni.position.x - oni.chasedPlayer.x)**2 +
+        (oni.position.z - oni.chasedPlayer.z)**2
+      );
+      // If close enough and can see → go to can touch
+      if (canSee && pDist < viewDist) {
+        oni.state = 'canTouch';
+        oni.foundName = gameState.username || 'Player';
+        oni.stateTimer = 0;
+      }
+      // Lost target
+      if (cDist < 2 && !canSee) {
+        oni.stateTimer += dt;
+        if (oni.stateTimer > 4) {
+          oni.state = 'patrol';
+          oni.stateTimer = 0;
+        }
+      }
+      break;
+    }
+    case 'canTouch': {
+      // Run to can
+      const canPos = g.can.group.position;
+      const speed = oni.canTouchSpeed * fatigueMult;
+      moveOni(oni, canPos.x, canPos.z, speed, dt, g);
+      const cDist = Math.sqrt(
+        (oni.position.x - canPos.x)**2 + (oni.position.z - canPos.z)**2
+      );
+      if (cDist < 2.5 && g.can.isAtHome) {
+        // Capture!
+        capturePlayer(g);
+        oni.state = 'patrol';
+        oni.restTimer = 2; // Post-capture pause
+        oni.stateTimer = 0;
+      }
+      // If can was kicked while running
+      if (!g.can.isAtHome || g.can.isFlying) {
+        oni.state = 'recovery';
+        oni.stateTimer = 0;
+      }
+      break;
+    }
+    case 'footSound': {
+      if (oni.targetPos) {
+        moveOni(oni, oni.targetPos.x, oni.targetPos.z, oni.speed * fatigueMult, dt, g);
+        const dist = Math.sqrt(
+          (oni.position.x - oni.targetPos.x)**2 + (oni.position.z - oni.targetPos.z)**2
+        );
+        if (dist < 2) {
+          oni.stateTimer += dt;
+          if (oni.stateTimer > 3) {
+            oni.state = 'patrol';
+            oni.stateTimer = 0;
+          }
+        }
+      }
+      if (canSee) {
+        oni.state = 'chase';
+        oni.chasedPlayer = playerPos.clone();
+      }
+      break;
+    }
+    case 'distraction': {
+      if (oni.distractionPos) {
+        moveOni(oni, oni.distractionPos.x, oni.distractionPos.z, oni.speed * fatigueMult, dt, g);
+        const dist = Math.sqrt(
+          (oni.position.x - oni.distractionPos.x)**2 + (oni.position.z - oni.distractionPos.z)**2
+        );
+        if (dist < 2) {
+          oni.stateTimer += dt;
+          if (oni.stateTimer > 3) {
+            oni.state = 'patrol';
+            oni.stateTimer = 0;
+          }
+        }
+      }
+      if (canSee) {
+        oni.state = 'chase';
+        oni.chasedPlayer = playerPos.clone();
+      }
+      break;
+    }
+    case 'recovery': {
+      // Go to can, pick up, return
+      const canPos = g.can.group.position;
+      moveOni(oni, canPos.x, canPos.z, oni.speed * fatigueMult, dt, g);
+      const dist = Math.sqrt(
+        (oni.position.x - canPos.x)**2 + (oni.position.z - canPos.z)**2
+      );
+      if (dist < 1.5 && !g.can.isFlying) {
+        // Return can to home
+        g.can.group.position.copy(g.can.homePos);
+        g.can.isAtHome = true;
+        oni.state = 'patrol';
+        oni.fatigue = Math.max(0, oni.fatigue - 15);
+      }
+      break;
+    }
+  }
+
+  // Update vision cone color based on state
+  if (oni.state === 'chase' || oni.state === 'canTouch') {
+    oni.cone.material.color.setHex(0xcc0000);
+    oni.cone.material.opacity = 0.35;
+  } else if (oni.state === 'footSound') {
+    oni.cone.material.color.setHex(0xff8800);
+    oni.cone.material.opacity = 0.25;
+  } else {
+    oni.cone.material.color.setHex(0xff3333);
+    oni.cone.material.opacity = 0.15;
+  }
+}
+
+function moveOni(oni, targetX, targetZ, speed, dt, g) {
+  const dx = targetX - oni.position.x;
+  const dz = targetZ - oni.position.z;
+  const dist = Math.sqrt(dx*dx + dz*dz);
+  if (dist < 0.1) return;
+
+  const moveSpeed = Math.min(speed * dt, dist);
+  oni.position.x += (dx / dist) * moveSpeed;
+  oni.position.z += (dz / dist) * moveSpeed;
+
+  // Boundary
+  const half = g.config.size / 2 - 0.5;
+  oni.position.x = Math.max(-half, Math.min(half, oni.position.x));
+  oni.position.z = Math.max(-half, Math.min(half, oni.position.z));
+
+  // Ground height
+  oni.position.y = getGroundHeight(g, oni.position.x, oni.position.z);
+
+  // Face direction
+  oni.rotation = Math.atan2(dx, dz);
+
+  // Update mesh
+  oni.fig.group.position.copy(oni.position);
+  oni.fig.group.rotation.y = oni.rotation;
+  const isRunning = oni.state === 'chase' || oni.state === 'canTouch';
+  updateStickAnimation(oni.fig, dt, speed, false, isRunning);
+}
+
+function getFootSoundRange(g) {
+  const baseRange = 8; // grass default
+  const mult = g.player.isDashing ? 1.8 : (g.player.isCrouching ? 0.3 : 1.0);
+  return baseRange * mult;
+}
+
+function capturePlayer(g) {
+  g.player.captured = true;
+  g.capturedCount++;
+  // Grey out player
+  g.playerFig.mat.color.setHex(0x666666);
+  g.playerFig.mat.emissive.setHex(0x333333);
+  // Constrain near can
+  g.player.position.set(g.can.homePos.x + 3, 0, g.can.homePos.z);
+  showNotification('見つけた！ ' + (gameState.username || 'Player'));
+
+  // Check game over
+  const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+  if (g.capturedCount >= totalPlayers) {
+    endGame(g, false); // Oni wins
+  }
+}
+
+// --- CAN MECHANICS ---
+function startKickGauge(g) {
+  if (g.kickGaugeActive) return;
+  g.kickGaugeActive = true;
+  g.kickGaugeValue = 0;
+  g.kickGaugeDir = 1;
+  g.kickGaugeSpeed = 120; // percent per second
+  const wrap = document.getElementById('kick-gauge-wrap');
+  if (wrap) wrap.style.display = 'block';
+}
+
+function updateKickGauge(g, dt) {
+  if (!g.kickGaugeActive) return;
+  g.kickGaugeValue += g.kickGaugeDir * g.kickGaugeSpeed * dt;
+  if (g.kickGaugeValue >= 100) { g.kickGaugeValue = 100; g.kickGaugeDir = -1; }
+  if (g.kickGaugeValue <= 0) { g.kickGaugeValue = 0; g.kickGaugeDir = 1; }
+
+  // Update UI
+  const fill = document.getElementById('kick-gauge-fill');
+  const marker = document.getElementById('kick-gauge-marker');
+  if (fill) fill.style.width = g.kickGaugeValue + '%';
+  if (marker) marker.style.left = g.kickGaugeValue + '%';
+
+  // Confirm kick on Space
+  if (g.player.keys['Space'] && !g._kickSpacePrev) {
+    performCanKick(g, g.kickGaugeValue);
+    g.kickGaugeActive = false;
+    const wrap = document.getElementById('kick-gauge-wrap');
+    if (wrap) wrap.style.display = 'none';
+  }
+  g._kickSpacePrev = g.player.keys['Space'];
+}
+
+function performCanKick(g, power) {
+  // Determine quality
+  let quality, hideTime;
+  if (power >= 80) { quality = 'PERFECT'; hideTime = 15; }
+  else if (power >= 60) { quality = 'GREAT'; hideTime = 10; }
+  else if (power >= 30) { quality = 'GOOD'; hideTime = 6; }
+  else { quality = 'MISS'; hideTime = 3; }
+
+  showNotification(quality + '!');
+
+  // Can physics
+  const kickAngle = g.player.rotation;
+  const strength = power / 100;
+  g.can.velocity.set(
+    Math.sin(kickAngle) * strength * 12,
+    strength * 6,
+    Math.cos(kickAngle) * strength * 12
+  );
+  g.can.isFlying = true;
+  g.can.isAtHome = false;
+
+  // If in seek phase (rescue kick), free all captured
+  if (g.gamePhase === 'seek' && g.capturedCount > 0) {
+    freeAllCaptured(g);
+    hideTime = 0; // No hide time for rescue kick during seek
+  }
+
+  // If initial kick phase, transition to hide phase
+  if (g.gamePhase === 'kick') {
+    g.hideTime = hideTime;
+    // Wait for can to land, then go to hide phase
+  }
+
+  // Play kick SE
+  if (SoundManager.seEnabled) {
+    SoundManager.playSE('click');
+  }
+}
+
+function updateCanPhysics(g, dt) {
+  if (!g.can.isFlying) return;
+
+  g.can.velocity.y -= 15 * dt; // Gravity
+  g.can.group.position.x += g.can.velocity.x * dt;
+  g.can.group.position.y += g.can.velocity.y * dt;
+  g.can.group.position.z += g.can.velocity.z * dt;
+
+  // Rotate can for visual effect
+  g.can.mesh.rotation.x += 10 * dt;
+
+  // Ground bounce
+  const groundY = getGroundHeight(g, g.can.group.position.x, g.can.group.position.z);
+  if (g.can.group.position.y <= groundY + 0.1) {
+    g.can.group.position.y = groundY + 0.1;
+    g.can.velocity.y *= -0.3; // Bounce
+    g.can.velocity.x *= 0.7; // Friction
+    g.can.velocity.z *= 0.7;
+
+    // Stop if very slow
+    if (Math.abs(g.can.velocity.y) < 0.5 && g.can.velocity.length() < 0.5) {
+      g.can.isFlying = false;
+      g.can.velocity.set(0, 0, 0);
+
+      // Transition phases
+      if (g.gamePhase === 'kick') {
+        g.gamePhase = 'hide';
+        g.phaseTimer = g.hideTime || 10;
+        showHideCountdown(g, true);
+      }
+    }
+  }
+
+  // Boundary
+  const half = g.config.size / 2 - 1;
+  g.can.group.position.x = Math.max(-half, Math.min(half, g.can.group.position.x));
+  g.can.group.position.z = Math.max(-half, Math.min(half, g.can.group.position.z));
+}
+
+function freeAllCaptured(g) {
+  g.capturedCount = 0;
+  g.player.captured = false;
+  g.playerFig.mat.color.setHex(0x4488ff);
+  g.playerFig.mat.emissive.setHex(0x4488ff);
+  showNotification('全員解放！');
+}
+
+function performHit(g, interactable) {
+  g._hitCooldown = true;
+  setTimeout(() => { g._hitCooldown = false; }, 5000);
+  showNotification(interactable.label);
+  if (SoundManager.seEnabled) SoundManager.playSE('click');
+
+  // Alert nearest oni
+  let nearest = null, nearestDist = Infinity;
+  for (const oni of g.onis) {
+    const dx = oni.position.x - interactable.x;
+    const dz = oni.position.z - interactable.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    if (dist < interactable.radius && dist < nearestDist) {
+      nearest = oni;
+      nearestDist = dist;
+    }
+  }
+  if (nearest && nearest.state === 'patrol') {
+    nearest.state = 'distraction';
+    nearest.distractionPos = new THREE.Vector3(interactable.x, 0, interactable.z);
+    nearest.stateTimer = 0;
+  }
+}
+
+// --- DAY/NIGHT CYCLE ---
+function createDayNightCycle(g) {
+  g.dayNight = {
+    time: g.config.startPhase * 15, // Start phase in seconds
+    cycleDuration: g.config.cycleDuration || 60,
+    phase: 'morning',
+    phases: [
+      { name: 'morning', skyColor: 0xffd0a0, sunColor: 0xffe0b0, sunIntensity: 0.6, hemiSky: 0xffd0a0, hemiGround: 0x806040 },
+      { name: 'day', skyColor: 0x87ceeb, sunColor: 0xffffff, sunIntensity: 1.0, hemiSky: 0x87ceeb, hemiGround: 0x404020 },
+      { name: 'evening', skyColor: 0xff8844, sunColor: 0xff8844, sunIntensity: 0.6, hemiSky: 0xff6644, hemiGround: 0x803010 },
+      { name: 'night', skyColor: 0x112244, sunColor: 0x4466aa, sunIntensity: 0.2, hemiSky: 0x112244, hemiGround: 0x101020 }
+    ]
+  };
+}
+
+function updateDayNight(g, dt) {
+  const dn = g.dayNight;
+  dn.time += dt;
+  if (dn.time >= dn.cycleDuration) dn.time -= dn.cycleDuration;
+
+  const phaseDuration = dn.cycleDuration / 4;
+  const phaseIndex = Math.floor(dn.time / phaseDuration) % 4;
+  const nextIndex = (phaseIndex + 1) % 4;
+  const phaseProgress = (dn.time % phaseDuration) / phaseDuration;
+
+  const current = dn.phases[phaseIndex];
+  const next = dn.phases[nextIndex];
+  dn.phase = current.name;
+
+  // Blend factor (smooth transition in last 20% of each phase)
+  let blend = 0;
+  if (phaseProgress > 0.8) {
+    blend = (phaseProgress - 0.8) / 0.2;
+  }
+
+  // Sky
+  const skyColor = new THREE.Color(current.skyColor).lerp(new THREE.Color(next.skyColor), blend);
+  g.scene.background = skyColor;
+  g.scene.fog.color = skyColor;
+
+  // Sun
+  const sunColor = new THREE.Color(current.sunColor).lerp(new THREE.Color(next.sunColor), blend);
+  g.sunLight.color = sunColor;
+  g.sunLight.intensity = current.sunIntensity + (next.sunIntensity - current.sunIntensity) * blend;
+
+  // Sun position (rotate around)
+  const angle = (dn.time / dn.cycleDuration) * Math.PI * 2 - Math.PI/2;
+  g.sunLight.position.set(Math.cos(angle) * 30, Math.sin(angle) * 25 + 10, 15);
+
+  // Hemisphere light
+  g.hemiLight.color = new THREE.Color(current.hemiSky).lerp(new THREE.Color(next.hemiSky), blend);
+  g.hemiLight.groundColor = new THREE.Color(current.hemiGround).lerp(new THREE.Color(next.hemiGround), blend);
+
+  // Street lights (on at night/evening)
+  const lightOn = (dn.phase === 'night' || (dn.phase === 'evening' && phaseProgress > 0.8));
+  for (const sl of g.streetLights) {
+    sl.spot.intensity = lightOn ? 1.5 : 0;
+    sl.fixMat.emissiveIntensity = lightOn ? 1.0 : 0.1;
+  }
+}
+
+// --- GAME STATE MACHINE ---
+function showHideCountdown(g, show) {
+  const el = document.getElementById('hide-countdown');
+  if (el) el.style.display = show ? 'block' : 'none';
+}
+
+function updateGamePhases(g, dt) {
+  switch (g.gamePhase) {
+    case 'placement':
+      g.placementTimer -= dt;
+      const ptEl = document.getElementById('placement-timer');
+      if (ptEl) ptEl.textContent = Math.ceil(g.placementTimer);
+      if (g.placementTimer <= 0) {
+        confirmCanPlacement(g);
+      }
+      break;
+
+    case 'kick':
+      // Waiting for player to kick the can
+      updateKickGauge(g, dt);
+      break;
+
+    case 'hide':
+      g.phaseTimer -= dt;
+      const hideEl = document.getElementById('hide-countdown-time');
+      if (hideEl) hideEl.textContent = Math.ceil(Math.max(0, g.phaseTimer));
+      if (g.phaseTimer <= 0) {
+        g.gamePhase = 'seek';
+        showHideCountdown(g, false);
+        showNotification('鬼が動き出した！');
+        // Oni starts moving
+        for (const oni of g.onis) {
+          oni.state = 'patrol';
+        }
+      }
+      // Oni walks to can during hide phase
+      for (const oni of g.onis) {
+        const canPos = g.can.isAtHome ? g.can.homePos : g.can.group.position;
+        moveOni(oni, canPos.x, canPos.z, oni.speed * 0.8, dt, g);
+        if (oni.position.distanceTo(canPos) < 1.5 && !g.can.isAtHome) {
+          g.can.group.position.copy(g.can.homePos);
+          g.can.isAtHome = true;
+        }
+      }
+      break;
+
+    case 'seek':
+      g.gameTimer -= dt;
+      // Update onis
+      for (const oni of g.onis) {
+        updateOni(g, oni, dt);
+      }
+      // Oni spawn at time thresholds
+      checkOniSpawn(g);
+      // Check win (timer runs out)
+      if (g.gameTimer <= 0 && !g.player.captured) {
+        endGame(g, true); // Player survived
+      }
+      break;
+  }
+}
+
+function checkOniSpawn(g) {
+  const elapsed = g.config.timeLimit - g.gameTimer;
+  const threshold75 = g.config.timeLimit * 0.75;
+  if (elapsed >= threshold75 && g.onis.length < g.config.maxOni && !g._oniSpawned75) {
+    g._oniSpawned75 = true;
+    const angle = Math.random() * Math.PI * 2;
+    const half = g.config.size / 2 - 3;
+    const oni = createOni(g, Math.cos(angle) * half, Math.sin(angle) * half);
+    g.onis.push(oni);
+    showNotification('新たな鬼が現れた！');
+  }
+}
+
+function confirmCanPlacement(g) {
+  const pos = g.config.canPositions[g.selectedCanPos || 0];
+  g.can.group.position.set(pos.x, 0.1, pos.z);
+  g.can.homePos.set(pos.x, 0.1, pos.z);
+  g.can.isAtHome = true;
+
+  const wrap = document.getElementById('can-placement-wrap');
+  if (wrap) wrap.style.display = 'none';
+
+  // Move to kick phase
+  g.gamePhase = 'kick';
+  g.player.position.set(pos.x, 0, pos.z + 2);
+  g.playerFig.group.position.copy(g.player.position);
+
+  showNotification('缶を蹴れ！ (Space)');
+  startKickGauge(g);
+}
+
+function togglePause(g) {
+  g.paused = !g.paused;
+  const overlay = document.getElementById('pause-overlay');
+  if (overlay) overlay.style.display = g.paused ? 'flex' : 'none';
+  if (g.paused && document.pointerLockElement) document.exitPointerLock();
+}
+
+function endGame(g, playerWon) {
+  g.gamePhase = 'result';
+  if (document.pointerLockElement) document.exitPointerLock();
+
+  const overlay = document.getElementById('result-overlay');
+  const title = document.getElementById('result-title');
+  const stats = document.getElementById('result-stats');
+
+  if (title) {
+    title.textContent = playerWon ? 'STAGE CLEAR!' : 'GAME OVER';
+    title.style.color = playerWon ? '#00ff41' : '#ff4444';
+    title.style.textShadow = playerWon
+      ? '0 0 20px rgba(0,255,65,0.5)'
+      : '0 0 20px rgba(255,68,68,0.5)';
+  }
+
+  if (stats) {
+    const survived = g.config.timeLimit - g.gameTimer;
+    const mm = Math.floor(survived / 60);
+    const ss = Math.floor(survived % 60);
+    stats.innerHTML = `
+      逃げ切り: ${playerWon ? '✓ YES' : '✗ NO'}<br>
+      生存時間: ${mm}:${String(ss).padStart(2,'0')}<br>
+      捕獲された数: ${g.capturedCount}
+    `;
+  }
+
+  if (overlay) overlay.style.display = 'flex';
+}
+
+// --- HUD UPDATES ---
+function updateHUD(g) {
+  // Timer
+  const timerEl = document.getElementById('hud-timer');
+  if (timerEl) {
+    const t = Math.max(0, g.gameTimer);
+    const mm = Math.floor(t / 60);
+    const ss = Math.floor(t % 60);
+    timerEl.textContent = mm + ':' + String(ss).padStart(2, '0');
+    timerEl.classList.toggle('warning', t < 30);
+  }
+
+  // Stamina
+  const staminaFill = document.getElementById('hud-stamina-fill');
+  if (staminaFill) {
+    const pct = (g.player.stamina / g.player.maxStamina) * 100;
+    staminaFill.style.width = pct + '%';
+    staminaFill.classList.toggle('low', pct < 20);
+  }
+
+  // Capture count
+  const capEl = document.getElementById('hud-capture');
+  if (capEl) {
+    const total = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+    capEl.textContent = '捕獲: ' + g.capturedCount + '/' + total;
+  }
+
+  // Can direction
+  const canDirEl = document.getElementById('hud-can-dir');
+  if (canDirEl && g.can) {
+    const dx = g.can.group.position.x - g.player.position.x;
+    const dz = g.can.group.position.z - g.player.position.z;
+    const dist = Math.sqrt(dx*dx + dz*dz).toFixed(0);
+    const angle = Math.atan2(dx, dz) - g.player.cameraYaw;
+    const arrows = ['↑','↗','→','↘','↓','↙','←','↖'];
+    const idx = Math.round(((angle + Math.PI) / (Math.PI*2)) * 8) % 8;
+    canDirEl.textContent = '缶 ' + arrows[idx] + ' ' + dist + 'm';
+  }
+
+  // Action prompt
+  const actionEl = document.getElementById('hud-action-prompt');
+  if (actionEl) {
+    if (g.player.canKick && g.gamePhase === 'seek' && !g.kickGaugeActive) {
+      actionEl.textContent = 'Space: 缶を蹴る！';
+      actionEl.style.display = 'block';
+    } else if (g.player.canHit && g.gamePhase === 'seek' && !g._hitCooldown) {
+      actionEl.textContent = 'Space: ' + g.player.canHit.label;
+      actionEl.style.display = 'block';
+    } else {
+      actionEl.style.display = 'none';
+    }
+  }
+
+  // Danger vignette (based on nearest oni distance)
+  const vignetteEl = document.getElementById('danger-vignette');
+  if (vignetteEl && g.onis.length > 0) {
+    let minDist = Infinity;
+    for (const oni of g.onis) {
+      const d = g.player.position.distanceTo(oni.position);
+      if (d < minDist) minDist = d;
+    }
+    let opacity = 0;
+    if (minDist < 20) opacity = Math.max(0, (20 - minDist) / 20) * 0.5;
+    vignetteEl.style.boxShadow = `inset 0 0 80px rgba(255,0,64,${opacity})`;
+  }
+
+  // Minimap
+  updateMinimap(g);
+}
+
+function updateMinimap(g) {
+  const canvas = document.getElementById('minimap-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const mapSize = g.config.size;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, w, h);
+
+  const toMap = (wx, wz) => ({
+    x: (wx / mapSize + 0.5) * w,
+    y: (wz / mapSize + 0.5) * h
+  });
+
+  // Player
+  const pp = toMap(g.player.position.x, g.player.position.z);
+  ctx.fillStyle = '#5599ff';
+  ctx.beginPath();
+  ctx.arc(pp.x, pp.y, 4, 0, Math.PI*2);
+  ctx.fill();
+
+  // Can
+  const cp = toMap(g.can.group.position.x, g.can.group.position.z);
+  ctx.fillStyle = '#00e5ff';
+  ctx.beginPath();
+  ctx.arc(cp.x, cp.y, 3, 0, Math.PI*2);
+  ctx.fill();
+
+  // Oni direction arrows (don't show exact position, just direction)
+  for (const oni of g.onis) {
+    const dx = oni.position.x - g.player.position.x;
+    const dz = oni.position.z - g.player.position.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    if (dist < 30) {
+      const angle = Math.atan2(dx, dz);
+      const arrowDist = Math.min(dist / mapSize * w, w * 0.4);
+      const ax = pp.x + Math.sin(angle) * arrowDist;
+      const ay = pp.y + Math.cos(angle) * arrowDist;
+      ctx.fillStyle = '#ff4444';
+      ctx.beginPath();
+      ctx.arc(ax, ay, 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  // Border
+  ctx.strokeStyle = 'rgba(85,153,255,0.4)';
+  ctx.strokeRect(0, 0, w, h);
+}
+
+// --- CAN NEON RING ANIMATION ---
+function updateCanEffects(g, dt) {
+  if (!g.can) return;
+  g.can.ring.rotation.z += dt * 1.5;
+  // Pulsing light
+  g.can.light.intensity = 0.5 + Math.sin(performance.now() * 0.003) * 0.3;
+}
+
+// --- SWING ANIMATION ---
+function updateSwings(g, dt) {
+  if (!g.swingSeats) return;
+  const t = performance.now() * 0.001;
+  for (let i = 0; i < g.swingSeats.length; i++) {
+    const sw = g.swingSeats[i];
+    const angle = Math.sin(t * 0.8 + i * 1.5) * 0.15;
+    sw.seat.position.z = Math.sin(angle) * 0.5;
+    sw.seat.position.y = sw.baseY - Math.abs(Math.sin(angle)) * 0.1;
+  }
+}
+
+// --- MAIN GAME LOOP ---
+let _lastGameTime = 0;
+function gameLoop(timestamp) {
+  if (!G || G.disposed) return;
+  G.animId = requestAnimationFrame(gameLoop);
+
+  const now = timestamp || performance.now();
+  const rawDt = _lastGameTime > 0 ? (now - _lastGameTime) / 1000 : 0.016;
+  const dt = Math.min(rawDt, 0.05);
+  _lastGameTime = now;
+
+  if (G.paused) return;
+
+  // Update systems
+  updatePlayer(G, dt);
+  updateCamera(G, dt);
+  updateCanPhysics(G, dt);
+  updateCanEffects(G, dt);
+  updateSwings(G, dt);
+  updateDayNight(G, dt);
+  updateGamePhases(G, dt);
+  updateHUD(G);
+
+  // Render
+  G.renderer.render(G.scene, G.camera);
+}
+
+// --- GAME INIT & CLEANUP ---
+function startGame(stageNum, mode) {
+  const config = STAGE_CONFIGS[stageNum];
+  if (!config) {
+    showNotification('Stage ' + stageNum + ' は未実装です');
+    return;
+  }
+
+  // Show game screen
+  showScreen('game-screen');
+  stopBGM();
+
+  // Create scene
+  G = createGameScene(config);
+  G.gamePhase = 'placement';
+  G.gameTimer = config.timeLimit;
+  G.capturedCount = 0;
+  G.paused = false;
+  G.kickGaugeActive = false;
+  G.selectedCanPos = 0;
+  G.placementTimer = 15;
+  G.hideTime = 10;
+  G.cpuAllies = [];
+  G.onis = [];
+  G._oniSpawned75 = false;
+  G._hitCooldown = false;
+
+  // Build stage
+  buildTerrain(G);
+  buildParkObjects(G);
+  createCan(G);
+  createDayNightCycle(G);
+
+  // Create player
+  G.playerFig = createStickFigure(G, 0x4488ff, false);
+  G.playerFig.group.position.set(0, 0, -10);
+  G.scene.add(G.playerFig.group);
+
+  // Create player controller
+  G.player = createPlayerController(G);
+
+  // Create initial oni
+  for (let i = 0; i < config.initialOni; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = config.size / 3;
+    const oni = createOni(G, Math.cos(angle) * dist, Math.sin(angle) * dist);
+    G.onis.push(oni);
+  }
+
+  // Show can placement UI
+  showCanPlacementUI(G);
+
+  // Resize handler
+  G._resizeHandler = () => {
+    G.camera.aspect = window.innerWidth / window.innerHeight;
+    G.camera.updateProjectionMatrix();
+    G.renderer.setSize(window.innerWidth, window.innerHeight);
+  };
+  window.addEventListener('resize', G._resizeHandler);
+
+  // Visibility change (auto-pause)
+  G._visHandler = () => {
+    if (document.hidden && G.gamePhase !== 'result') {
+      G.paused = true;
+      const overlay = document.getElementById('pause-overlay');
+      if (overlay) overlay.style.display = 'flex';
+    }
+  };
+  document.addEventListener('visibilitychange', G._visHandler);
+
+  // Pause/Resume/Quit buttons
+  const resumeBtn = document.getElementById('btn-resume');
+  if (resumeBtn) resumeBtn.onclick = () => togglePause(G);
+  const quitBtn = document.getElementById('btn-quit-game');
+  if (quitBtn) quitBtn.onclick = () => cleanupGame();
+  const retryBtn = document.getElementById('btn-retry');
+  if (retryBtn) retryBtn.onclick = () => { cleanupGame(); startGame(stageNum, mode); };
+  const titleBtn = document.getElementById('btn-to-title');
+  if (titleBtn) titleBtn.onclick = () => cleanupGame();
+
+  // Start loop
+  _lastGameTime = 0;
+  G.animId = requestAnimationFrame(gameLoop);
+}
+
+function showCanPlacementUI(g) {
+  const wrap = document.getElementById('can-placement-wrap');
+  const opts = document.getElementById('placement-options');
+  if (!wrap || !opts) return;
+
+  opts.innerHTML = '';
+  g.config.canPositions.forEach((pos, i) => {
+    const div = document.createElement('div');
+    div.className = 'placement-opt' + (i === 0 ? ' selected' : '');
+    div.textContent = gameState.language === 'en' ? pos.labelEn : pos.label;
+    div.addEventListener('click', () => {
+      opts.querySelectorAll('.placement-opt').forEach(o => o.classList.remove('selected'));
+      div.classList.add('selected');
+      g.selectedCanPos = i;
+      // Move camera to preview
+      const target = new THREE.Vector3(pos.x, 8, pos.z + 5);
+      g.camera.position.lerp(target, 0.5);
+      g.camera.lookAt(pos.x, 0, pos.z);
+    });
+    opts.appendChild(div);
+  });
+
+  // Set overhead camera for placement
+  g.camera.position.set(0, 20, 10);
+  g.camera.lookAt(0, 0, 0);
+
+  wrap.style.display = 'block';
+
+  const confirmBtn = document.getElementById('placement-confirm');
+  if (confirmBtn) confirmBtn.onclick = () => confirmCanPlacement(g);
+}
+
+function cleanupGame() {
+  if (!G) return;
+  G.disposed = true;
+
+  // Cancel animation
+  if (G.animId) cancelAnimationFrame(G.animId);
+
+  // Remove event listeners
+  if (G._keyDown) document.removeEventListener('keydown', G._keyDown);
+  if (G._keyUp) document.removeEventListener('keyup', G._keyUp);
+  if (G._pointerLockChange) document.removeEventListener('pointerlockchange', G._pointerLockChange);
+  if (G._mouseMove) document.removeEventListener('mousemove', G._mouseMove);
+  if (G._resizeHandler) window.removeEventListener('resize', G._resizeHandler);
+  if (G._visHandler) document.removeEventListener('visibilitychange', G._visHandler);
+
+  // Exit pointer lock
+  if (document.pointerLockElement) document.exitPointerLock();
+
+  // Dispose Three.js resources
+  G.geometries.forEach(geo => geo.dispose());
+  G.materials.forEach(mat => mat.dispose());
+  G.textures.forEach(tex => tex.dispose());
+  if (G.renderer) {
+    G.renderer.dispose();
+    const container = document.getElementById('game-container');
+    if (container) container.innerHTML = '';
+  }
+
+  // Reset HUD
+  const pauseOv = document.getElementById('pause-overlay');
+  if (pauseOv) pauseOv.style.display = 'none';
+  const resultOv = document.getElementById('result-overlay');
+  if (resultOv) resultOv.style.display = 'none';
+  const kickWrap = document.getElementById('kick-gauge-wrap');
+  if (kickWrap) kickWrap.style.display = 'none';
+  const canWrap = document.getElementById('can-placement-wrap');
+  if (canWrap) canWrap.style.display = 'none';
+  const hideCD = document.getElementById('hide-countdown');
+  if (hideCD) hideCD.style.display = 'none';
+
+  G = null;
+
+  // Return to title
+  showScreen('title-screen');
+  playBGM('title');
 }
 
 // ============================================================
@@ -1628,7 +3804,7 @@ function init() {
 
   // Prevent default touch behaviors
   document.addEventListener('touchmove', (e) => {
-    if (e.target.closest('.modal-box') || e.target.closest('#title-screen')) return;
+    if (e.target.closest('.modal-box') || e.target.closest('#title-screen') || e.target.closest('#game-hud')) return;
     e.preventDefault();
   }, { passive: false });
 
