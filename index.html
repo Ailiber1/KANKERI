@@ -567,8 +567,8 @@ html, body {
    SECTION: GAME SCREEN & HUD
    ============================================================ */
 #game-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; background: #000; }
-#game-container { width: 100%; height: 100%; }
-#game-container canvas { display: block; width: 100%; height: 100%; }
+#game-container { width: 100%; height: 100%; position: relative; flex: 1 1 100%; overflow: hidden; }
+#game-container canvas { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 #game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
 #game-hud > * { pointer-events: auto; }
 #hud-top-bar { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; }
@@ -3137,7 +3137,7 @@ function createPlayerController(g) {
 
   const onMouseMove = (e) => {
     if (!ctrl.isPointerLocked) return;
-    ctrl.cameraYaw -= e.movementX * 0.003;
+    ctrl.cameraYaw += e.movementX * 0.003;
     ctrl.cameraPitch = Math.max(-0.5, Math.min(1.2, ctrl.cameraPitch + e.movementY * 0.003));
   };
   document.addEventListener('mousemove', onMouseMove);
@@ -3195,7 +3195,7 @@ function createPlayerController(g) {
       e.preventDefault();
       for (const t of e.changedTouches) {
         if (t.identifier === camTouch) {
-          ctrl.cameraYaw -= (t.clientX - camLastX) * 0.005;
+          ctrl.cameraYaw += (t.clientX - camLastX) * 0.005;
           ctrl.cameraPitch = Math.max(-0.5, Math.min(1.2, ctrl.cameraPitch + (t.clientY - camLastY) * 0.005));
           camLastX = t.clientX;
           camLastY = t.clientY;
@@ -4940,18 +4940,31 @@ function gameLoop(timestamp) {
   if (G.paused) return;
 
   // Update systems
-  updatePlayer(G, dt);
-  updateAllCpuAllies(G, dt);
-  updateCamera(G, dt);
-  updateCanPhysics(G, dt);
-  updateCanEffects(G, dt);
-  updateSwings(G, dt);
-  updateDayNight(G, dt);
-  updateGamePhases(G, dt);
-  updateHUD(G);
+  try {
+    updatePlayer(G, dt);
+    updateAllCpuAllies(G, dt);
+    updateCamera(G, dt);
+    updateCanPhysics(G, dt);
+    updateCanEffects(G, dt);
+    updateSwings(G, dt);
+    updateDayNight(G, dt);
+    updateGamePhases(G, dt);
+    updateHUD(G);
+  } catch(e) {
+    console.error('gameLoop error:', e);
+    // Show error on screen for debugging
+    if (!G._errorShown) {
+      G._errorShown = true;
+      showNotification('ERROR: ' + e.message);
+    }
+  }
 
-  // Render
-  G.renderer.render(G.scene, G.camera);
+  // Render (always execute even if update fails)
+  try {
+    G.renderer.render(G.scene, G.camera);
+  } catch(e2) {
+    console.error('render error:', e2);
+  }
 }
 
 // --- GAME INIT & CLEANUP ---
