@@ -883,9 +883,9 @@ html, body {
     <div class="pause-panel ui-panel">
       <div class="corner-bl"></div><div class="corner-br"></div>
       <h2 style="font-family:'Cinzel Decorative',serif;color:#5599ff;text-align:center;margin-bottom:20px;">PAUSED</h2>
-      <button id="btn-resume" class="btn btn-neon" style="width:100%;margin-bottom:10px;">RESUME</button>
+      <button id="btn-resume" class="btn btn-neon" style="width:100%;margin-bottom:10px;">再開</button>
       <button id="btn-controls" class="btn btn-neon" style="width:100%;margin-bottom:10px;">操作説明</button>
-      <button id="btn-quit-game" class="btn btn-neon" style="width:100%;">QUIT TO TITLE</button>
+      <button id="btn-quit-game" class="btn btn-neon" style="width:100%;">タイトルに戻る</button>
     </div>
   </div>
   <div id="controls-overlay" style="display:none;">
@@ -3441,6 +3441,9 @@ function updatePlayer(g, dt) {
 
   // --- Peek (Q/E) near walls ---
   ctrl.nearWall = false;
+  ctrl._wallSide = 'none'; // Which side the wall is relative to camera facing
+  let nearestWallDist = Infinity;
+  let nearestWallX = 0, nearestWallZ = 0;
   for (const col of g.colliders) {
     let dist;
     if (col.type === 'box') {
@@ -3452,19 +3455,33 @@ function updatePlayer(g, dt) {
       const dz = ctrl.position.z - col.z;
       dist = Math.sqrt(dx*dx + dz*dz) - (col.r || 0);
     }
-    if (dist < 1.8 && dist > 0) { ctrl.nearWall = true; break; }
+    if (dist < 1.8 && dist > 0 && dist < nearestWallDist) {
+      nearestWallDist = dist;
+      nearestWallX = col.x;
+      nearestWallZ = col.z;
+      ctrl.nearWall = true;
+    }
+  }
+  // Determine wall side relative to player's camera direction
+  if (ctrl.nearWall) {
+    const toWallX = nearestWallX - ctrl.position.x;
+    const toWallZ = nearestWallZ - ctrl.position.z;
+    // Camera right vector: (cos(yaw), sin(yaw))
+    const rightX = Math.cos(ctrl.cameraYaw);
+    const rightZ = Math.sin(ctrl.cameraYaw);
+    const dot = toWallX * rightX + toWallZ * rightZ;
+    ctrl._wallSide = dot > 0 ? 'right' : 'left'; // Wall is to player's right or left
   }
 
   const canPeek = ctrl.nearWall && !ctrl.isDashing && (g.gamePhase === 'seek' || g.gamePhase === 'hide');
-  if (canPeek && keys['KeyQ']) {
-    ctrl.isPeeking = 'left';
-  } else if (canPeek && keys['KeyE']) {
-    ctrl.isPeeking = 'right';
+  if (canPeek && (keys['KeyQ'] || keys['KeyE'])) {
+    // Auto-detect peek direction: lean AWAY from wall to peek around its edge
+    ctrl.isPeeking = ctrl._wallSide === 'right' ? 'left' : 'right';
   } else {
     ctrl.isPeeking = 'none';
   }
 
-  // Peek body tilt animation
+  // Peek body tilt animation (lean toward the open side)
   const peekTiltTarget = ctrl.isPeeking === 'left' ? 0.26 : (ctrl.isPeeking === 'right' ? -0.26 : 0);
   ctrl._peekTilt = ctrl._peekTilt || 0;
   ctrl._peekTilt += (peekTiltTarget - ctrl._peekTilt) * Math.min(10 * dt, 1);
@@ -4020,7 +4037,7 @@ function createCpuAlly(g, name, level, spawnX, spawnZ, colorIndex) {
     state: 'idle', // idle, sneak, hiding, relocate, tryKick, captured
     targetPos: null,
     hideSpot: null,
-    sneakSpeed: level === 'strong' ? 3.0 : (level === 'normal' ? 2.5 : 2.0),
+    sneakSpeed: level === 'strong' ? 3.5 : (level === 'normal' ? 3.0 : 2.5),
     sprintSpeed: level === 'strong' ? 7.0 : (level === 'normal' ? 6.0 : 4.5),
     moveSpeed: 0,
     stateTimer: 0,
@@ -4042,7 +4059,7 @@ function findHideSpot(g, ally) {
   const { oni: closestOni } = getClosestOniDist(g, ally.position);
   const oniPos = closestOni ? closestOni.position : new THREE.Vector3(0, 0, 0);
 
-  // Score each spot: farther from oni = better, not too far from ally = bonus
+  // Score each spot: farther from oni = better, must be at least 3m from ally (avoid instant arrival)
   let scoredSpots = spots.map(s => {
     const oniDx = s.x - oniPos.x;
     const oniDz = s.z - oniPos.z;
@@ -4052,6 +4069,9 @@ function findHideSpot(g, ally) {
     const allyDist = Math.sqrt(allyDx * allyDx + allyDz * allyDz);
     return { spot: s, oniDist, allyDist };
   });
+  // Filter out spots too close to current position (minimum 3m walk)
+  const farEnough = scoredSpots.filter(s => s.allyDist >= 3);
+  if (farEnough.length > 0) scoredSpots = farEnough;
 
   let chosen = null;
   if (level === 'weak') {
@@ -4252,9 +4272,14 @@ function updateCpuAlly(g, ally, dt) {
       if (ally.targetPos) {
         moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, ally.sneakSpeed, dt, g);
         const dist = ally.position.distanceTo(ally.targetPos);
-        if (dist < 1.0) {
+        if (dist < 0.5) {
           ally.moveSpeed = 0;
           ally.state = 'hiding';
+          ally.stateTimer = 0;
+        }
+        // Stuck detection: if no progress after 5s, pick new spot
+        if (ally.stateTimer > 5 && dist > 2) {
+          ally.state = 'idle';
           ally.stateTimer = 0;
         }
       } else {
@@ -4620,25 +4645,32 @@ function freeAllCaptured(g) {
 
 function doKickLegAnim(fig) {
   if (!fig || !fig.rightLeg || !fig.rightLeg.pivot) return;
-  fig.rightLeg.pivot.rotation.x = 1.2; // Leg swings forward
-  if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = -0.3;
+  // Wind-up: pull leg back slightly
+  fig.rightLeg.pivot.rotation.x = 0.4;
+  if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0.6;
   setTimeout(() => {
-    if (fig.rightLeg) {
-      fig.rightLeg.pivot.rotation.x = 0.4;
-      if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0;
-    }
+    if (!fig.rightLeg) return;
+    // Kick forward: hip flexion + knee extension
+    fig.rightLeg.pivot.rotation.x = -1.0;
+    if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0;
     setTimeout(() => {
-      if (fig.rightLeg) {
+      if (!fig.rightLeg) return;
+      // Follow-through
+      fig.rightLeg.pivot.rotation.x = -0.5;
+      if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0.2;
+      setTimeout(() => {
+        if (!fig.rightLeg) return;
+        // Return to neutral
         fig.rightLeg.pivot.rotation.x = 0;
         if (fig.rightLeg.kneePivot) fig.rightLeg.kneePivot.rotation.x = 0;
-      }
-    }, 150);
+      }, 300);
+    }, 250);
   }, 200);
 }
 
 function performKickAnim(g) {
   g._kickAnimCooldown = true;
-  setTimeout(() => { g._kickAnimCooldown = false; }, 800);
+  setTimeout(() => { g._kickAnimCooldown = false; }, 1200);
   doKickLegAnim(g.playerFig);
 }
 
@@ -4940,14 +4972,12 @@ function updateHUD(g) {
   const peekEl = document.getElementById('hud-peek-prompt');
   if (peekEl) {
     if (g.player.nearWall && !g.player.isDashing && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
-      if (g.player.isPeeking === 'left') {
-        peekEl.textContent = '◀ Q 覗き中...';
-        peekEl.style.color = '#ffcc00';
-      } else if (g.player.isPeeking === 'right') {
-        peekEl.textContent = '覗き中... E ▶';
+      if (g.player.isPeeking !== 'none') {
+        const arrow = g.player.isPeeking === 'left' ? '◀' : '▶';
+        peekEl.textContent = arrow + ' 覗き中...';
         peekEl.style.color = '#ffcc00';
       } else {
-        peekEl.textContent = 'Q◀ 覗き ▶E';
+        peekEl.textContent = 'Q / E : 覗く';
         peekEl.style.color = '#00e5ff';
       }
       peekEl.style.display = 'block';
