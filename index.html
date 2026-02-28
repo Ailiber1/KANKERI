@@ -2609,15 +2609,17 @@ function buildTerrain(g, stageNum) {
     // 上段（境内）と下段（参道）を石段で繋ぐ
     for (let i = 0; i < verts.length; i += 3) {
       const x = verts[i], y = verts[i+1];
-      let h = noise.noise2D(x * 0.02, y * 0.02) * 0.15;
-      h += noise2.noise2D(x * 0.15, y * 0.15) * 0.03;
-      // 上段（境内エリア z > -5）: 高さ+2m
-      // 下段（参道 z < -10）: 高さ0
-      // 石段エリア（-10 < z < -5）: 滑らかな傾斜
-      if (y > -5) {
+      // rotateX(-PI/2)後: world_z = -y なので、world_z座標に変換して計算
+      const wz = -y;
+      let h = noise.noise2D(x * 0.02, wz * 0.02) * 0.15;
+      h += noise2.noise2D(x * 0.15, wz * 0.15) * 0.03;
+      // 上段（境内エリア wz > -5）: 高さ+2m
+      // 下段（参道 wz < -10）: 高さ0
+      // 石段エリア（-10 < wz < -5）: 滑らかな傾斜
+      if (wz > -5) {
         h += 2.0;
-      } else if (y > -10) {
-        const t = (y + 10) / 5; // 0→1
+      } else if (wz > -10) {
+        const t = (wz + 10) / 5; // 0→1
         h += 2.0 * t * t * (3 - 2 * t); // smoothstep
       }
       verts[i+2] = h;
@@ -2626,16 +2628,18 @@ function buildTerrain(g, stageNum) {
     // === STAGE 1: 児童公園の地形 ===
     for (let i = 0; i < verts.length; i += 3) {
       const x = verts[i], y = verts[i+1];
-      let h = noise.noise2D(x * 0.025, y * 0.025) * 0.25;
-      h += noise.noise2D(x * 0.06, y * 0.06) * 0.10;
-      h += noise2.noise2D(x * 0.2, y * 0.2) * 0.04;
-      h += noise.noise2D(x * 0.5, y * 0.5) * 0.015;
+      // rotateX(-PI/2)後: world_z = -y なので変換
+      const wz = -y;
+      let h = noise.noise2D(x * 0.025, wz * 0.025) * 0.25;
+      h += noise.noise2D(x * 0.06, wz * 0.06) * 0.10;
+      h += noise2.noise2D(x * 0.2, wz * 0.2) * 0.04;
+      h += noise.noise2D(x * 0.5, wz * 0.5) * 0.015;
       // Hill
-      const hx = x - 8, hy = y - 12;
-      const hillDist = Math.sqrt(hx*hx + hy*hy);
+      const hx = x - 8, hz = wz - 12;
+      const hillDist = Math.sqrt(hx*hx + hz*hz);
       if (hillDist < 5) h += Math.max(0, 1.5 * Math.cos(hillDist / 5 * Math.PI * 0.5));
       // Sandbox depression
-      const sdist = Math.sqrt(x*x + (y-2)*(y-2));
+      const sdist = Math.sqrt(x*x + (wz-2)*(wz-2));
       if (sdist < 3.5) h -= 0.25 * Math.max(0, Math.cos(sdist / 3.5 * Math.PI * 0.5));
       verts[i+2] = h;
     }
