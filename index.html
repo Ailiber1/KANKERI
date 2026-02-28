@@ -2743,6 +2743,9 @@ function createGameScene(stageConfig) {
 
   // Street lights (will be created in buildStage)
   g.streetLights = [];
+  // Camera raycasting meshes & kickable signs (pre-init for all stages)
+  g.cameraMeshes = [];
+  g.kickableSigns = [];
 
   return g;
 }
@@ -4739,11 +4742,11 @@ function buildSchoolObjects(g) {
 
   // === 校庭の照明 ===
   // 廃校専用の環境光（月明かりの底上げ）
-  const schoolAmbient = new THREE.AmbientLight(0x223355, 0.6);
+  const schoolAmbient = new THREE.AmbientLight(0x223355, 0.8);
   g.scene.add(schoolAmbient);
 
   // メインのDirectionalLight（月光 — シーン全体を均一に照らす）
-  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 0.8);
+  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 1.0);
   moonDirLight.position.set(30, 50, 20);
   moonDirLight.castShadow = true;
   moonDirLight.shadow.mapSize.width = 1024;
@@ -4755,7 +4758,7 @@ function buildSchoolObjects(g) {
   g.scene.add(moonDirLight);
 
   // SpotLight（月光のハイライト — 校庭中央を重点的に照らす）
-  const moonLight = new THREE.SpotLight(0x8888cc, 2.5, 150, Math.PI / 3, 0.4, 0.5);
+  const moonLight = new THREE.SpotLight(0x8888cc, 3.0, 150, Math.PI / 3, 0.4, 0.5);
   moonLight.position.set(30, 50, 20);
   moonLight.target.position.set(0, 0, 0);
   g.scene.add(moonLight);
@@ -4799,6 +4802,9 @@ function buildSchoolObjects(g) {
     g.scene.add(lampLight);
     g.streetLights.push({ spot: lampLight, fixture: lampHead, fixMat: lampHeadMat });
   }
+
+  // Stage 4 夜間シーンの露出を明るめに調整
+  g.renderer.toneMappingExposure = 1.1;
 
   // === kickableSigns の初期化 ===
   g.kickableSigns = g.kickableSigns || [];
