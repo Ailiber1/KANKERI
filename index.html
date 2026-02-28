@@ -4968,6 +4968,10 @@ function updatePlayer(g, dt) {
   const moveZ = mz * speed * dt;
   ctrl.moveSpeed = Math.sqrt(moveX*moveX + moveZ*moveZ) / dt;
 
+  // 前のフレームの有効位置を保存（壁めり込み時のフォールバック用）
+  const prevValidX = ctrl.position.x;
+  const prevValidZ = ctrl.position.z;
+
   const newX = ctrl.position.x + moveX;
   const newZ = ctrl.position.z + moveZ;
 
@@ -4976,32 +4980,66 @@ function updatePlayer(g, dt) {
   ctrl.position.x = Math.max(-half, Math.min(half, newX));
   ctrl.position.z = Math.max(-half, Math.min(half, newZ));
 
-  // Collider check
+  // Collider check — 複数パスで連鎖押し出しを処理 + マージン拡大
+  const COL_MARGIN = 0.5;
   let blocked = false;
-  for (const col of g.colliders) {
-    if (col.type === 'box') {
-      if (Math.abs(ctrl.position.x - col.x) < col.hw + 0.3 &&
-          Math.abs(ctrl.position.z - col.z) < col.hd + 0.3) {
-        // Push out
+  for (let pass = 0; pass < 3; pass++) {
+    let anyPush = false;
+    for (const col of g.colliders) {
+      if (col.type === 'box') {
+        const overX = col.hw + COL_MARGIN - Math.abs(ctrl.position.x - col.x);
+        const overZ = col.hd + COL_MARGIN - Math.abs(ctrl.position.z - col.z);
+        if (overX > 0 && overZ > 0) {
+          // 押し出し量が少ない軸で押し出す（最小移動距離）
+          if (overX < overZ) {
+            ctrl.position.x += Math.sign(ctrl.position.x - col.x) * overX;
+          } else {
+            ctrl.position.z += Math.sign(ctrl.position.z - col.z) * overZ;
+          }
+          anyPush = true;
+        }
+      } else if (col.type === 'cylinder') {
         const dx = ctrl.position.x - col.x;
         const dz = ctrl.position.z - col.z;
-        if (Math.abs(dx) / col.hw > Math.abs(dz) / col.hd) {
-          ctrl.position.x = col.x + Math.sign(dx) * (col.hw + 0.3);
-        } else {
-          ctrl.position.z = col.z + Math.sign(dz) * (col.hd + 0.3);
+        const dist = Math.sqrt(dx*dx + dz*dz);
+        if (dist < col.r + COL_MARGIN) {
+          const push = (col.r + COL_MARGIN - dist);
+          if (dist > 0.01) {
+            ctrl.position.x += (dx / dist) * push;
+            ctrl.position.z += (dz / dist) * push;
+          } else {
+            ctrl.position.x += COL_MARGIN;
+          }
+          anyPush = true;
         }
+      }
+    }
+    if (!anyPush) break;
+  }
+
+  // 全パス後もコライダー内にいる場合、前の有効位置に戻す
+  for (const col of g.colliders) {
+    if (col.type === 'box') {
+      if (Math.abs(ctrl.position.x - col.x) < col.hw + 0.1 &&
+          Math.abs(ctrl.position.z - col.z) < col.hd + 0.1) {
+        ctrl.position.x = prevValidX;
+        ctrl.position.z = prevValidZ;
+        break;
       }
     } else if (col.type === 'cylinder') {
       const dx = ctrl.position.x - col.x;
       const dz = ctrl.position.z - col.z;
-      const dist = Math.sqrt(dx*dx + dz*dz);
-      if (dist < col.r + 0.3) {
-        const push = (col.r + 0.3 - dist);
-        ctrl.position.x += (dx / dist) * push;
-        ctrl.position.z += (dz / dist) * push;
+      if (Math.sqrt(dx*dx + dz*dz) < col.r + 0.1) {
+        ctrl.position.x = prevValidX;
+        ctrl.position.z = prevValidZ;
+        break;
       }
     }
   }
+
+  // 再度境界チェック（押し出しで境界外に出た場合）
+  ctrl.position.x = Math.max(-half, Math.min(half, ctrl.position.x));
+  ctrl.position.z = Math.max(-half, Math.min(half, ctrl.position.z));
 
   // Get ground height at player position
   ctrl.position.y = getGroundHeight(g, ctrl.position.x, ctrl.position.z);
@@ -5845,29 +5883,39 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   oni.position.x = Math.max(-half, Math.min(half, oni.position.x));
   oni.position.z = Math.max(-half, Math.min(half, oni.position.z));
 
-  // コライダー押し出し（プレイヤーと同じシンプルな方式）
-  for (const col of g.colliders) {
-    if (col.type === 'box') {
-      if (Math.abs(oni.position.x - col.x) < col.hw + 0.3 &&
-          Math.abs(oni.position.z - col.z) < col.hd + 0.3) {
+  // コライダー押し出し（複数パス + マージン拡大）
+  const ONI_MARGIN = 0.5;
+  for (let pass = 0; pass < 3; pass++) {
+    let anyPush = false;
+    for (const col of g.colliders) {
+      if (col.type === 'box') {
+        const overX = col.hw + ONI_MARGIN - Math.abs(oni.position.x - col.x);
+        const overZ = col.hd + ONI_MARGIN - Math.abs(oni.position.z - col.z);
+        if (overX > 0 && overZ > 0) {
+          if (overX < overZ) {
+            oni.position.x += Math.sign(oni.position.x - col.x) * overX;
+          } else {
+            oni.position.z += Math.sign(oni.position.z - col.z) * overZ;
+          }
+          anyPush = true;
+        }
+      } else if (col.type === 'cylinder') {
         const cx = oni.position.x - col.x;
         const cz = oni.position.z - col.z;
-        if (Math.abs(cx) / col.hw > Math.abs(cz) / col.hd) {
-          oni.position.x = col.x + Math.sign(cx) * (col.hw + 0.3);
-        } else {
-          oni.position.z = col.z + Math.sign(cz) * (col.hd + 0.3);
+        const cDist = Math.sqrt(cx*cx + cz*cz);
+        if (cDist < col.r + ONI_MARGIN) {
+          const push = col.r + ONI_MARGIN - cDist;
+          if (cDist > 0.01) {
+            oni.position.x += (cx / cDist) * push;
+            oni.position.z += (cz / cDist) * push;
+          } else {
+            oni.position.x += ONI_MARGIN;
+          }
+          anyPush = true;
         }
       }
-    } else if (col.type === 'cylinder') {
-      const cx = oni.position.x - col.x;
-      const cz = oni.position.z - col.z;
-      const cDist = Math.sqrt(cx*cx + cz*cz);
-      if (cDist < col.r + 0.3 && cDist > 0.01) {
-        const push = col.r + 0.3 - cDist;
-        oni.position.x += (cx / cDist) * push;
-        oni.position.z += (cz / cDist) * push;
-      }
     }
+    if (!anyPush) break;
   }
 
   // スタック検出: 移動前後でほぼ動いていなければスタックカウント加算
@@ -6094,30 +6142,39 @@ function moveCpuAlly(ally, targetX, targetZ, speed, dt, g) {
   newX = Math.max(-half, Math.min(half, newX));
   newZ = Math.max(-half, Math.min(half, newZ));
 
-  // Simple collider avoidance
-  for (const col of g.colliders) {
-    if (col.type === 'box') {
-      if (Math.abs(newX - col.x) < col.hw + 0.4 && Math.abs(newZ - col.z) < col.hd + 0.4) {
+  // コライダー押し出し（複数パス + マージン拡大）
+  const ALLY_MARGIN = 0.5;
+  for (let pass = 0; pass < 3; pass++) {
+    let anyPush = false;
+    for (const col of g.colliders) {
+      if (col.type === 'box') {
+        const overX = col.hw + ALLY_MARGIN - Math.abs(newX - col.x);
+        const overZ = col.hd + ALLY_MARGIN - Math.abs(newZ - col.z);
+        if (overX > 0 && overZ > 0) {
+          if (overX < overZ) {
+            newX += Math.sign(newX - col.x) * overX;
+          } else {
+            newZ += Math.sign(newZ - col.z) * overZ;
+          }
+          anyPush = true;
+        }
+      } else if (col.type === 'cylinder') {
         const cdx = newX - col.x;
         const cdz = newZ - col.z;
-        if (Math.abs(cdx) / col.hw > Math.abs(cdz) / col.hd) {
-          newX = col.x + Math.sign(cdx) * (col.hw + 0.4);
-        } else {
-          newZ = col.z + Math.sign(cdz) * (col.hd + 0.4);
-        }
-      }
-    } else if (col.type === 'cylinder') {
-      const cdx = newX - col.x;
-      const cdz = newZ - col.z;
-      const cdist = Math.sqrt(cdx * cdx + cdz * cdz);
-      if (cdist < col.r + 0.4) {
-        const push = col.r + 0.4 - cdist;
-        if (cdist > 0.01) {
-          newX += (cdx / cdist) * push;
-          newZ += (cdz / cdist) * push;
+        const cdist = Math.sqrt(cdx * cdx + cdz * cdz);
+        if (cdist < col.r + ALLY_MARGIN) {
+          const push = col.r + ALLY_MARGIN - cdist;
+          if (cdist > 0.01) {
+            newX += (cdx / cdist) * push;
+            newZ += (cdz / cdist) * push;
+          } else {
+            newX += ALLY_MARGIN;
+          }
+          anyPush = true;
         }
       }
     }
+    if (!anyPush) break;
   }
 
   ally.position.x = newX;
