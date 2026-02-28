@@ -2714,7 +2714,7 @@ function createGameScene(stageConfig) {
   // Scene
   g.scene = new THREE.Scene();
   g.scene.background = new THREE.Color(0x87ceeb);
-  g.scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
+  g.scene.fog = new THREE.FogExp2(0x87ceeb, stageNum === 4 ? 0.006 : 0.012);
 
   // Camera (TPS)
   g.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -4735,13 +4735,26 @@ function buildSchoolObjects(g) {
   g.scene.add(moon);
 
   // === 校庭の照明 ===
-  // メインのSpotLight（月光色）
-  const moonLight = new THREE.SpotLight(0x8888cc, 1.5, 120, Math.PI / 3, 0.5, 1);
+  // 廃校専用の環境光（月明かりの底上げ）
+  const schoolAmbient = new THREE.AmbientLight(0x223355, 0.6);
+  g.scene.add(schoolAmbient);
+
+  // メインのDirectionalLight（月光 — シーン全体を均一に照らす）
+  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 0.8);
+  moonDirLight.position.set(30, 50, 20);
+  moonDirLight.castShadow = true;
+  moonDirLight.shadow.mapSize.width = 1024;
+  moonDirLight.shadow.mapSize.height = 1024;
+  moonDirLight.shadow.camera.left = -40;
+  moonDirLight.shadow.camera.right = 40;
+  moonDirLight.shadow.camera.top = 40;
+  moonDirLight.shadow.camera.bottom = -40;
+  g.scene.add(moonDirLight);
+
+  // SpotLight（月光のハイライト — 校庭中央を重点的に照らす）
+  const moonLight = new THREE.SpotLight(0x8888cc, 2.5, 150, Math.PI / 3, 0.4, 0.5);
   moonLight.position.set(30, 50, 20);
   moonLight.target.position.set(0, 0, 0);
-  moonLight.castShadow = true;
-  moonLight.shadow.mapSize.width = 1024;
-  moonLight.shadow.mapSize.height = 1024;
   g.scene.add(moonLight);
   g.scene.add(moonLight.target);
 
@@ -4769,7 +4782,7 @@ function buildSchoolObjects(g) {
     const lampHeadGeo = new THREE.BoxGeometry(0.6, 0.15, 0.3);
     g.geometries.push(lampHeadGeo);
     const lampHeadMat = new THREE.MeshStandardMaterial({
-      color: 0x666666, emissive: 0xffeecc, emissiveIntensity: 0.3,
+      color: 0x666666, emissive: 0xffeecc, emissiveIntensity: 0.8,
       roughness: 0.3, metalness: 0.5
     });
     g.materials.push(lampHeadMat);
@@ -4777,8 +4790,8 @@ function buildSchoolObjects(g) {
     lampHead.position.set(lp.x, gH(lp.x, lp.z) + 5, lp.z);
     g.scene.add(lampHead);
 
-    // 街灯の光（弱め — 廃校なので減衰）
-    const lampLight = new THREE.PointLight(0xffeecc, 0.4, 15);
+    // 街灯の光（廃校だが視認できる程度に）
+    const lampLight = new THREE.PointLight(0xffeecc, 1.2, 25);
     lampLight.position.set(lp.x, gH(lp.x, lp.z) + 4.8, lp.z);
     g.scene.add(lampLight);
     g.streetLights.push({ spot: lampLight, fixture: lampHead, fixMat: lampHeadMat });
