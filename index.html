@@ -2728,15 +2728,6 @@ function buildTerrain(g, stageNum) {
       // 排水勾配: 道路中央が微妙に高い
       const roadCenterX = Math.abs(x) < 3 ? (1 - Math.abs(x) / 3) * 0.03 : 0;
       h += roadCenterX;
-      // 2階テラスエリア (x:22~28, z:5~12): 高さ+4m
-      if (x > 22 && x < 28 && wz > 5 && wz < 12) {
-        h += 4.0;
-      }
-      // テラスへの階段 (x:20~22, z:7~10): 滑らかな傾斜
-      else if (x > 20 && x < 22 && wz > 7 && wz < 10) {
-        const t = (x - 20) / 2;
-        h += 4.0 * t * t * (3 - 2 * t);
-      }
       verts[i+2] = h;
     }
   } else if (stageNum === 2) {
