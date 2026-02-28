@@ -6027,7 +6027,7 @@ function updateKickGauge(g, dt) {
   // Confirm kick on F / Space
   const kickConfirm = g.player.keys['KeyF'] || g.player.keys['Space'];
   if (kickConfirm && !g._kickFPrev) {
-    performCanKick(g, g.kickGaugeValue, 'プレイヤー');
+    performCanKick(g, g.kickGaugeValue, gameState.username || 'プレイヤー');
     g.kickGaugeActive = false;
     const wrap = document.getElementById('kick-gauge-wrap');
     if (wrap) wrap.style.display = 'none';
