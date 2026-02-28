@@ -5897,8 +5897,29 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   const prevZ = oni.position.z;
 
   const moveSpeed = Math.min(speed * dt, dist);
-  oni.position.x += (dx / dist) * moveSpeed;
-  oni.position.z += (dz / dist) * moveSpeed;
+  let moveX = (dx / dist) * moveSpeed;
+  let moveZ = (dz / dist) * moveSpeed;
+
+  // 壁スライディング: スタック時に壁に沿って移動する
+  if (oni._stuckCount > 15) {
+    // 移動方向に対して垂直方向（壁に沿う方向）を計算
+    const perpX = -dz / dist;
+    const perpZ = dx / dist;
+    // スタック開始時にスライド方向を決定、1秒で反転
+    if (!oni._stuckSide) oni._stuckSide = Math.random() < 0.5 ? 1 : -1;
+    if (oni._stuckCount > 75) oni._stuckSide = -oni._stuckSide;
+    if (oni._stuckCount > 135) oni._stuckCount = 15; // リセットして再試行
+    // 壁に沿う方向の成分を増やし、壁に向かう成分を減らす
+    const slideRatio = Math.min((oni._stuckCount - 15) / 30, 1.0); // 0→1
+    moveX = moveX * (1 - slideRatio * 0.7) + perpX * moveSpeed * slideRatio * oni._stuckSide;
+    moveZ = moveZ * (1 - slideRatio * 0.7) + perpZ * moveSpeed * slideRatio * oni._stuckSide;
+    // 速度を維持
+    const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+    if (len > 0.001) { moveX *= moveSpeed / len; moveZ *= moveSpeed / len; }
+  }
+
+  oni.position.x += moveX;
+  oni.position.z += moveZ;
 
   // Boundary
   const half = g.config.size / 2 - 0.5;
@@ -5955,13 +5976,18 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
     }
   } else {
     oni._stuckCount = 0;
+    oni._stuckSide = 0;
   }
 
   // Ground height
   oni.position.y = getGroundHeight(g, oni.position.x, oni.position.z);
 
-  // Face direction
-  oni.rotation = Math.atan2(dx, dz);
+  // Face direction (実際の移動方向を向く)
+  const actualDx = oni.position.x - prevX;
+  const actualDz = oni.position.z - prevZ;
+  if (actualDx * actualDx + actualDz * actualDz > 0.0001) {
+    oni.rotation = Math.atan2(actualDx, actualDz);
+  }
 
   // Update mesh
   oni.fig.group.position.copy(oni.position);
