@@ -1377,63 +1377,92 @@ const SoundManager = {
           break;
         }
         case 'hit': {
-          // 物を叩く鈍い音（木・壁・茂みなど）
+          // 物を叩く重い音（木・壁・茂みなど）— 音量大・余韻長め
+          const hitMaster = ctx.createGain();
+          hitMaster.gain.setValueAtTime(1.0, now);
+          hitMaster.connect(ctx.destination);
+          // 1. 衝撃ノイズ（ドスッ）
           const n = ctx.createBufferSource();
-          const buf = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
+          const buf = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate);
           const d = buf.getChannelData(0);
-          for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.03));
+          for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.04));
           n.buffer = buf;
-          const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
-          const gn = ctx.createGain(); gn.gain.setValueAtTime(0.5, now); gn.gain.linearRampToValueAtTime(0, now + 0.12);
-          n.connect(lp); lp.connect(gn); gn.connect(ctx.destination);
-          n.start(now); n.stop(now + 0.12);
-          // Low thump
+          const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600;
+          const gn = ctx.createGain(); gn.gain.setValueAtTime(0.9, now); gn.gain.linearRampToValueAtTime(0, now + 0.2);
+          n.connect(lp); lp.connect(gn); gn.connect(hitMaster);
+          n.start(now); n.stop(now + 0.2);
+          // 2. 低音サブベース（ドーン）
           const o = ctx.createOscillator(); const g2 = ctx.createGain();
-          o.type = 'sine'; o.frequency.setValueAtTime(120, now); o.frequency.exponentialRampToValueAtTime(50, now + 0.1);
-          g2.gain.setValueAtTime(0.4, now); g2.gain.linearRampToValueAtTime(0, now + 0.1);
-          o.connect(g2); g2.connect(ctx.destination); o.start(now); o.stop(now + 0.1);
+          o.type = 'sine'; o.frequency.setValueAtTime(150, now); o.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+          g2.gain.setValueAtTime(0.7, now); g2.gain.linearRampToValueAtTime(0, now + 0.2);
+          o.connect(g2); g2.connect(hitMaster); o.start(now); o.stop(now + 0.2);
+          // 3. 中音の衝撃（バンッ）
+          const mid = ctx.createOscillator(); const mg = ctx.createGain();
+          mid.type = 'triangle'; mid.frequency.setValueAtTime(300, now); mid.frequency.exponentialRampToValueAtTime(100, now + 0.12);
+          mg.gain.setValueAtTime(0.5, now); mg.gain.linearRampToValueAtTime(0, now + 0.15);
+          mid.connect(mg); mg.connect(hitMaster); mid.start(now); mid.stop(now + 0.15);
           break;
         }
         case 'hit_metal': {
-          // 金属を蹴る音（フェンス・ジャングルジム・ブランコ等）
-          const freqs = [1200, 2400, 3600];
-          for (const f of freqs) {
+          // 金属を蹴る音（フェンス・ジャングルジム等）— 大きく響く金属音
+          const metalMaster = ctx.createGain();
+          metalMaster.gain.setValueAtTime(1.0, now);
+          metalMaster.connect(ctx.destination);
+          // 1. 金属共鳴（ガーン！）— 音量大・余韻長い
+          const freqs = [800, 1600, 2800, 4000];
+          const vols = [0.5, 0.35, 0.25, 0.15];
+          const decays = [0.6, 0.45, 0.35, 0.25];
+          for (let i = 0; i < freqs.length; i++) {
             const o = ctx.createOscillator(); const g = ctx.createGain();
-            o.type = 'sine'; o.frequency.value = f + (Math.random() - 0.5) * 100;
-            g.gain.setValueAtTime(0.15, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-            o.connect(g); g.connect(ctx.destination); o.start(now); o.stop(now + 0.3);
+            o.type = 'sine'; o.frequency.value = freqs[i] + (Math.random() - 0.5) * 80;
+            o.frequency.exponentialRampToValueAtTime(freqs[i] * 0.9, now + decays[i]);
+            g.gain.setValueAtTime(vols[i], now); g.gain.exponentialRampToValueAtTime(0.001, now + decays[i]);
+            o.connect(g); g.connect(metalMaster); o.start(now); o.stop(now + decays[i]);
           }
-          // Impact click
-          const n = ctx.createBufferSource();
-          const buf = ctx.createBuffer(1, ctx.sampleRate * 0.02, ctx.sampleRate);
-          const d = buf.getChannelData(0);
-          for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.005));
-          n.buffer = buf;
-          const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2000;
-          const gn = ctx.createGain(); gn.gain.setValueAtTime(0.4, now); gn.gain.linearRampToValueAtTime(0, now + 0.02);
-          n.connect(hp); hp.connect(gn); gn.connect(ctx.destination); n.start(now); n.stop(now + 0.03);
+          // 2. 衝撃ノイズ（ガッ！）
+          const mn = ctx.createBufferSource();
+          const mbuf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
+          const md = mbuf.getChannelData(0);
+          for (let i = 0; i < md.length; i++) md[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.008));
+          mn.buffer = mbuf;
+          const mhp = ctx.createBiquadFilter(); mhp.type = 'highpass'; mhp.frequency.value = 1500;
+          const mgn = ctx.createGain(); mgn.gain.setValueAtTime(0.7, now); mgn.gain.linearRampToValueAtTime(0, now + 0.05);
+          mn.connect(mhp); mhp.connect(mgn); mgn.connect(metalMaster); mn.start(now); mn.stop(now + 0.05);
+          // 3. 低音の振動（ビーン）
+          const vib = ctx.createOscillator(); const vg = ctx.createGain();
+          vib.type = 'sawtooth'; vib.frequency.setValueAtTime(120, now); vib.frequency.exponentialRampToValueAtTime(60, now + 0.4);
+          vg.gain.setValueAtTime(0.3, now); vg.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          vib.connect(vg); vg.connect(metalMaster); vib.start(now); vib.stop(now + 0.4);
           break;
         }
         case 'hit_stone': {
-          // 石を蹴る音（カコッ＋転がりカラカラ）
-          // Impact
+          // 石を蹴る音（カコッ＋転がりカラカラ）— しっかり聞こえる
+          const stoneMaster = ctx.createGain();
+          stoneMaster.gain.setValueAtTime(1.0, now);
+          stoneMaster.connect(ctx.destination);
+          // 1. Impact（カコッ！）
           const o1 = ctx.createOscillator(); const g1 = ctx.createGain();
-          o1.type = 'triangle'; o1.frequency.setValueAtTime(800, now); o1.frequency.exponentialRampToValueAtTime(300, now + 0.05);
-          g1.gain.setValueAtTime(0.5, now); g1.gain.linearRampToValueAtTime(0, now + 0.06);
-          o1.connect(g1); g1.connect(ctx.destination); o1.start(now); o1.stop(now + 0.06);
-          // Stone click
-          const o2 = ctx.createOscillator(); const g2 = ctx.createGain();
-          o2.type = 'square'; o2.frequency.setValueAtTime(1500, now); o2.frequency.exponentialRampToValueAtTime(600, now + 0.03);
-          g2.gain.setValueAtTime(0.3, now); g2.gain.linearRampToValueAtTime(0, now + 0.04);
-          o2.connect(g2); g2.connect(ctx.destination); o2.start(now); o2.stop(now + 0.04);
-          // Rolling clicks (カラカラカラ)
-          for (let i = 0; i < 6; i++) {
-            const t = now + 0.08 + i * 0.07;
+          o1.type = 'triangle'; o1.frequency.setValueAtTime(1000, now); o1.frequency.exponentialRampToValueAtTime(300, now + 0.08);
+          g1.gain.setValueAtTime(0.8, now); g1.gain.linearRampToValueAtTime(0, now + 0.1);
+          o1.connect(g1); g1.connect(stoneMaster); o1.start(now); o1.stop(now + 0.1);
+          // 2. Stone click（パキッ）
+          const o2 = ctx.createOscillator(); const g2c = ctx.createGain();
+          o2.type = 'square'; o2.frequency.setValueAtTime(1800, now); o2.frequency.exponentialRampToValueAtTime(600, now + 0.05);
+          g2c.gain.setValueAtTime(0.6, now); g2c.gain.linearRampToValueAtTime(0, now + 0.06);
+          o2.connect(g2c); g2c.connect(stoneMaster); o2.start(now); o2.stop(now + 0.06);
+          // 3. 低音インパクト補強
+          const sub = ctx.createOscillator(); const sg = ctx.createGain();
+          sub.type = 'sine'; sub.frequency.setValueAtTime(200, now); sub.frequency.exponentialRampToValueAtTime(80, now + 0.1);
+          sg.gain.setValueAtTime(0.5, now); sg.gain.linearRampToValueAtTime(0, now + 0.12);
+          sub.connect(sg); sg.connect(stoneMaster); sub.start(now); sub.stop(now + 0.12);
+          // 4. Rolling clicks（カラカラカラ）— 大きめ、長め
+          for (let i = 0; i < 8; i++) {
+            const t = now + 0.1 + i * 0.06;
             const o = ctx.createOscillator(); const g = ctx.createGain();
-            o.type = 'triangle'; o.frequency.value = 600 + Math.random() * 800;
-            const vol = 0.2 * Math.exp(-i * 0.4);
-            g.gain.setValueAtTime(vol, t); g.gain.linearRampToValueAtTime(0, t + 0.03);
-            o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.03);
+            o.type = 'triangle'; o.frequency.value = 700 + Math.random() * 900;
+            const vol = 0.4 * Math.exp(-i * 0.3);
+            g.gain.setValueAtTime(vol, t); g.gain.linearRampToValueAtTime(0, t + 0.04);
+            o.connect(g); g.connect(stoneMaster); o.start(t); o.stop(t + 0.04);
           }
           break;
         }
