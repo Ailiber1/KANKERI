@@ -3815,22 +3815,22 @@ function buildAlleyObjects(g) {
   // === ビル群（建物ブロック）===
   // 最低4mの通路幅を確保した配置
   const buildingDefs = [
-    // NW区画（端ビルは境界壁まで延長）
-    { x:-20, z:16, hw:7, hd:6, h:10, texType:'concrete' },  // edge x=-13
-    { x:-6, z:25, hw:3, hd:2, h:8, texType:'brick' },       // edge x=-9, gap=4m
-    { x:-21, z:27, hw:7, hd:3, h:7, texType:'concrete' },   // z:[24,30] 境界壁まで埋める
-    // NE区画（端ビルは境界壁まで延長して隙間をなくす）
-    { x:15, z:14, hw:5, hd:5, h:11, texType:'brick' },      // edge x=20
-    { x:27, z:15, hw:3, hd:6, h:8, texType:'concrete' },    // x:[24,30] 境界壁まで埋める
-    { x:17, z:27, hw:7, hd:3, h:9, texType:'brick' },       // z:[24,30] 境界壁まで埋める
-    // SW区画
-    { x:-16, z:-14, hw:6, hd:5, h:9, texType:'concrete' },  // edge x=-22
-    { x:-27, z:-15, hw:3, hd:7, h:7, texType:'brick' },     // x:[-30,-24] 境界壁まで埋める
-    { x:-18, z:-27, hw:7, hd:3, h:8, texType:'concrete' },  // z:[-30,-24] 境界壁まで埋める
-    // SE区画
-    { x:16, z:-14, hw:6, hd:5, h:12, texType:'brick' },     // edge x=22
-    { x:27, z:-13, hw:3, hd:4, h:6, texType:'concrete' },   // x:[24,30] 境界壁まで埋める
-    { x:18, z:-27, hw:7, hd:3, h:9, texType:'brick' },      // z:[-30,-24] 境界壁まで埋める
+    // NW区画（全隙間4m以上確保）
+    { x:-20, z:16, hw:7, hd:6, h:10, texType:'concrete' },  // x:[-27,-13], z:[10,22]
+    { x:-6, z:25, hw:3, hd:2, h:8, texType:'brick' },       // x:[-9,-3], z:[23,27]
+    { x:-22, z:28, hw:8, hd:2, h:7, texType:'concrete' },   // x:[-30,-14], z:[26,30] gap=4m(z22→z26)
+    // NE区画（全隙間4m以上確保）
+    { x:15, z:14, hw:5, hd:5, h:11, texType:'brick' },      // x:[10,20], z:[9,19]
+    { x:28, z:15, hw:2, hd:6, h:8, texType:'concrete' },    // x:[26,30], z:[9,21] gap=6m(x20→x26)
+    { x:17, z:28, hw:7, hd:2, h:9, texType:'brick' },       // x:[10,24], z:[26,30]
+    // SW区画（全隙間4m以上確保）
+    { x:-16, z:-14, hw:6, hd:5, h:9, texType:'concrete' },  // x:[-22,-10], z:[-19,-9]
+    { x:-28, z:-15, hw:2, hd:7, h:7, texType:'brick' },     // x:[-30,-26], z:[-22,-8] gap=4m(x-22→x-26)
+    { x:-18, z:-28, hw:7, hd:2, h:8, texType:'concrete' },  // x:[-25,-11], z:[-30,-26]
+    // SE区画（全隙間4m以上確保）
+    { x:16, z:-14, hw:6, hd:5, h:12, texType:'brick' },     // x:[10,22], z:[-19,-9]
+    { x:28, z:-13, hw:2, hd:4, h:6, texType:'concrete' },   // x:[26,30], z:[-17,-9] gap=4m(x22→x26)
+    { x:18, z:-28, hw:7, hd:2, h:9, texType:'brick' },      // x:[11,25], z:[-30,-26]
   ];
 
   for (const b of buildingDefs) {
@@ -4918,6 +4918,11 @@ function updatePlayer(g, dt) {
     ctrl.position.y = getGroundHeight(g, ctrl.position.x, ctrl.position.z);
     const fig = g.playerFig;
     fig.group.position.copy(ctrl.position);
+    // 毎フレーム灰色を強制（色が戻るバグ防止）
+    if (fig.mat.color.getHex() !== 0x666666) {
+      fig.mat.color.setHex(0x666666);
+      fig.mat.emissive.setHex(0x333333);
+    }
     updateStickAnimation(fig, dt, 0, true, false);
     return;
   }
@@ -4972,52 +4977,57 @@ function updatePlayer(g, dt) {
   const prevValidX = ctrl.position.x;
   const prevValidZ = ctrl.position.z;
 
-  const newX = ctrl.position.x + moveX;
-  const newZ = ctrl.position.z + moveZ;
-
-  // Boundary check
+  // サブステップで移動＋コリジョンを処理（壁すり抜け完全防止）
+  const moveDist = Math.sqrt(moveX * moveX + moveZ * moveZ);
+  const maxStep = 0.25; // 1ステップの最大移動量（マージン0.5の半分）
+  const subSteps = moveDist > maxStep ? Math.ceil(moveDist / maxStep) : 1;
+  const stepX = moveX / subSteps;
+  const stepZ = moveZ / subSteps;
   const half = g.config.size / 2 - 0.5;
-  ctrl.position.x = Math.max(-half, Math.min(half, newX));
-  ctrl.position.z = Math.max(-half, Math.min(half, newZ));
-
-  // Collider check — 複数パスで連鎖押し出しを処理 + マージン拡大
   const COL_MARGIN = 0.5;
   let blocked = false;
-  for (let pass = 0; pass < 3; pass++) {
-    let anyPush = false;
-    for (const col of g.colliders) {
-      if (col.type === 'box') {
-        const overX = col.hw + COL_MARGIN - Math.abs(ctrl.position.x - col.x);
-        const overZ = col.hd + COL_MARGIN - Math.abs(ctrl.position.z - col.z);
-        if (overX > 0 && overZ > 0) {
-          // 押し出し量が少ない軸で押し出す（最小移動距離）
-          if (overX < overZ) {
-            ctrl.position.x += Math.sign(ctrl.position.x - col.x) * overX;
-          } else {
-            ctrl.position.z += Math.sign(ctrl.position.z - col.z) * overZ;
+
+  for (let step = 0; step < subSteps; step++) {
+    // サブステップ移動
+    ctrl.position.x = Math.max(-half, Math.min(half, ctrl.position.x + stepX));
+    ctrl.position.z = Math.max(-half, Math.min(half, ctrl.position.z + stepZ));
+
+    // コライダー押し出し（複数パス）
+    for (let pass = 0; pass < 3; pass++) {
+      let anyPush = false;
+      for (const col of g.colliders) {
+        if (col.type === 'box') {
+          const overX = col.hw + COL_MARGIN - Math.abs(ctrl.position.x - col.x);
+          const overZ = col.hd + COL_MARGIN - Math.abs(ctrl.position.z - col.z);
+          if (overX > 0 && overZ > 0) {
+            if (overX < overZ) {
+              ctrl.position.x += (Math.sign(ctrl.position.x - col.x) || 1) * overX;
+            } else {
+              ctrl.position.z += (Math.sign(ctrl.position.z - col.z) || 1) * overZ;
+            }
+            anyPush = true;
           }
-          anyPush = true;
-        }
-      } else if (col.type === 'cylinder') {
-        const dx = ctrl.position.x - col.x;
-        const dz = ctrl.position.z - col.z;
-        const dist = Math.sqrt(dx*dx + dz*dz);
-        if (dist < col.r + COL_MARGIN) {
-          const push = (col.r + COL_MARGIN - dist);
-          if (dist > 0.01) {
-            ctrl.position.x += (dx / dist) * push;
-            ctrl.position.z += (dz / dist) * push;
-          } else {
-            ctrl.position.x += COL_MARGIN;
+        } else if (col.type === 'cylinder') {
+          const dx = ctrl.position.x - col.x;
+          const dz = ctrl.position.z - col.z;
+          const dist = Math.sqrt(dx*dx + dz*dz);
+          if (dist < col.r + COL_MARGIN) {
+            const push = (col.r + COL_MARGIN - dist);
+            if (dist > 0.01) {
+              ctrl.position.x += (dx / dist) * push;
+              ctrl.position.z += (dz / dist) * push;
+            } else {
+              ctrl.position.x += COL_MARGIN;
+            }
+            anyPush = true;
           }
-          anyPush = true;
         }
       }
+      if (!anyPush) break;
     }
-    if (!anyPush) break;
   }
 
-  // 全パス後もコライダー内にいる場合、前の有効位置に戻す
+  // 全ステップ後もコライダー内にいる場合、前の有効位置に戻す
   for (const col of g.colliders) {
     if (col.type === 'box') {
       if (Math.abs(ctrl.position.x - col.x) < col.hw + 0.1 &&
@@ -5638,9 +5648,11 @@ function updateOni(g, oni, dt) {
         } else {
           oni.state = 'canTouch';
           oni.foundTarget = oni.chaseTarget || closestVisibleTarget;
-          oni.foundName = (oni.chaseTarget === 'player') ? (gameState.username || 'Player') : (oni.chaseTarget && oni.chaseTarget.name ? oni.chaseTarget.name : closestVisibleName);
+          oni.foundName = (oni.chaseTarget === 'player')
+            ? (gameState.username || 'Player')
+            : (oni.chaseTarget && oni.chaseTarget.name ? oni.chaseTarget.name : (closestVisibleName || '???'));
           oni.stateTimer = 0;
-          showNotification('見つけた！ ' + oni.foundName);
+          showNotification('見つけた！ ' + (oni.foundName || '???'));
           SoundManager.playGameSE('found');
         }
       }
@@ -5893,9 +5905,9 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
         const overZ = col.hd + ONI_MARGIN - Math.abs(oni.position.z - col.z);
         if (overX > 0 && overZ > 0) {
           if (overX < overZ) {
-            oni.position.x += Math.sign(oni.position.x - col.x) * overX;
+            oni.position.x += (Math.sign(oni.position.x - col.x) || 1) * overX;
           } else {
-            oni.position.z += Math.sign(oni.position.z - col.z) * overZ;
+            oni.position.z += (Math.sign(oni.position.z - col.z) || 1) * overZ;
           }
           anyPush = true;
         }
@@ -6152,9 +6164,9 @@ function moveCpuAlly(ally, targetX, targetZ, speed, dt, g) {
         const overZ = col.hd + ALLY_MARGIN - Math.abs(newZ - col.z);
         if (overX > 0 && overZ > 0) {
           if (overX < overZ) {
-            newX += Math.sign(newX - col.x) * overX;
+            newX += (Math.sign(newX - col.x) || 1) * overX;
           } else {
-            newZ += Math.sign(newZ - col.z) * overZ;
+            newZ += (Math.sign(newZ - col.z) || 1) * overZ;
           }
           anyPush = true;
         }
