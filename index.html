@@ -4999,11 +4999,12 @@ function updatePlayer(g, dt) {
         if (col.type === 'box') {
           const overX = col.hw + COL_MARGIN - Math.abs(ctrl.position.x - col.x);
           const overZ = col.hd + COL_MARGIN - Math.abs(ctrl.position.z - col.z);
-          if (overX > 0 && overZ > 0) {
-            if (overX < overZ) {
-              ctrl.position.x += (Math.sign(ctrl.position.x - col.x) || 1) * overX;
+          // コーナーすり抜け防止: overlap=0でも衝突判定を維持
+          if (overX > -0.001 && overZ > -0.001 && (overX > 0 || overZ > 0)) {
+            if (overZ <= 0 || (overX > 0 && overX < overZ)) {
+              ctrl.position.x += (Math.sign(ctrl.position.x - col.x) || 1) * Math.max(overX, 0.001);
             } else {
-              ctrl.position.z += (Math.sign(ctrl.position.z - col.z) || 1) * overZ;
+              ctrl.position.z += (Math.sign(ctrl.position.z - col.z) || 1) * Math.max(overZ, 0.001);
             }
             anyPush = true;
           }
@@ -5903,11 +5904,12 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
       if (col.type === 'box') {
         const overX = col.hw + ONI_MARGIN - Math.abs(oni.position.x - col.x);
         const overZ = col.hd + ONI_MARGIN - Math.abs(oni.position.z - col.z);
-        if (overX > 0 && overZ > 0) {
-          if (overX < overZ) {
-            oni.position.x += (Math.sign(oni.position.x - col.x) || 1) * overX;
+        // コーナーすり抜け防止: overlap=0でも衝突判定を維持
+        if (overX > -0.001 && overZ > -0.001 && (overX > 0 || overZ > 0)) {
+          if (overZ <= 0 || (overX > 0 && overX < overZ)) {
+            oni.position.x += (Math.sign(oni.position.x - col.x) || 1) * Math.max(overX, 0.001);
           } else {
-            oni.position.z += (Math.sign(oni.position.z - col.z) || 1) * overZ;
+            oni.position.z += (Math.sign(oni.position.z - col.z) || 1) * Math.max(overZ, 0.001);
           }
           anyPush = true;
         }
@@ -6162,11 +6164,12 @@ function moveCpuAlly(ally, targetX, targetZ, speed, dt, g) {
       if (col.type === 'box') {
         const overX = col.hw + ALLY_MARGIN - Math.abs(newX - col.x);
         const overZ = col.hd + ALLY_MARGIN - Math.abs(newZ - col.z);
-        if (overX > 0 && overZ > 0) {
-          if (overX < overZ) {
-            newX += (Math.sign(newX - col.x) || 1) * overX;
+        // コーナーすり抜け防止: overlap=0でも衝突判定を維持
+        if (overX > -0.001 && overZ > -0.001 && (overX > 0 || overZ > 0)) {
+          if (overZ <= 0 || (overX > 0 && overX < overZ)) {
+            newX += (Math.sign(newX - col.x) || 1) * Math.max(overX, 0.001);
           } else {
-            newZ += (Math.sign(newZ - col.z) || 1) * overZ;
+            newZ += (Math.sign(newZ - col.z) || 1) * Math.max(overZ, 0.001);
           }
           anyPush = true;
         }
@@ -7398,7 +7401,7 @@ function updateHUD(g) {
     const dist = Math.sqrt(dx*dx + dz*dz).toFixed(0);
     const angle = Math.atan2(dx, dz) - g.player.cameraYaw;
     const arrows = ['↑','↗','→','↘','↓','↙','←','↖'];
-    const idx = Math.round(((angle + Math.PI) / (Math.PI*2)) * 8) % 8;
+    const idx = ((Math.round(((angle + Math.PI) / (Math.PI*2)) * 8) % 8) + 8) % 8;
     canDirEl.textContent = '缶 ' + arrows[idx] + ' ' + dist + 'm';
   }
 
