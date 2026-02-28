@@ -3938,7 +3938,7 @@ function createOni(g, spawnX, spawnZ) {
     fig, cone,
     position: new THREE.Vector3(spawnX, 0, spawnZ),
     rotation: 0,
-    state: 'patrol', // patrol, chase, canTouch, footSound, distraction, recovery
+    state: 'patrol', // patrol, chase, canTouch, footSound, distraction, recovery, search, canGuard
     targetWaypoint: 0,
     targetPos: null,
     chasedPlayer: null,
@@ -3954,7 +3954,11 @@ function createOni(g, spawnX, spawnZ) {
     foundName: null,
     foundTarget: null,
     chaseTarget: null,
-    distractionPos: null
+    distractionPos: null,
+    role: 'patrol', // 'patrol' or 'searcher' or 'canGuard'
+    searchTarget: null, // collider to search behind
+    searchTimer: 0, // time since last search attempt
+    searchedCovers: [] // recently searched covers (avoid re-searching)
   };
 }
 
@@ -4081,6 +4085,22 @@ function updateOni(g, oni, dt) {
     }
   }
 
+  // --- Role assignment for multiple onis ---
+  if (g.onis.length >= 2) {
+    const oniIdx = g.onis.indexOf(oni);
+    // First oni = canGuard (stays near can), others = searcher (hunts behind walls)
+    if (oniIdx === 0) {
+      oni.role = 'canGuard';
+    } else {
+      oni.role = 'searcher';
+    }
+  } else {
+    oni.role = 'patrol'; // single oni: normal patrol with occasional search
+  }
+
+  // Track search timer
+  oni.searchTimer += dt;
+
   switch (oni.state) {
     case 'patrol': {
       const wp = g.config.waypoints[oni.targetWaypoint];
@@ -4090,8 +4110,27 @@ function updateOni(g, oni, dt) {
       if (dist < 1.5) {
         oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
       }
-      const speed = oni.speed * fatigueMult;
-      moveOni(oni, wp.x, wp.z, speed, dt, g);
+
+      // canGuard role: stay within range of can
+      if (oni.role === 'canGuard') {
+        const canPos = g.can.group.position;
+        const canDist = oni.position.distanceTo(canPos);
+        // If too far from can (>12m), head back toward can area
+        if (canDist > 12 && g.can.isAtHome) {
+          const backAngle = Math.atan2(canPos.x - oni.position.x, canPos.z - oni.position.z);
+          // Patrol in a circle around the can (radius ~6-8m)
+          const guardX = canPos.x + Math.sin(backAngle + Math.PI * 0.3) * 7;
+          const guardZ = canPos.z + Math.cos(backAngle + Math.PI * 0.3) * 7;
+          moveOni(oni, guardX, guardZ, oni.speed * fatigueMult, dt, g);
+        } else {
+          const speed = oni.speed * fatigueMult;
+          moveOni(oni, wp.x, wp.z, speed, dt, g);
+        }
+      } else {
+        const speed = oni.speed * fatigueMult;
+        moveOni(oni, wp.x, wp.z, speed, dt, g);
+      }
+
       // Check vision — chase closest visible target
       if (canSeeAny) {
         oni.state = 'chase';
@@ -4109,6 +4148,39 @@ function updateOni(g, oni, dt) {
         }
       } else if (!canSeeAny) {
         oni.stateTimer = 0;
+      }
+
+      // --- Search behind covers: searcher role searches more often ---
+      if (!canSeeAny && !loudestFootTarget) {
+        const searchInterval = oni.role === 'searcher' ? 8 : 15;
+        if (oni.searchTimer > searchInterval) {
+          // Find a nearby tall cover to search behind
+          const coverCandidates = g.colliders.filter(c => {
+            if (c.h < 1.0) return false;
+            const cd = Math.sqrt((c.x - oni.position.x)**2 + (c.z - oni.position.z)**2);
+            if (cd > 15 || cd < 2) return false;
+            // Skip recently searched covers
+            if (oni.searchedCovers.some(sc => sc.x === c.x && sc.z === c.z)) return false;
+            return true;
+          });
+          if (coverCandidates.length > 0) {
+            // Pick the closest unsearched cover
+            coverCandidates.sort((a, b) => {
+              const da = (a.x - oni.position.x)**2 + (a.z - oni.position.z)**2;
+              const db = (b.x - oni.position.x)**2 + (b.z - oni.position.z)**2;
+              return da - db;
+            });
+            // Add randomness — don't always go to the closest one
+            const pick = coverCandidates[Math.floor(Math.random() * Math.min(3, coverCandidates.length))];
+            oni.searchTarget = pick;
+            oni.state = 'search';
+            oni.stateTimer = 0;
+            oni.searchTimer = 0;
+            // Remember this cover (forget after 3 searches to allow re-visits)
+            oni.searchedCovers.push({ x: pick.x, z: pick.z });
+            if (oni.searchedCovers.length > 3) oni.searchedCovers.shift();
+          }
+        }
       }
       break;
     }
@@ -4255,6 +4327,68 @@ function updateOni(g, oni, dt) {
       }
       break;
     }
+    case 'search': {
+      // 壁の裏側を覗きに行く — 遮蔽物の反対側に回り込む
+      if (!oni.searchTarget) { oni.state = 'patrol'; oni.stateTimer = 0; break; }
+      const col = oni.searchTarget;
+
+      // Phase 1: Move to the far side of the cover (opposite from oni's approach)
+      if (oni.stateTimer < 0.1 && !oni._searchDest) {
+        // Calculate the peek position: walk around the cover to the far side
+        const approachAngle = Math.atan2(oni.position.x - col.x, oni.position.z - col.z);
+        const coverR = col.type === 'cylinder' ? col.r : Math.max(col.hw, col.hd);
+        // Go to the opposite side + slight offset to peek
+        const peekX = col.x - Math.sin(approachAngle) * (coverR + 1.2);
+        const peekZ = col.z - Math.cos(approachAngle) * (coverR + 1.2);
+        const half = g.config.size / 2 - 1;
+        oni._searchDest = new THREE.Vector3(
+          Math.max(-half, Math.min(half, peekX)), 0,
+          Math.max(-half, Math.min(half, peekZ))
+        );
+      }
+
+      if (oni._searchDest) {
+        moveOni(oni, oni._searchDest.x, oni._searchDest.z, oni.speed * 1.1 * fatigueMult, dt, g);
+        const sDist = oni.position.distanceTo(oni._searchDest);
+        if (sDist < 1.5) {
+          // Arrived at peek position — look around briefly
+          oni.stateTimer += dt;
+          if (oni.stateTimer > 2.5) {
+            oni.state = 'patrol';
+            oni.stateTimer = 0;
+            oni._searchDest = null;
+            oni.searchTarget = null;
+          }
+        }
+      }
+
+      // If spot someone during search, chase immediately
+      if (canSeeAny) {
+        oni.state = 'chase';
+        oni.chasedPlayer = closestVisiblePos;
+        oni.chaseTarget = closestVisibleTarget;
+        oni.stateTimer = 0;
+        oni._searchDest = null;
+        oni.searchTarget = null;
+      }
+      // Foot sound during search
+      if (loudestFootTarget && !canSeeAny) {
+        oni.state = 'footSound';
+        oni.targetPos = loudestFootTarget;
+        oni.stateTimer = 0;
+        oni._searchDest = null;
+        oni.searchTarget = null;
+      }
+
+      // Timeout
+      if (oni.stateTimer > 8) {
+        oni.state = 'patrol';
+        oni.stateTimer = 0;
+        oni._searchDest = null;
+        oni.searchTarget = null;
+      }
+      break;
+    }
   }
 
   // Update vision cone color based on state
@@ -4264,6 +4398,9 @@ function updateOni(g, oni, dt) {
   } else if (oni.state === 'footSound') {
     oni.cone.material.color.setHex(0xff8800);
     oni.cone.material.opacity = 0.25;
+  } else if (oni.state === 'search') {
+    oni.cone.material.color.setHex(0xff6600);
+    oni.cone.material.opacity = 0.2;
   } else {
     oni.cone.material.color.setHex(0xff3333);
     oni.cone.material.opacity = 0.15;
@@ -4609,6 +4746,18 @@ function updateCpuAlly(g, ally, dt) {
     oniFacingAlly = Math.abs(angleDiff) < closestOni.viewAngle / 2;
   }
 
+  // --- Time-aware strategy: remaining time affects decisions ---
+  const remainingTime = g.gameTimer || 90;
+  const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+  const uncapturedCount = totalPlayers - capturedCount;
+  // If time is running out and we're not captured, prioritize survival
+  const endgameMode = remainingTime < 30;
+  const criticalMode = remainingTime < 15;
+  // Strong allies understand: if we survive, we WIN — don't take unnecessary risks
+  const shouldPrioritizeSurvival = (ally.level === 'strong' && endgameMode)
+    || (ally.level === 'normal' && criticalMode)
+    || (uncapturedCount <= 1); // last survivor must hide
+
   switch (ally.state) {
     case 'idle': {
       // Find a hiding spot and start sneaking toward it
@@ -4708,11 +4857,20 @@ function updateCpuAlly(g, ally, dt) {
             }
           }
         }
-        // Also check if oni is in chase mode heading toward us
+        // Also check if oni is in chase/search mode heading toward us
         if (closestOni.state === 'chase' || closestOni.state === 'footSound') {
           if (oniFacingAlly && oniDist < 15) {
             oniApproaching = true;
             oniApproachETA = oniDist / 5.0;
+          }
+        }
+        // Detect oni in search mode coming to check our cover!
+        if (closestOni.state === 'search' && closestOni._searchDest) {
+          const searchDestDist = ally.position.distanceTo(closestOni._searchDest);
+          if (searchDestDist < 4) {
+            // Oni is searching the cover we're hiding behind!
+            oniApproaching = true;
+            oniApproachETA = oniDist / 3.5;
           }
         }
       }
@@ -4784,6 +4942,26 @@ function updateCpuAlly(g, ally, dt) {
       }
 
       // --- Rescue logic: if allies are captured, look for safe opportunity to kick ---
+      // Strategic decision: should we risk rescue or prioritize survival?
+      if (shouldPrioritizeSurvival) {
+        // Smart play: stay hidden and run out the clock!
+        // Only rescue if conditions are EXTREMELY safe (strong) or never (critical mode)
+        if (criticalMode) break; // < 15s: absolutely stay hidden, victory is near
+        // < 30s + strong: only rescue if we have overwhelming advantage
+        if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying
+          && canToOniDist > 18 && oniDist > 18 && !oniFacingAlly) {
+          const allyTimeTocan = canDist / ally.sprintSpeed;
+          const oniTimeToCan = canToOniDist / 5.5;
+          if (oniTimeToCan - allyTimeTocan > 3.0 && Math.random() < 0.3) {
+            ally.state = 'tryKick';
+            ally.stateTimer = 0;
+            ally.isCrouching = false;
+            ally.targetPos = canPos.clone();
+          }
+        }
+        break;
+      }
+
       if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
         const kickInterval = ally.level === 'strong' ? 3 : (ally.level === 'normal' ? 5 : 8);
         const safeOniFromCan = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 13 : 16);
@@ -4793,7 +4971,7 @@ function updateCpuAlly(g, ally, dt) {
         const allyTimeTocan = canDist / ally.sprintSpeed;
         const oniTimeToCan = canToOniDist / 5.5;
         const timeAdvantage = oniTimeToCan - allyTimeTocan;
-        // Need time advantage to kick safely (reduced thresholds)
+        // Need time advantage to kick safely
         const minAdvantage = ally.level === 'strong' ? 0.5 : (ally.level === 'normal' ? 1.0 : 1.5);
 
         // Also check: is oni facing AWAY from can? (extra safe)
@@ -4803,11 +4981,19 @@ function updateCpuAlly(g, ally, dt) {
           let canAngleDiff = toCanAngle - closestOni.rotation;
           while (canAngleDiff > Math.PI) canAngleDiff -= Math.PI * 2;
           while (canAngleDiff < -Math.PI) canAngleDiff += Math.PI * 2;
-          oniFacingAwayCan = Math.abs(canAngleDiff) > Math.PI * 0.6; // >108° away
+          oniFacingAwayCan = Math.abs(canAngleDiff) > Math.PI * 0.6;
         }
 
-        const safeEnough = (canToOniDist > safeOniFromCan && oniDist > safeOniFromAlly)
-          || (oniFacingAwayCan && canToOniDist > safeOniFromCan * 0.6);
+        // Check ALL onis (not just closest) — is any oni guarding the can?
+        let anyOniNearCan = false;
+        for (const o of g.onis) {
+          if (canPos.distanceTo(o.position) < 8) { anyOniNearCan = true; break; }
+        }
+        // If a guard oni is near can, need much higher safety threshold
+        const guardBonus = anyOniNearCan ? 1.5 : 1.0;
+
+        const safeEnough = (canToOniDist > safeOniFromCan * guardBonus && oniDist > safeOniFromAlly)
+          || (oniFacingAwayCan && canToOniDist > safeOniFromCan * 0.6 && !anyOniNearCan);
 
         if (ally.kickCheckTimer > kickInterval
           && safeEnough
