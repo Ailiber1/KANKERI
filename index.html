@@ -6037,6 +6037,14 @@ function updateCpuAlly(g, ally, dt) {
   ally.stateTimer += dt;
   ally.kickCheckTimer += dt;
 
+  // === 近接キック判定（全状態共通） ===
+  // 味方が捕まっていて、缶の近く(3.5m以内)を通過中なら即座に蹴る
+  if (capturedCount > 0 && canDist < 3.5 && g.can.isAtHome && !g.can.isFlying
+    && ally.state !== 'tryKick') {
+    cpuPerformKick(g, ally);
+    return;
+  }
+
   // Check if oni is facing toward this ally (used for smart decisions)
   let oniFacingAlly = false;
   if (closestOni) {
@@ -6245,35 +6253,35 @@ function updateCpuAlly(g, ally, dt) {
       // --- Rescue logic: if allies are captured, look for safe opportunity to kick ---
       // Strategic decision: should we risk rescue or prioritize survival?
       if (shouldPrioritizeSurvival) {
-        // Smart play: stay hidden and run out the clock!
-        // Only rescue if conditions are EXTREMELY safe (strong) or never (critical mode)
-        if (criticalMode) break; // < 15s: absolutely stay hidden, victory is near
-        // < 30s + strong: only rescue if we have overwhelming advantage
-        if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying
-          && canToOniDist > 18 && oniDist > 18 && !oniFacingAlly) {
-          const allyTimeTocan = canDist / ally.sprintSpeed;
-          const oniTimeToCan = canToOniDist / 5.5;
-          if (oniTimeToCan - allyTimeTocan > 3.0 && Math.random() < 0.3) {
-            ally.state = 'tryKick';
-            ally.stateTimer = 0;
-            ally.isCrouching = false;
-            ally.targetPos = canPos.clone();
+        // 生存優先モードでも味方が捕まっていれば救出を検討
+        if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
+          // 缶が近い場合（8m以内）は積極的に救出
+          const safeD = canDist < 8 ? 8 : 14;
+          if (canToOniDist > safeD && oniDist > safeD && !oniFacingAlly) {
+            const allyTimeTocan = canDist / ally.sprintSpeed;
+            const oniTimeToCan = canToOniDist / 5.5;
+            if (oniTimeToCan - allyTimeTocan > 1.0 && Math.random() < 0.6) {
+              ally.state = 'tryKick';
+              ally.stateTimer = 0;
+              ally.isCrouching = false;
+              ally.targetPos = canPos.clone();
+            }
           }
         }
         break;
       }
 
       if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
-        const kickInterval = ally.level === 'strong' ? 3 : (ally.level === 'normal' ? 5 : 8);
-        const safeOniFromCan = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 13 : 16);
-        const safeOniFromAlly = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 13 : 16);
+        const kickInterval = ally.level === 'strong' ? 2 : (ally.level === 'normal' ? 3 : 5);
+        const safeOniFromCan = ally.level === 'strong' ? 8 : (ally.level === 'normal' ? 10 : 13);
+        const safeOniFromAlly = ally.level === 'strong' ? 8 : (ally.level === 'normal' ? 10 : 13);
 
         // Key insight: can ally reach the can BEFORE oni does?
         const allyTimeTocan = canDist / ally.sprintSpeed;
         const oniTimeToCan = canToOniDist / 5.5;
         const timeAdvantage = oniTimeToCan - allyTimeTocan;
         // Need time advantage to kick safely
-        const minAdvantage = ally.level === 'strong' ? 0.5 : (ally.level === 'normal' ? 1.0 : 1.5);
+        const minAdvantage = ally.level === 'strong' ? 0.3 : (ally.level === 'normal' ? 0.7 : 1.2);
 
         // Also check: is oni facing AWAY from can? (extra safe)
         let oniFacingAwayCan = false;
@@ -6288,20 +6296,19 @@ function updateCpuAlly(g, ally, dt) {
         // Check ALL onis (not just closest) — is any oni guarding the can?
         let anyOniNearCan = false;
         for (const o of g.onis) {
-          if (canPos.distanceTo(o.position) < 8) { anyOniNearCan = true; break; }
+          if (canPos.distanceTo(o.position) < 6) { anyOniNearCan = true; break; }
         }
-        // If a guard oni is near can, need much higher safety threshold
-        const guardBonus = anyOniNearCan ? 1.5 : 1.0;
+        const guardBonus = anyOniNearCan ? 1.3 : 1.0;
 
         const safeEnough = (canToOniDist > safeOniFromCan * guardBonus && oniDist > safeOniFromAlly)
-          || (oniFacingAwayCan && canToOniDist > safeOniFromCan * 0.6 && !anyOniNearCan);
+          || (oniFacingAwayCan && canToOniDist > safeOniFromCan * 0.5 && !anyOniNearCan);
 
         if (ally.kickCheckTimer > kickInterval
           && safeEnough
           && !oniFacingAlly
           && timeAdvantage > minAdvantage) {
           ally.kickCheckTimer = 0;
-          const kickChance = ally.level === 'strong' ? 0.8 : (ally.level === 'normal' ? 0.6 : 0.4);
+          const kickChance = ally.level === 'strong' ? 0.9 : (ally.level === 'normal' ? 0.75 : 0.55);
           if (Math.random() < kickChance) {
             ally.state = 'tryKick';
             ally.stateTimer = 0;
