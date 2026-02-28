@@ -7358,10 +7358,8 @@ function startGame(stageNum, mode) {
 
   // Visibility change (auto-pause)
   G._visHandler = () => {
-    if (document.hidden && G.gamePhase !== 'result') {
-      G.paused = true;
-      const overlay = document.getElementById('pause-overlay');
-      if (overlay) overlay.style.display = 'flex';
+    if (document.hidden && G.gamePhase !== 'result' && !G.paused) {
+      togglePause(G);
     }
   };
   document.addEventListener('visibilitychange', G._visHandler);
