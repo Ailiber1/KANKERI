@@ -1010,6 +1010,12 @@ html, body {
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
 <script>
 // ============================================================
 // SECTION: CONSTANTS
@@ -2760,6 +2766,48 @@ function createGameScene(stageConfig) {
   g.kickableSigns = [];
   g.playerFloor = 0;
   g.flickeringLights = [];
+
+  // === ポストプロセッシング（全ステージ共通）===
+  try {
+    const composer = new THREE.EffectComposer(g.renderer);
+    composer.addPass(new THREE.RenderPass(g.scene, g.camera));
+    // ブルーム（光のにじみ）
+    const bloomPass = new THREE.UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.25, 0.4, 0.88
+    );
+    composer.addPass(bloomPass);
+    // カスタムシェーダ（ビネット + フィルムグレイン + 色補正）
+    const filmShader = {
+      uniforms: {
+        tDiffuse: { value: null },
+        time: { value: 0 },
+        vignetteAmt: { value: 0.6 },
+        grainAmt: { value: 0.04 },
+        tintR: { value: 1.0 }, tintG: { value: 1.0 }, tintB: { value: 1.0 },
+        desaturation: { value: 0.0 }
+      },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: [
+        'uniform sampler2D tDiffuse; uniform float time,vignetteAmt,grainAmt,tintR,tintG,tintB,desaturation;',
+        'varying vec2 vUv;',
+        'float rand(vec2 co){ return fract(sin(dot(co,vec2(12.9898,78.233)))*43758.5453); }',
+        'void main(){',
+        '  vec4 c=texture2D(tDiffuse,vUv);',
+        '  vec2 uv=vUv*2.0-1.0; float vig=1.0-dot(uv,uv)*vignetteAmt*0.5; c.rgb*=vig;',
+        '  float g=rand(vUv+fract(time))*grainAmt; c.rgb+=g-grainAmt*0.5;',
+        '  c.rgb*=vec3(tintR,tintG,tintB);',
+        '  float gray=dot(c.rgb,vec3(0.299,0.587,0.114)); c.rgb=mix(vec3(gray),c.rgb,1.0-desaturation);',
+        '  gl_FragColor=c;',
+        '}'
+      ].join('\n')
+    };
+    const filmPass = new THREE.ShaderPass(filmShader);
+    composer.addPass(filmPass);
+    g.composer = composer;
+    g.bloomPass = bloomPass;
+    g.filmPass = filmPass;
+  } catch(e) { console.warn('Post-processing init failed:', e); }
 
   return g;
 }
@@ -5117,8 +5165,19 @@ function buildSchoolObjects(g) {
     g.streetLights.push({ spot: lampLight, fixture: lampHead, fixMat: lampHeadMat });
   }
 
-  // Stage 4 夜間シーンの露出を明るめに調整
+  // Stage 4 夜間シーンの露出 + ポストプロセッシング強化
   g.renderer.toneMappingExposure = 1.1;
+  if (g.composer && g.bloomPass && g.filmPass) {
+    g.bloomPass.strength = 0.4;   // ホラー用ブルーム強め
+    g.bloomPass.radius = 0.5;
+    g.bloomPass.threshold = 0.7;
+    g.filmPass.uniforms.vignetteAmt.value = 0.9;  // 画面端を暗く
+    g.filmPass.uniforms.grainAmt.value = 0.06;    // フィルムグレイン強め
+    g.filmPass.uniforms.tintR.value = 0.88;        // 寒色系ティント
+    g.filmPass.uniforms.tintG.value = 0.92;
+    g.filmPass.uniforms.tintB.value = 1.08;
+    g.filmPass.uniforms.desaturation.value = 0.2;  // 彩度を落とす
+  }
 
   // === kickableSigns の初期化 ===
   g.kickableSigns = g.kickableSigns || [];
@@ -5211,6 +5270,259 @@ function buildSchoolObjects(g) {
       text: '机', color: 0x8b6914, isDesk: true
     });
   }
+
+  // ================================================================
+  // 廃校ビジュアル品質強化
+  // ================================================================
+
+  // === 大気エフェクト: 塵パーティクル ===
+  const dustCount = 300;
+  const dustPos = new Float32Array(dustCount * 3);
+  for (let i = 0; i < dustCount; i++) {
+    dustPos[i*3]   = -18 + Math.random() * 36;
+    dustPos[i*3+1] = 0.3 + Math.random() * 7.5;
+    dustPos[i*3+2] = 24.5 + Math.random() * 7;
+  }
+  const dustGeo = new THREE.BufferGeometry();
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  g.geometries.push(dustGeo);
+  const dustMat = new THREE.PointsMaterial({
+    color: 0xddccaa, size: 0.025, transparent: true, opacity: 0.4,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  g.materials.push(dustMat);
+  g.dustParticles = new THREE.Points(dustGeo, dustMat);
+  g.scene.add(g.dustParticles);
+
+  // === 月光の光柱（窓から差し込む光）===
+  const shaftMat = new THREE.MeshBasicMaterial({
+    color: 0x5566aa, transparent: true, opacity: 0.04,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+  });
+  g.materials.push(shaftMat);
+  const shaftPositions = [-15, -9, -3, 3, 9, 15];
+  for (const sx of shaftPositions) {
+    const shGeo = new THREE.PlaneGeometry(1.2, 5);
+    g.geometries.push(shGeo);
+    const sh = new THREE.Mesh(shGeo, shaftMat);
+    sh.position.set(sx, 2.5, 24.3);
+    sh.rotation.x = -0.2;
+    sh.rotation.y = 0.1;
+    g.scene.add(sh);
+  }
+
+  // === 校舎外装ディテール ===
+  // --- 屋上パラペット（笠木）---
+  const parapetMat = makePBRMat(concretePBR, { roughness: 0.85 });
+  const parapetGeo = new THREE.BoxGeometry(40.4, 0.5, 8.4);
+  parapetGeo.setAttribute('uv2', parapetGeo.attributes.uv);
+  g.geometries.push(parapetGeo);
+  const parapet = new THREE.Mesh(parapetGeo, parapetMat);
+  parapet.position.set(0, gH(0,28) + 8.25, 28);
+  parapet.castShadow = true;
+  g.scene.add(parapet); g.cameraMeshes.push(parapet);
+  // パラペット上の低い壁
+  const parapetWallGeo = new THREE.BoxGeometry(40, 0.6, 0.15);
+  g.geometries.push(parapetWallGeo);
+  for (const pz of [24.1, 31.9]) {
+    const pw = new THREE.Mesh(parapetWallGeo, schoolMat);
+    pw.position.set(0, gH(0,28) + 8.7, pz);
+    pw.castShadow = true;
+    g.scene.add(pw);
+  }
+
+  // --- 正面玄関庇（ひさし）---
+  const canopyGeo = new THREE.BoxGeometry(6, 0.2, 2.5);
+  canopyGeo.setAttribute('uv2', canopyGeo.attributes.uv);
+  g.geometries.push(canopyGeo);
+  const canopyMat = makePBRMat(concretePBR, { roughness: 0.8 });
+  const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+  canopy.position.set(0, gH(0,24) + 3.2, 22.8);
+  canopy.castShadow = true; canopy.receiveShadow = true;
+  g.scene.add(canopy); g.cameraMeshes.push(canopy);
+  // 庇の支柱（2本）
+  const pillarGeo = new THREE.CylinderGeometry(0.12, 0.12, 3.2, 8);
+  g.geometries.push(pillarGeo);
+  const pillarMat = makePBRMat(concretePBR, { roughness: 0.75 });
+  for (const px of [-2.5, 2.5]) {
+    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+    pillar.position.set(px, gH(0,24) + 1.6, 22.8);
+    pillar.castShadow = true;
+    g.scene.add(pillar); g.cameraMeshes.push(pillar);
+  }
+
+  // --- 校名看板（「旧 南央小学校」）---
+  const signCanvas = document.createElement('canvas');
+  signCanvas.width = 512; signCanvas.height = 128;
+  const sCtx = signCanvas.getContext('2d');
+  sCtx.fillStyle = '#2a2520';
+  sCtx.fillRect(0, 0, 512, 128);
+  sCtx.fillStyle = '#887766';
+  sCtx.fillRect(4, 4, 504, 120);
+  sCtx.font = 'bold 52px serif';
+  sCtx.fillStyle = '#221a10';
+  sCtx.textAlign = 'center';
+  sCtx.fillText('旧 南央小学校', 256, 80);
+  // 汚れ・剥がれ
+  for (let i = 0; i < 30; i++) {
+    sCtx.fillStyle = `rgba(${40+Math.random()*40},${35+Math.random()*30},${25+Math.random()*20},${0.1+Math.random()*0.3})`;
+    sCtx.fillRect(Math.random()*512, Math.random()*128, 20+Math.random()*60, 5+Math.random()*15);
+  }
+  const signTex = new THREE.CanvasTexture(signCanvas);
+  g.textures.push(signTex);
+  const signMat2 = new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.9 });
+  g.materials.push(signMat2);
+  const signGeo2 = new THREE.PlaneGeometry(4, 1);
+  g.geometries.push(signGeo2);
+  const schoolSign = new THREE.Mesh(signGeo2, signMat2);
+  schoolSign.position.set(0, gH(0,24) + 6.5, 23.96);
+  g.scene.add(schoolSign);
+
+  // --- 窓枠（金属フレーム）---
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.5, metalness: 0.7 });
+  g.materials.push(frameMat);
+  const frameH = new THREE.BoxGeometry(1.3, 0.04, 0.08);
+  const frameV = new THREE.BoxGeometry(0.04, 1.1, 0.08);
+  g.geometries.push(frameH, frameV);
+  for (let floor = 0; floor < 2; floor++) {
+    for (let wx = -18; wx <= 18; wx += 3) {
+      if (Math.abs(wx) < 3 && floor === 0) continue;
+      const fy = gH(0,28) + 2.0 + floor * FLOOR_H;
+      // 南面
+      for (const geo of [frameH, frameH]) {
+        const f1 = new THREE.Mesh(frameH, frameMat);
+        f1.position.set(wx, fy - 0.55, 23.95);
+        g.scene.add(f1);
+        const f2 = new THREE.Mesh(frameH, frameMat);
+        f2.position.set(wx, fy + 0.55, 23.95);
+        g.scene.add(f2);
+      }
+      const fL = new THREE.Mesh(frameV, frameMat);
+      fL.position.set(wx - 0.63, fy, 23.95);
+      g.scene.add(fL);
+      const fR = new THREE.Mesh(frameV, frameMat);
+      fR.position.set(wx + 0.63, fy, 23.95);
+      g.scene.add(fR);
+    }
+  }
+
+  // --- 排水管（外壁に沿って垂直）---
+  const pipeMat = new THREE.MeshStandardMaterial({ color: 0x556655, roughness: 0.6, metalness: 0.3 });
+  g.materials.push(pipeMat);
+  const pipeGeo = new THREE.CylinderGeometry(0.06, 0.06, 8, 8);
+  g.geometries.push(pipeGeo);
+  for (const px of [-19.8, 19.8]) {
+    const pipe = new THREE.Mesh(pipeGeo, pipeMat);
+    pipe.position.set(px, gH(0,28) + 4, 24.2);
+    g.scene.add(pipe);
+  }
+
+  // --- 蔦（ツタ）外壁 ---
+  const ivyMat = new THREE.MeshStandardMaterial({
+    color: 0x1a3518, roughness: 0.85, side: THREE.DoubleSide,
+    transparent: true, opacity: 0.85
+  });
+  g.materials.push(ivyMat);
+  for (let i = 0; i < 12; i++) {
+    const ix = -18 + Math.random() * 36;
+    const iz = Math.random() < 0.5 ? 23.95 : 32.05;
+    const ih = 1.5 + Math.random() * 4;
+    const iw = 1 + Math.random() * 2;
+    const ivyGeo = new THREE.PlaneGeometry(iw, ih);
+    g.geometries.push(ivyGeo);
+    const ivy = new THREE.Mesh(ivyGeo, ivyMat);
+    ivy.position.set(ix, gH(0,28) + ih/2, iz);
+    if (iz > 30) ivy.rotation.y = Math.PI;
+    g.scene.add(ivy);
+  }
+
+  // === 廊下ディテール ===
+  // --- ロッカー（廊下南壁に沿って配置）---
+  const lockerMat = new THREE.MeshStandardMaterial({ color: 0x607070, roughness: 0.5, metalness: 0.5 });
+  g.materials.push(lockerMat);
+  for (let fl = 0; fl < 2; fl++) {
+    const yOff = fl * FLOOR_H;
+    for (let lx = -17; lx <= 12; lx += 4) {
+      if (Math.abs(lx) < 3) continue; // 入口付近を避ける
+      const locGeo = new THREE.BoxGeometry(2.5, 1.8, 0.4);
+      locGeo.setAttribute('uv2', locGeo.attributes.uv);
+      g.geometries.push(locGeo);
+      const locker = new THREE.Mesh(locGeo, lockerMat);
+      locker.position.set(lx, yOff + 0.9, 24.7);
+      locker.castShadow = true; locker.receiveShadow = true;
+      g.scene.add(locker); g.cameraMeshes.push(locker);
+    }
+  }
+
+  // --- 掲示板（廊下壁面）---
+  const boardMat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.8 });
+  g.materials.push(boardMat);
+  for (let fl = 0; fl < 2; fl++) {
+    const yOff = fl * FLOOR_H;
+    for (const bx of [-12, 4]) {
+      const bGeo = new THREE.BoxGeometry(2, 1.2, 0.05);
+      g.geometries.push(bGeo);
+      const board = new THREE.Mesh(bGeo, boardMat);
+      board.position.set(bx, yOff + 2.0, 26.95);
+      g.scene.add(board);
+      // 紙片（掲示物の残骸）
+      for (let p = 0; p < 3; p++) {
+        const paperMat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color().setHSL(Math.random()*0.15 + 0.08, 0.3, 0.6 + Math.random()*0.2),
+          roughness: 0.9, side: THREE.DoubleSide
+        });
+        g.materials.push(paperMat);
+        const pGeo = new THREE.PlaneGeometry(0.3 + Math.random()*0.4, 0.2 + Math.random()*0.3);
+        g.geometries.push(pGeo);
+        const paper = new THREE.Mesh(pGeo, paperMat);
+        paper.position.set(bx - 0.6 + Math.random()*1.2, yOff + 1.6 + Math.random()*0.8, 26.93);
+        paper.rotation.z = (Math.random()-0.5)*0.3;
+        g.scene.add(paper);
+      }
+    }
+  }
+
+  // --- 消火器（廊下壁際）---
+  const extMat = new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.4, metalness: 0.3 });
+  g.materials.push(extMat);
+  for (let fl = 0; fl < 2; fl++) {
+    const yOff = fl * FLOOR_H;
+    const exGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.4, 8);
+    g.geometries.push(exGeo);
+    const ext = new THREE.Mesh(exGeo, extMat);
+    ext.position.set(-6, yOff + 0.2, 24.6);
+    ext.rotation.z = 0.15; // 少し傾いている
+    g.scene.add(ext);
+  }
+
+  // --- 床の水たまり（反射プレーン）---
+  const puddleMat = new THREE.MeshStandardMaterial({
+    color: 0x111122, roughness: 0.05, metalness: 0.9,
+    transparent: true, opacity: 0.4
+  });
+  g.materials.push(puddleMat);
+  const puddleDefs = [
+    { x: -10, z: 25.5, w: 2, d: 1 },
+    { x: 5, z: 26, w: 1.5, d: 1.2 },
+    { x: -3, z: 29, w: 1, d: 0.8 }
+  ];
+  for (const pd of puddleDefs) {
+    for (let fl = 0; fl < 2; fl++) {
+      const pudGeo = new THREE.PlaneGeometry(pd.w, pd.d);
+      g.geometries.push(pudGeo);
+      const puddle = new THREE.Mesh(pudGeo, puddleMat);
+      puddle.rotation.x = -Math.PI / 2;
+      puddle.position.set(pd.x, fl * FLOOR_H + 0.01, pd.z);
+      g.scene.add(puddle);
+    }
+  }
+
+  // --- 外部追加照明: 月の方向スポットライト ---
+  const moonSpot = new THREE.SpotLight(0x4466aa, 1.5, 60, Math.PI/6, 0.5, 1);
+  moonSpot.position.set(-30, 25, 10);
+  moonSpot.target.position.set(0, 0, 28);
+  g.scene.add(moonSpot);
+  g.scene.add(moonSpot.target);
 }
 
 // --- CAN ---
@@ -8671,8 +8983,27 @@ function gameLoop(timestamp) {
     }
   }
 
-  // Render
-  try { G.renderer.render(G.scene, G.camera); } catch(e2) { console.error('render error:', e2); }
+  // Dust particle animation (Stage 4)
+  if (G.dustParticles) {
+    const pos = G.dustParticles.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      pos.array[i*3+1] += Math.sin(timestamp*0.0003 + i*0.7) * 0.002;
+      pos.array[i*3] += Math.cos(timestamp*0.0002 + i*1.3) * 0.001;
+      if (pos.array[i*3+1] > 7.5) pos.array[i*3+1] = 0.5;
+      if (pos.array[i*3+1] < 0.3) pos.array[i*3+1] = 7;
+    }
+    pos.needsUpdate = true;
+  }
+
+  // Render（ポストプロセッシング対応）
+  try {
+    if (G.composer) {
+      if (G.filmPass) G.filmPass.uniforms.time.value = timestamp * 0.001;
+      G.composer.render();
+    } else {
+      G.renderer.render(G.scene, G.camera);
+    }
+  } catch(e2) { console.error('render error:', e2); }
 }
 
 // --- GAME INIT & CLEANUP ---
@@ -8791,6 +9122,7 @@ function startGame(stageNum, mode) {
     G.camera.aspect = window.innerWidth / window.innerHeight;
     G.camera.updateProjectionMatrix();
     G.renderer.setSize(window.innerWidth, window.innerHeight);
+    if (G.composer) G.composer.setSize(window.innerWidth, window.innerHeight);
   };
   window.addEventListener('resize', G._resizeHandler);
 
@@ -8883,6 +9215,8 @@ function cleanupGame() {
   // Exit pointer lock
   if (document.pointerLockElement) document.exitPointerLock();
 
+  // Dispose post-processing
+  if (G.composer) { try { G.composer.renderTarget1.dispose(); G.composer.renderTarget2.dispose(); } catch(e){} }
   // Dispose Three.js resources
   G.geometries.forEach(geo => geo.dispose());
   G.materials.forEach(mat => mat.dispose());
