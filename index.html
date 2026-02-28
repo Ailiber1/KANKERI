@@ -4482,8 +4482,10 @@ function updatePlayer(g, dt) {
   ctrl._peekTilt += (peekTiltTarget - ctrl._peekTilt) * Math.min(10 * dt, 1);
   if (fig.body) fig.body.rotation.z = ctrl._peekTilt;
 
-  // Check can proximity
-  const canDist = ctrl.position.distanceTo(g.can.group.position);
+  // Check can proximity（2D距離で判定 — Y座標の差で蹴れなくなるのを防止）
+  const canDx = ctrl.position.x - g.can.group.position.x;
+  const canDz = ctrl.position.z - g.can.group.position.z;
+  const canDist = Math.sqrt(canDx*canDx + canDz*canDz);
   ctrl.canKick = canDist < 2.5 && g.can.isAtHome && !g.can.isFlying;
 
   // Check interactable proximity
@@ -5177,64 +5179,9 @@ function updateOni(g, oni, dt) {
 }
 
 function moveOni(oni, targetX, targetZ, speed, dt, g) {
-  let dx = targetX - oni.position.x;
-  let dz = targetZ - oni.position.z;
-  let dist = Math.sqrt(dx*dx + dz*dz);
-  if (dist < 0.1) return;
-
-  // コライダー回避: 進行方向に大きなコライダーがある場合、迂回する
-  const margin = 1.5; // 鬼とコライダーの最小距離
-  for (const col of g.colliders) {
-    if (col.h < 0.5) continue; // 低いコライダーは無視
-    const cx = oni.position.x - col.x;
-    const cz = oni.position.z - col.z;
-    if (col.type === 'box') {
-      const overlapX = col.hw + margin - Math.abs(cx);
-      const overlapZ = col.hd + margin - Math.abs(cz);
-      if (overlapX > 0 && overlapZ > 0) {
-        // コライダー内にいる → 最短方向に押し出す
-        if (overlapX < overlapZ) {
-          oni.position.x += (cx > 0 ? overlapX : -overlapX) * 0.5;
-        } else {
-          oni.position.z += (cz > 0 ? overlapZ : -overlapZ) * 0.5;
-        }
-      } else {
-        // 進行方向にコライダーがある場合、迂回方向を計算
-        const futureX = oni.position.x + (dx / dist) * 2;
-        const futureZ = oni.position.z + (dz / dist) * 2;
-        const fOverlapX = col.hw + margin - Math.abs(futureX - col.x);
-        const fOverlapZ = col.hd + margin - Math.abs(futureZ - col.z);
-        if (fOverlapX > 0 && fOverlapZ > 0) {
-          // 迂回: コライダーの角を目指す
-          const sideX = cx > 0 ? col.x + col.hw + margin : col.x - col.hw - margin;
-          const sideZ = cz > 0 ? col.z + col.hd + margin : col.z - col.hd - margin;
-          // 短い方の辺を回り込む
-          if (Math.abs(oni.position.x - sideX) < Math.abs(oni.position.z - sideZ)) {
-            dx = sideX - oni.position.x;
-            dz = oni.position.z > col.z ? col.z + col.hd + margin - oni.position.z : col.z - col.hd - margin - oni.position.z;
-          } else {
-            dx = oni.position.x > col.x ? col.x + col.hw + margin - oni.position.x : col.x - col.hw - margin - oni.position.x;
-            dz = sideZ - oni.position.z;
-          }
-          dist = Math.sqrt(dx*dx + dz*dz);
-          if (dist < 0.1) return;
-        }
-      }
-    } else if (col.type === 'cylinder') {
-      const cDist = Math.sqrt(cx*cx + cz*cz);
-      if (cDist < col.r + margin && cDist > 0.01) {
-        // 押し出す
-        const pushDist = col.r + margin - cDist;
-        oni.position.x += (cx / cDist) * pushDist * 0.5;
-        oni.position.z += (cz / cDist) * pushDist * 0.5;
-      }
-    }
-  }
-
-  // 再計算（コライダー回避後）
-  dx = targetX - oni.position.x;
-  dz = targetZ - oni.position.z;
-  dist = Math.sqrt(dx*dx + dz*dz);
+  const dx = targetX - oni.position.x;
+  const dz = targetZ - oni.position.z;
+  const dist = Math.sqrt(dx*dx + dz*dz);
   if (dist < 0.1) return;
 
   const moveSpeed = Math.min(speed * dt, dist);
@@ -5245,6 +5192,31 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   const half = g.config.size / 2 - 0.5;
   oni.position.x = Math.max(-half, Math.min(half, oni.position.x));
   oni.position.z = Math.max(-half, Math.min(half, oni.position.z));
+
+  // コライダー押し出し（プレイヤーと同じシンプルな方式）
+  for (const col of g.colliders) {
+    if (col.type === 'box') {
+      if (Math.abs(oni.position.x - col.x) < col.hw + 0.3 &&
+          Math.abs(oni.position.z - col.z) < col.hd + 0.3) {
+        const cx = oni.position.x - col.x;
+        const cz = oni.position.z - col.z;
+        if (Math.abs(cx) / col.hw > Math.abs(cz) / col.hd) {
+          oni.position.x = col.x + Math.sign(cx) * (col.hw + 0.3);
+        } else {
+          oni.position.z = col.z + Math.sign(cz) * (col.hd + 0.3);
+        }
+      }
+    } else if (col.type === 'cylinder') {
+      const cx = oni.position.x - col.x;
+      const cz = oni.position.z - col.z;
+      const cDist = Math.sqrt(cx*cx + cz*cz);
+      if (cDist < col.r + 0.3 && cDist > 0.01) {
+        const push = col.r + 0.3 - cDist;
+        oni.position.x += (cx / cDist) * push;
+        oni.position.z += (cz / cDist) * push;
+      }
+    }
+  }
 
   // Ground height
   oni.position.y = getGroundHeight(g, oni.position.x, oni.position.z);
