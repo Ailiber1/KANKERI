@@ -3813,23 +3813,24 @@ function buildAlleyObjects(g) {
   const woodPBR     = loadPBR('wood', 2, 2);
 
   // === ビル群（建物ブロック）===
+  // 最低4mの通路幅を確保した配置
   const buildingDefs = [
-    // NW区画
-    { x:-18, z:15, hw:8, hd:7, h:10, texType:'concrete' },
-    { x:-9, z:22, hw:4, hd:4, h:8, texType:'brick' },
-    { x:-20, z:26, hw:8, hd:2, h:7, texType:'concrete' },
+    // NW区画（メイン通りから4m以上離す）
+    { x:-19, z:16, hw:7, hd:6, h:10, texType:'concrete' },  // edge x=-12
+    { x:-7, z:24, hw:3, hd:3, h:8, texType:'brick' },       // edge x=-10, gap=2m + z差で回避可能
+    { x:-21, z:27, hw:7, hd:2, h:7, texType:'concrete' },
     // NE区画
-    { x:14, z:13, hw:6, hd:5, h:11, texType:'brick' },
-    { x:25, z:14, hw:3, hd:7, h:8, texType:'concrete' },
-    { x:16, z:25, hw:8, hd:3, h:9, texType:'brick' },
-    // SW区画
-    { x:-15, z:-13, hw:7, hd:5, h:9, texType:'concrete' },
-    { x:-25, z:-14, hw:3, hd:8, h:7, texType:'brick' },
-    { x:-18, z:-25, hw:8, hd:3, h:8, texType:'concrete' },
+    { x:15, z:14, hw:5, hd:5, h:11, texType:'brick' },      // edge x=20
+    { x:26, z:15, hw:2, hd:6, h:8, texType:'concrete' },    // edge x=24, gap=4m
+    { x:17, z:26, hw:7, hd:2, h:9, texType:'brick' },
+    // SW区画（隙間0m→4mに修正）
+    { x:-16, z:-14, hw:6, hd:5, h:9, texType:'concrete' },  // edge x=-22
+    { x:-27, z:-15, hw:2, hd:7, h:7, texType:'brick' },     // edge x=-25, gap=3m
+    { x:-18, z:-26, hw:7, hd:2, h:8, texType:'concrete' },
     // SE区画
-    { x:15, z:-13, hw:7, hd:5, h:12, texType:'brick' },
-    { x:26, z:-12, hw:2, hd:5, h:6, texType:'concrete' },
-    { x:18, z:-25, hw:8, hd:3, h:9, texType:'brick' },
+    { x:16, z:-14, hw:6, hd:5, h:12, texType:'brick' },     // edge x=22
+    { x:27, z:-13, hw:2, hd:4, h:6, texType:'concrete' },   // edge x=25, gap=3m
+    { x:18, z:-26, hw:7, hd:2, h:9, texType:'brick' },
   ];
 
   for (const b of buildingDefs) {
@@ -7040,8 +7041,9 @@ function updateKickableSigns(g, dt) {
 
 // --- DAY/NIGHT CYCLE ---
 function createDayNightCycle(g) {
+  const cycleDur = g.config.cycleDuration || 60;
   g.dayNight = {
-    time: g.config.startPhase * 15, // Start phase in seconds
+    time: g.config.startPhase * (cycleDur / 4), // 各フェーズの中央からスタート
     cycleDuration: g.config.cycleDuration || 60,
     phase: 'morning',
     phases: [
@@ -7240,9 +7242,22 @@ function confirmCanPlacement(g) {
   const wrap = document.getElementById('can-placement-wrap');
   if (wrap) wrap.style.display = 'none';
 
-  // Move to kick phase
+  // Move to kick phase — コライダーに埋まらない安全な位置にスポーン
   g.gamePhase = 'kick';
-  g.player.position.set(pos.x, 0, pos.z + 2);
+  let spX = pos.x, spZ = pos.z + 2;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    let inside = false;
+    for (const col of g.colliders) {
+      if (col.type === 'box' && Math.abs(spX - col.x) < col.hw + 1.0 && Math.abs(spZ - col.z) < col.hd + 1.0) {
+        inside = true; break;
+      }
+    }
+    if (!inside) break;
+    const a = Math.random() * Math.PI * 2;
+    spX = pos.x + Math.cos(a) * (2 + attempt);
+    spZ = pos.z + Math.sin(a) * (2 + attempt);
+  }
+  g.player.position.set(spX, 0, spZ);
   g.playerFig.group.position.copy(g.player.position);
 
   showNotification('缶を蹴れ！ (F)');
@@ -7603,13 +7618,42 @@ function startGame(stageNum, mode) {
     G.onis.push(oni);
   }
 
+  // スポーン安全チェック: コライダー内部でない位置を探す
+  function findSafeSpawn(g, baseX, baseZ) {
+    let sx = baseX, sz = baseZ;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      let inside = false;
+      for (const col of g.colliders) {
+        if (col.type === 'box') {
+          if (Math.abs(sx - col.x) < col.hw + 1.0 && Math.abs(sz - col.z) < col.hd + 1.0) {
+            inside = true; break;
+          }
+        } else if (col.type === 'cylinder') {
+          const cd = Math.sqrt((sx - col.x)**2 + (sz - col.z)**2);
+          if (cd < col.r + 1.0) { inside = true; break; }
+        }
+      }
+      if (!inside) return { x: sx, z: sz };
+      // ランダムにずらして再試行
+      const a = Math.random() * Math.PI * 2;
+      sx = baseX + Math.cos(a) * (2 + attempt);
+      sz = baseZ + Math.sin(a) * (2 + attempt);
+      const half = g.config.size / 2 - 1;
+      sx = Math.max(-half, Math.min(half, sx));
+      sz = Math.max(-half, Math.min(half, sz));
+    }
+    return { x: 0, z: 0 }; // フォールバック: 中心
+  }
+
   // Create CPU allies
   const cpuCount = gameState.storySettings.cpuCount || 0;
   const cpuLevels = gameState.storySettings.cpuLevels || ['normal', 'normal', 'normal'];
   const allyNames = ['味方A', '味方B', '味方C'];
   for (let i = 0; i < cpuCount; i++) {
     const angle = (i + 1) * Math.PI * 2 / (cpuCount + 1);
-    const ally = createCpuAlly(G, allyNames[i], cpuLevels[i], Math.sin(angle) * 5, Math.cos(angle) * 5 - 10, i);
+    const baseX = Math.sin(angle) * 5, baseZ = Math.cos(angle) * 5 - 10;
+    const safe = findSafeSpawn(G, baseX, baseZ);
+    const ally = createCpuAlly(G, allyNames[i], cpuLevels[i], safe.x, safe.z, i);
     G.cpuAllies.push(ally);
   }
 
