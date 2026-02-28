@@ -2688,14 +2688,27 @@ function buildTerrain(g, stageNum) {
 
   // === Stage-specific paths and terrain features ===
   if (stageNum === 2) {
-    // 砂利の参道（中央に太い一本道、z方向に走る）
+    // 砂利の参道（中央に太い一本道、z方向に走る）— 外部PBRテクスチャ使用
     const sandoGeo = new THREE.PlaneGeometry(4, size * 0.8, 1, 1);
-    const gravelTex = makeTexSet('gravel', 512, 6);
+    sandoGeo.setAttribute('uv2', sandoGeo.attributes.uv);
+    const gLoader = new THREE.TextureLoader();
+    const setGravelRepeat = (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(2, 8);
+      tex.anisotropy = 4;
+      return tex;
+    };
+    const grvDiff  = setGravelRepeat(gLoader.load('textures/gravel_diff.jpg'));
+    const grvNor   = setGravelRepeat(gLoader.load('textures/gravel_nor.jpg'));
+    const grvRough = setGravelRepeat(gLoader.load('textures/gravel_rough.jpg'));
+    const grvAo    = setGravelRepeat(gLoader.load('textures/gravel_ao.jpg'));
+    g.textures.push(grvDiff, grvNor, grvRough, grvAo);
     const sandoMat = new THREE.MeshStandardMaterial({
-      map: gravelTex.diff, roughness: 0.9, metalness: 0,
-      normalMap: gravelTex.nor, normalScale: new THREE.Vector2(1.0, 1.0)
+      map: grvDiff, roughness: 0.9, metalness: 0,
+      normalMap: grvNor, normalScale: new THREE.Vector2(1.2, 1.2),
+      roughnessMap: grvRough,
+      aoMap: grvAo, aoMapIntensity: 0.8
     });
-    Object.values(gravelTex).forEach(t => g.textures.push(t));
     g.materials.push(sandoMat);
     g.geometries.push(sandoGeo);
 
@@ -2705,12 +2718,30 @@ function buildTerrain(g, stageNum) {
     sando.receiveShadow = true;
     g.scene.add(sando);
 
-    // 石段（5段、z:-10 ~ z:-5、高さ0→2m）
-    const stepMat = new THREE.MeshStandardMaterial({ color: 0x999988, roughness: 0.75, metalness: 0.1 });
+    // 石段（5段、z:-10 ~ z:-5、高さ0→2m）— 外部PBRテクスチャ使用
+    const stnLoader = new THREE.TextureLoader();
+    const setStoneRepeat = (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(2, 0.5);
+      tex.anisotropy = 4;
+      return tex;
+    };
+    const stnDiff  = setStoneRepeat(stnLoader.load('textures/stone_diff.jpg'));
+    const stnNor   = setStoneRepeat(stnLoader.load('textures/stone_nor.jpg'));
+    const stnRough = setStoneRepeat(stnLoader.load('textures/stone_rough.jpg'));
+    const stnAo    = setStoneRepeat(stnLoader.load('textures/stone_ao.jpg'));
+    g.textures.push(stnDiff, stnNor, stnRough, stnAo);
+    const stepMat = new THREE.MeshStandardMaterial({
+      map: stnDiff, roughness: 0.75, metalness: 0.1,
+      normalMap: stnNor, normalScale: new THREE.Vector2(1.0, 1.0),
+      roughnessMap: stnRough,
+      aoMap: stnAo, aoMapIntensity: 0.8
+    });
     g.materials.push(stepMat);
     for (let s = 0; s < 5; s++) {
       const stepW = 5;
       const stepGeo = new THREE.BoxGeometry(stepW, 0.4, 1);
+      stepGeo.setAttribute('uv2', stepGeo.attributes.uv);
       g.geometries.push(stepGeo);
       const step = new THREE.Mesh(stepGeo, stepMat);
       step.position.set(0, 0.2 + s * 0.4, -10 + s * 1);
@@ -2793,9 +2824,31 @@ function buildTerrain(g, stageNum) {
   const half = size / 2;
   const wallH = stageNum === 2 ? 2.5 : 2;
   const fenceGeo = new THREE.BoxGeometry(size + 2, wallH, 0.1);
-  const fenceMat = stageNum === 2
-    ? new THREE.MeshStandardMaterial({ color: 0x666655, roughness: 0.85, metalness: 0 })
-    : new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8, transparent: true, opacity: 0.3, wireframe: true });
+  let fenceMat;
+  if (stageNum === 2) {
+    // 石壁: 外部PBRテクスチャ適用
+    const wLoader = new THREE.TextureLoader();
+    const setWallRep = (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(12, 1);
+      tex.anisotropy = 4;
+      return tex;
+    };
+    const wDiff  = setWallRep(wLoader.load('textures/stone_diff.jpg'));
+    const wNor   = setWallRep(wLoader.load('textures/stone_nor.jpg'));
+    const wRough = setWallRep(wLoader.load('textures/stone_rough.jpg'));
+    const wAo    = setWallRep(wLoader.load('textures/stone_ao.jpg'));
+    g.textures.push(wDiff, wNor, wRough, wAo);
+    fenceGeo.setAttribute('uv2', fenceGeo.attributes.uv);
+    fenceMat = new THREE.MeshStandardMaterial({
+      map: wDiff, roughness: 0.85, metalness: 0,
+      normalMap: wNor, normalScale: new THREE.Vector2(0.8, 0.8),
+      roughnessMap: wRough,
+      aoMap: wAo, aoMapIntensity: 0.6
+    });
+  } else {
+    fenceMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8, transparent: true, opacity: 0.3, wireframe: true });
+  }
   g.geometries.push(fenceGeo);
   g.materials.push(fenceMat);
 
