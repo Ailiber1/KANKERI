@@ -2399,8 +2399,11 @@ const STAGE_CONFIGS = {
       { type:'dumpster', x:25, z:18, radius:18, label:'ゴミコンテナ', sound:'metal' },
       { type:'pole', x:-3, z:-20, radius:15, label:'電柱', sound:'metal' },
       { type:'pole', x:3, z:15, radius:15, label:'電柱', sound:'metal' },
-      { type:'sign', x:12, z:3, radius:12, label:'看板', sound:'metal' },
-      { type:'sign', x:-8, z:-10, radius:12, label:'看板', sound:'metal' },
+      { type:'sign', x:4, z:-3, radius:25, label:'立て看板「営業中」', sound:'metal' },
+      { type:'sign', x:-6, z:8, radius:25, label:'立て看板「本日限定」', sound:'metal' },
+      { type:'sign', x:12, z:-15, radius:25, label:'立て看板「半額」', sound:'metal' },
+      { type:'sign', x:-14, z:-8, radius:25, label:'立て看板「OPEN」', sound:'metal' },
+      { type:'sign', x:0, z:18, radius:25, label:'立て看板「おすすめ」', sound:'metal' },
       { type:'barrel', x:20, z:20, radius:12, label:'ドラム缶', sound:'metal' },
       { type:'barrel', x:-20, z:8, radius:12, label:'ドラム缶', sound:'metal' },
       { type:'crate', x:8, z:-22, radius:12, label:'木箱', sound:'thud' },
@@ -2998,10 +3001,26 @@ function buildTerrain(g, stageNum) {
   const fenceGeo = new THREE.BoxGeometry(size + 2, wallH, 0.1);
   let fenceMat;
   if (stageNum === 3) {
-    // ステージ3: 暗いコンクリート壁（ビルの外壁）
+    // ステージ3: コンクリート壁PBRテクスチャ（Poly Haven CC0）
+    const wLoader3 = new THREE.TextureLoader();
+    const setWallRep3 = (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(14, 2);
+      tex.anisotropy = 4;
+      return tex;
+    };
+    const w3Diff  = setWallRep3(wLoader3.load('textures/concrete_diff.jpg'));
+    const w3Nor   = setWallRep3(wLoader3.load('textures/concrete_nor.jpg'));
+    const w3Rough = setWallRep3(wLoader3.load('textures/concrete_rough.jpg'));
+    const w3Ao    = setWallRep3(wLoader3.load('textures/concrete_ao.jpg'));
+    g.textures.push(w3Diff, w3Nor, w3Rough, w3Ao);
+    fenceGeo.setAttribute('uv2', fenceGeo.attributes.uv);
     fenceMat = new THREE.MeshStandardMaterial({
-      color: 0x2a2a30, roughness: 0.9, metalness: 0.0,
-      emissive: 0x050508, emissiveIntensity: 0.3
+      map: w3Diff, roughness: 0.9, metalness: 0.0,
+      normalMap: w3Nor, normalScale: new THREE.Vector2(1.0, 1.0),
+      roughnessMap: w3Rough,
+      aoMap: w3Ao, aoMapIntensity: 0.7,
+      emissive: 0x050508, emissiveIntensity: 0.2
     });
     g.materials.push(fenceMat);
   } else if (stageNum === 2) {
@@ -3771,31 +3790,57 @@ function buildShrineObjects(g) {
 // --- ALLEY OBJECTS (Stage 3) ---
 function buildAlleyObjects(g) {
   const gH = (x, z) => getGroundHeight(g, x, z);
+  const texLoader = new THREE.TextureLoader();
+
+  // === PBRテクスチャのロード（Poly Haven CC0） ===
+  const loadPBR = (name, repS, repT) => {
+    const setRep = (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(repS, repT);
+      tex.anisotropy = 4;
+      return tex;
+    };
+    const diff  = setRep(texLoader.load('textures/' + name + '_diff.jpg'));
+    const nor   = setRep(texLoader.load('textures/' + name + '_nor.jpg'));
+    const rough = setRep(texLoader.load('textures/' + name + '_rough.jpg'));
+    const ao    = setRep(texLoader.load('textures/' + name + '_ao.jpg'));
+    g.textures.push(diff, nor, rough, ao);
+    return { diff, nor, rough, ao };
+  };
+  const concretePBR = loadPBR('concrete', 2, 2);
+  const brickPBR    = loadPBR('brick', 2, 2);
+  const metalPBR    = loadPBR('metal', 3, 2);
+  const woodPBR     = loadPBR('wood', 2, 2);
 
   // === ビル群（建物ブロック）===
   const buildingDefs = [
     // NW区画
-    { x:-18, z:15, hw:8, hd:7, h:10, color:0x2a2a35 },
-    { x:-9, z:22, hw:4, hd:4, h:8, color:0x282832 },
-    { x:-20, z:26, hw:8, hd:2, h:7, color:0x252530 },
+    { x:-18, z:15, hw:8, hd:7, h:10, texType:'concrete' },
+    { x:-9, z:22, hw:4, hd:4, h:8, texType:'brick' },
+    { x:-20, z:26, hw:8, hd:2, h:7, texType:'concrete' },
     // NE区画
-    { x:14, z:13, hw:6, hd:5, h:11, color:0x2c2c38 },
-    { x:25, z:14, hw:3, hd:7, h:8, color:0x262636 },
-    { x:16, z:25, hw:8, hd:3, h:9, color:0x2a2a32 },
+    { x:14, z:13, hw:6, hd:5, h:11, texType:'brick' },
+    { x:25, z:14, hw:3, hd:7, h:8, texType:'concrete' },
+    { x:16, z:25, hw:8, hd:3, h:9, texType:'brick' },
     // SW区画
-    { x:-15, z:-13, hw:7, hd:5, h:9, color:0x282838 },
-    { x:-25, z:-14, hw:3, hd:8, h:7, color:0x242434 },
-    { x:-18, z:-25, hw:8, hd:3, h:8, color:0x262632 },
+    { x:-15, z:-13, hw:7, hd:5, h:9, texType:'concrete' },
+    { x:-25, z:-14, hw:3, hd:8, h:7, texType:'brick' },
+    { x:-18, z:-25, hw:8, hd:3, h:8, texType:'concrete' },
     // SE区画
-    { x:15, z:-13, hw:7, hd:5, h:12, color:0x2e2e3a },
-    { x:26, z:-12, hw:2, hd:5, h:6, color:0x242430 },
-    { x:18, z:-25, hw:8, hd:3, h:9, color:0x282835 },
+    { x:15, z:-13, hw:7, hd:5, h:12, texType:'brick' },
+    { x:26, z:-12, hw:2, hd:5, h:6, texType:'concrete' },
+    { x:18, z:-25, hw:8, hd:3, h:9, texType:'brick' },
   ];
 
   for (const b of buildingDefs) {
     const bGeo = new THREE.BoxGeometry(b.hw * 2, b.h, b.hd * 2);
+    bGeo.setAttribute('uv2', bGeo.attributes.uv);
+    const pbr = b.texType === 'brick' ? brickPBR : concretePBR;
     const bMat = new THREE.MeshStandardMaterial({
-      color: b.color, roughness: 0.92, metalness: 0.0,
+      map: pbr.diff, roughness: 0.92, metalness: 0.0,
+      normalMap: pbr.nor, normalScale: new THREE.Vector2(0.8, 0.8),
+      roughnessMap: pbr.rough,
+      aoMap: pbr.ao, aoMapIntensity: 0.6,
       emissive: 0x050508, emissiveIntensity: 0.2
     });
     const mesh = new THREE.Mesh(bGeo, bMat);
@@ -3887,10 +3932,11 @@ function buildAlleyObjects(g) {
   ];
   for (const vd of vendingDefs) {
     const vGroup = new THREE.Group();
-    // 本体
+    // 本体 — 金属PBRテクスチャ
     const vGeo = new THREE.BoxGeometry(0.8, 1.8, 0.6);
     const vMat = new THREE.MeshStandardMaterial({
-      color: 0x333344, roughness: 0.3, metalness: 0.5
+      map: metalPBR.diff, color: 0x333344, roughness: 0.3, metalness: 0.5,
+      normalMap: metalPBR.nor, normalScale: new THREE.Vector2(0.5, 0.5)
     });
     const vMesh = new THREE.Mesh(vGeo, vMat);
     vMesh.position.y = 0.9;
@@ -3920,18 +3966,27 @@ function buildAlleyObjects(g) {
     g.colliders.push({ type:'box', x:vd.x, z:vd.z, hw:0.5, hd:0.4, h:1.8 });
   }
 
-  // === 屋台 ===
+  // === 屋台 — 木材PBRテクスチャ ===
   const stallX = -10, stallZ = 5;
   const stallGroup = new THREE.Group();
   // カウンター
   const counterGeo = new THREE.BoxGeometry(3, 1.0, 1.2);
-  const counterMat = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.8, metalness: 0.0 });
+  counterGeo.setAttribute('uv2', counterGeo.attributes.uv);
+  const counterMat = new THREE.MeshStandardMaterial({
+    map: woodPBR.diff, roughness: 0.8, metalness: 0.0,
+    normalMap: woodPBR.nor, normalScale: new THREE.Vector2(1.0, 1.0),
+    roughnessMap: woodPBR.rough,
+    aoMap: woodPBR.ao, aoMapIntensity: 0.5
+  });
   const counter = new THREE.Mesh(counterGeo, counterMat);
   counter.position.y = 0.5;
   stallGroup.add(counter);
   // 屋根
   const roofGeo = new THREE.BoxGeometry(3.5, 0.05, 1.8);
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0x443322, roughness: 0.9 });
+  const roofMat = new THREE.MeshStandardMaterial({
+    map: woodPBR.diff, roughness: 0.9,
+    normalMap: woodPBR.nor, normalScale: new THREE.Vector2(0.5, 0.5)
+  });
   const stallRoof = new THREE.Mesh(roofGeo, roofMat);
   stallRoof.position.y = 2.2;
   stallGroup.add(stallRoof);
@@ -3955,19 +4010,24 @@ function buildAlleyObjects(g) {
   g.scene.add(stallLight);
   g.colliders.push({ type:'box', x:stallX, z:stallZ, hw:1.8, hd:0.8, h:2.2 });
 
-  // === ゴミコンテナ ===
+  // === ゴミコンテナ — 金属PBRテクスチャ ===
   const dumpsterDefs = [
     { x:-22, z:-15 }, { x:25, z:18 },
   ];
+  const dumpsterMat = new THREE.MeshStandardMaterial({
+    map: metalPBR.diff, roughness: 0.85, metalness: 0.2,
+    normalMap: metalPBR.nor, normalScale: new THREE.Vector2(1.0, 1.0),
+    roughnessMap: metalPBR.rough,
+    color: 0x448844
+  });
+  g.materials.push(dumpsterMat);
   for (const dd of dumpsterDefs) {
     const dGeo = new THREE.BoxGeometry(2, 1.5, 1.2);
-    const dMat = new THREE.MeshStandardMaterial({ color: 0x336633, roughness: 0.85, metalness: 0.2 });
-    const dMesh = new THREE.Mesh(dGeo, dMat);
+    const dMesh = new THREE.Mesh(dGeo, dumpsterMat);
     dMesh.position.set(dd.x, gH(dd.x, dd.z) + 0.75, dd.z);
     dMesh.castShadow = true;
     g.scene.add(dMesh);
     g.geometries.push(dGeo);
-    g.materials.push(dMat);
     g.colliders.push({ type:'box', x:dd.x, z:dd.z, hw:1.2, hd:0.8, h:1.5 });
   }
 
@@ -4019,42 +4079,55 @@ function buildAlleyObjects(g) {
     g.streetLights.push({ spot: sLight, fixture: fix, fixMat });
   }
 
-  // === ドラム缶 ===
+  // === ドラム缶 — 金属PBRテクスチャ ===
   const barrelDefs = [
     { x:20, z:20 }, { x:-20, z:8 }, { x:10, z:-20 }, { x:-12, z:-18 },
   ];
+  const barrelMat = new THREE.MeshStandardMaterial({
+    map: metalPBR.diff, roughness: 0.7, metalness: 0.4,
+    normalMap: metalPBR.nor, normalScale: new THREE.Vector2(0.8, 0.8),
+    roughnessMap: metalPBR.rough
+  });
+  g.materials.push(barrelMat);
   for (const bd of barrelDefs) {
     const bGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.0, 8);
-    const bMat = new THREE.MeshStandardMaterial({ color: 0x665533, roughness: 0.7, metalness: 0.4 });
-    const barrel = new THREE.Mesh(bGeo, bMat);
+    const barrel = new THREE.Mesh(bGeo, barrelMat);
     barrel.position.set(bd.x, gH(bd.x, bd.z) + 0.5, bd.z);
     barrel.castShadow = true;
     g.scene.add(barrel);
     g.geometries.push(bGeo);
-    g.materials.push(bMat);
     g.colliders.push({ type:'cylinder', x:bd.x, z:bd.z, r:0.5, h:1.0 });
   }
 
-  // === 木箱 ===
+  // === 木箱 — 木材PBRテクスチャ ===
   const crateDefs = [
     { x:8, z:-22 }, { x:-15, z:18 }, { x:22, z:10 }, { x:-22, z:12 },
   ];
+  const crateMat = new THREE.MeshStandardMaterial({
+    map: woodPBR.diff, roughness: 0.9, metalness: 0.0,
+    normalMap: woodPBR.nor, normalScale: new THREE.Vector2(1.0, 1.0),
+    roughnessMap: woodPBR.rough
+  });
+  g.materials.push(crateMat);
   for (const cd of crateDefs) {
     const cGeo = new THREE.BoxGeometry(1.0, 0.8, 0.8);
-    const cMat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.9, metalness: 0.0 });
-    const crate = new THREE.Mesh(cGeo, cMat);
+    cGeo.setAttribute('uv2', cGeo.attributes.uv);
+    const crate = new THREE.Mesh(cGeo, crateMat);
     crate.position.set(cd.x, gH(cd.x, cd.z) + 0.4, cd.z);
     crate.castShadow = true;
     g.scene.add(crate);
     g.geometries.push(cGeo);
-    g.materials.push(cMat);
     g.colliders.push({ type:'box', x:cd.x, z:cd.z, hw:0.6, hd:0.5, h:0.8 });
   }
 
-  // === シャッター（SE区画）===
+  // === シャッター（SE区画）— 金属PBRテクスチャ ===
   const shutterGeo = new THREE.PlaneGeometry(3, 2.5);
+  shutterGeo.setAttribute('uv2', shutterGeo.attributes.uv);
   const shutterMat = new THREE.MeshStandardMaterial({
-    color: 0x555566, roughness: 0.6, metalness: 0.5,
+    map: metalPBR.diff, roughness: 0.6, metalness: 0.5,
+    normalMap: metalPBR.nor, normalScale: new THREE.Vector2(1.0, 1.0),
+    roughnessMap: metalPBR.rough,
+    aoMap: metalPBR.ao, aoMapIntensity: 0.5,
     emissive: 0x111122, emissiveIntensity: 0.2, side: THREE.DoubleSide
   });
   const shutter = new THREE.Mesh(shutterGeo, shutterMat);
@@ -4063,18 +4136,21 @@ function buildAlleyObjects(g) {
   g.geometries.push(shutterGeo);
   g.materials.push(shutterMat);
 
-  // === 配管（ビル壁面に沿って）===
+  // === 配管（ビル壁面に沿って）— 金属テクスチャ ===
   const pipeDefs = [
     { x:8, z:8.5, h:9 }, { x:-8, z:-8.5, h:7 }, { x:22, z:5, h:10 },
   ];
+  const pipMat = new THREE.MeshStandardMaterial({
+    map: metalPBR.diff, roughness: 0.5, metalness: 0.6,
+    normalMap: metalPBR.nor, normalScale: new THREE.Vector2(0.5, 0.5)
+  });
+  g.materials.push(pipMat);
   for (const pp of pipeDefs) {
     const pipGeo = new THREE.CylinderGeometry(0.06, 0.06, pp.h, 6);
-    const pipMat = new THREE.MeshStandardMaterial({ color: 0x667788, roughness: 0.5, metalness: 0.6 });
     const pipe = new THREE.Mesh(pipGeo, pipMat);
     pipe.position.set(pp.x, pp.h / 2, pp.z);
     g.scene.add(pipe);
     g.geometries.push(pipGeo);
-    g.materials.push(pipMat);
   }
 
   // === 猫シルエット（装飾）===
@@ -4153,6 +4229,79 @@ function buildAlleyObjects(g) {
     g.scene.add(puddle);
     g.geometries.push(puGeo);
     g.materials.push(puMat);
+  }
+
+  // === 蹴れる立て看板（A型看板）===
+  // 蹴ると倒れて鬼の注意を引く陽動オブジェクト
+  g.kickableSigns = [];
+  const signDefs = [
+    { x:4, z:-3, ry:0.2, text:'営業中', color:0xff6633 },
+    { x:-6, z:8, ry:-0.3, text:'本日限定', color:0x33ccff },
+    { x:12, z:-15, ry:0.5, text:'半額', color:0xff3366 },
+    { x:-14, z:-8, ry:-0.1, text:'OPEN', color:0x33ff66 },
+    { x:0, z:18, ry:0.4, text:'おすすめ', color:0xffcc00 },
+  ];
+  for (const sd of signDefs) {
+    const signGroup = new THREE.Group();
+    // 看板本体（A型フレーム）
+    const boardGeo = new THREE.BoxGeometry(0.8, 1.2, 0.06);
+    boardGeo.setAttribute('uv2', boardGeo.attributes.uv);
+    const boardMat = new THREE.MeshStandardMaterial({
+      map: woodPBR.diff, roughness: 0.8, metalness: 0.0,
+      normalMap: woodPBR.nor, normalScale: new THREE.Vector2(0.6, 0.6)
+    });
+    const board = new THREE.Mesh(boardGeo, boardMat);
+    board.position.y = 0.65;
+    signGroup.add(board);
+    // 看板テキスト面（前面に色付きパネル）
+    const textGeo = new THREE.PlaneGeometry(0.7, 0.5);
+    const textMat = new THREE.MeshStandardMaterial({
+      color: sd.color, emissive: sd.color, emissiveIntensity: 0.5,
+      roughness: 0.3, metalness: 0.0
+    });
+    const textMesh = new THREE.Mesh(textGeo, textMat);
+    textMesh.position.set(0, 0.75, 0.035);
+    signGroup.add(textMesh);
+    // 裏面
+    const textBack = new THREE.Mesh(textGeo, textMat);
+    textBack.position.set(0, 0.75, -0.035);
+    textBack.rotation.y = Math.PI;
+    signGroup.add(textBack);
+    // 脚（A型の支え）
+    const legGeo = new THREE.BoxGeometry(0.04, 1.3, 0.03);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.7, metalness: 0.3 });
+    const legL = new THREE.Mesh(legGeo, legMat);
+    legL.position.set(-0.35, 0.6, 0);
+    signGroup.add(legL);
+    const legR = new THREE.Mesh(legGeo, legMat);
+    legR.position.set(0.35, 0.6, 0);
+    signGroup.add(legR);
+
+    g.geometries.push(boardGeo, textGeo, legGeo);
+    g.materials.push(boardMat, textMat, legMat);
+
+    const groundY = gH(sd.x, sd.z);
+    signGroup.position.set(sd.x, groundY, sd.z);
+    signGroup.rotation.y = sd.ry;
+    signGroup.castShadow = true;
+    g.scene.add(signGroup);
+
+    // 小さなポイントライト（看板が夜に光る）
+    const sLight = new THREE.PointLight(sd.color, 0.4, 6);
+    sLight.position.set(sd.x, groundY + 1.2, sd.z);
+    g.scene.add(sLight);
+
+    // 看板データを保存（蹴り判定用）
+    g.kickableSigns.push({
+      group: signGroup,
+      light: sLight,
+      x: sd.x, z: sd.z,
+      fallen: false,
+      fallTimer: 0,
+      originalY: groundY,
+      text: sd.text,
+      color: sd.color
+    });
   }
 }
 
@@ -4964,6 +5113,13 @@ function updatePlayer(g, dt) {
   ctrl.canHit = null;
   if (!ctrl.canKick && g.config.interactables) {
     for (const inter of g.config.interactables) {
+      // 倒れた看板はスキップ
+      if (inter.type === 'sign' && g.kickableSigns) {
+        const sign = g.kickableSigns.find(s =>
+          Math.abs(s.x - inter.x) < 2 && Math.abs(s.z - inter.z) < 2
+        );
+        if (sign && sign.fallen) continue;
+      }
       const dx = ctrl.position.x - inter.x;
       const dz = ctrl.position.z - inter.z;
       if (Math.sqrt(dx*dx + dz*dz) < 2.5) {
@@ -6723,7 +6879,6 @@ function performKickAnim(g) {
 function performHit(g, interactable) {
   g._hitCooldown = true;
   setTimeout(() => { g._hitCooldown = false; }, 3000);
-  showNotification('💥 ' + interactable.label + ' を蹴った！');
 
   // Play sound based on material type
   const snd = interactable.sound || 'thud';
@@ -6739,21 +6894,51 @@ function performHit(g, interactable) {
     spawnRollingPebbles(g, interactable.x, interactable.z, g.player.rotation || g.player.cameraYaw);
   }
 
-  // Alert nearest oni
-  let nearest = null, nearestDist = Infinity;
+  // === 看板蹴り特別演出 ===
+  let isSignKick = false;
+  if (interactable.type === 'sign' && g.kickableSigns) {
+    const sign = g.kickableSigns.find(s =>
+      Math.abs(s.x - interactable.x) < 2 && Math.abs(s.z - interactable.z) < 2 && !s.fallen
+    );
+    if (sign) {
+      isSignKick = true;
+      sign.fallen = true;
+      sign.fallTimer = 0;
+      // 蹴り方向を計算（プレイヤーの向いている方向）
+      const kickYaw = g.player.rotation || g.player.cameraYaw || 0;
+      sign.fallAngle = kickYaw;
+      // 倒れアニメ開始（X軸回転で前に倒す）
+      sign._fallPhase = 'falling';
+
+      showCenterAlert('看板を蹴り倒した！', '鬼の注意がそちらに…', 2500);
+      SoundManager.playGameSE('hit_metal');
+
+      // 小石飛散
+      spawnRollingPebbles(g, sign.x, sign.z, kickYaw);
+    }
+  }
+
+  if (!isSignKick) {
+    showNotification('💥 ' + interactable.label + ' を蹴った！');
+  }
+
+  // Alert oni — 看板は範囲が広く、patrol以外の鬼も引き寄せる
+  const alertRadius = isSignKick ? interactable.radius * 2.5 : interactable.radius;
+  const alertStates = isSignKick
+    ? ['patrol', 'search', 'footSound']  // 看板は広範囲の鬼に影響
+    : ['patrol'];
+  let alerted = 0;
   for (const oni of g.onis) {
     const dx = oni.position.x - interactable.x;
     const dz = oni.position.z - interactable.z;
     const dist = Math.sqrt(dx*dx + dz*dz);
-    if (dist < interactable.radius && dist < nearestDist) {
-      nearest = oni;
-      nearestDist = dist;
+    if (dist < alertRadius && alertStates.includes(oni.state)) {
+      oni.state = 'distraction';
+      oni.distractionPos = new THREE.Vector3(interactable.x, 0, interactable.z);
+      oni.stateTimer = 0;
+      alerted++;
+      if (!isSignKick) break; // 通常オブジェクトは1体のみ
     }
-  }
-  if (nearest && nearest.state === 'patrol') {
-    nearest.state = 'distraction';
-    nearest.distractionPos = new THREE.Vector3(interactable.x, 0, interactable.z);
-    nearest.stateTimer = 0;
   }
 }
 
@@ -6810,6 +6995,46 @@ function updateRollingPebbles(g, dt) {
     // Friction
     p.vx *= (1 - 2.0 * dt);
     p.vz *= (1 - 2.0 * dt);
+  }
+}
+
+// --- 蹴れる看板の倒れアニメーション更新 ---
+function updateKickableSigns(g, dt) {
+  if (!g.kickableSigns) return;
+  for (const sign of g.kickableSigns) {
+    if (!sign.fallen || sign._fallPhase === 'done') continue;
+
+    sign.fallTimer += dt;
+
+    if (sign._fallPhase === 'falling') {
+      // 倒れるアニメーション（0.6秒で完了）
+      const progress = Math.min(sign.fallTimer / 0.6, 1.0);
+      // イージング: 加速して倒れる（重力感）
+      const eased = 1 - Math.pow(1 - progress, 2);
+      // プレイヤーの蹴り方向に倒す
+      const fallDir = sign.fallAngle || 0;
+      sign.group.rotation.x = -Math.sin(fallDir) * eased * (Math.PI / 2);
+      sign.group.rotation.z = Math.cos(fallDir) * eased * (Math.PI / 2);
+      sign.group.position.y = sign.originalY - eased * 0.3;
+
+      if (progress >= 1.0) {
+        sign._fallPhase = 'grounded';
+        sign.fallTimer = 0;
+        // 倒れた看板のライトを消す
+        if (sign.light) sign.light.intensity = 0;
+      }
+    } else if (sign._fallPhase === 'grounded') {
+      // 20秒後に看板を復帰（再利用可能に）
+      if (sign.fallTimer > 20) {
+        sign.fallen = false;
+        sign._fallPhase = 'done';
+        sign.group.rotation.x = 0;
+        sign.group.rotation.z = 0;
+        sign.group.position.y = sign.originalY;
+        if (sign.light) sign.light.intensity = 0.4;
+        sign._fallPhase = null;
+      }
+    }
   }
 }
 
@@ -7295,6 +7520,7 @@ function gameLoop(timestamp) {
     ['updateSwings', () => updateSwings(G, dt)],
     ['updateDayNight', () => updateDayNight(G, dt)],
     ['updateRollingPebbles', () => updateRollingPebbles(G, dt)],
+    ['updateKickableSigns', () => updateKickableSigns(G, dt)],
     ['updateGamePhases', () => updateGamePhases(G, dt)],
     ['updateHUD', () => updateHUD(G)]
   ];
