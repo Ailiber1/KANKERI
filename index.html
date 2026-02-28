@@ -907,6 +907,7 @@ html, body {
     <div id="hud-info-bar">
       <div id="hud-capture">捕獲: 0/0</div>
       <div id="hud-can-dir"></div>
+      <div id="hud-debug-pos" style="font-size:10px;color:#88ff88;opacity:0.7;"></div>
     </div>
     <div id="hud-action-prompt" style="display:none;"></div>
     <div id="hud-peek-prompt" style="display:none;"></div>
@@ -3842,7 +3843,8 @@ function buildAlleyObjects(g) {
       normalMap: pbr.nor, normalScale: new THREE.Vector2(0.8, 0.8),
       roughnessMap: pbr.rough,
       aoMap: pbr.ao, aoMapIntensity: 0.6,
-      emissive: 0x050508, emissiveIntensity: 0.2
+      emissive: 0x050508, emissiveIntensity: 0.2,
+      side: THREE.DoubleSide
     });
     const mesh = new THREE.Mesh(bGeo, bMat);
     mesh.position.set(b.x, b.h / 2, b.z);
@@ -4147,11 +4149,13 @@ function buildAlleyObjects(g) {
   });
   g.materials.push(pipMat);
   for (const pp of pipeDefs) {
-    const pipGeo = new THREE.CylinderGeometry(0.06, 0.06, pp.h, 6);
+    const pipGeo = new THREE.CylinderGeometry(0.15, 0.15, pp.h, 8);
     const pipe = new THREE.Mesh(pipGeo, pipMat);
     pipe.position.set(pp.x, pp.h / 2, pp.z);
+    pipe.castShadow = true;
     g.scene.add(pipe);
     g.geometries.push(pipGeo);
+    g.colliders.push({ type:'cylinder', x:pp.x, z:pp.z, r:0.15, h:pp.h });
   }
 
   // === 猫シルエット（装飾）===
@@ -4984,7 +4988,7 @@ function updatePlayer(g, dt) {
   const stepX = moveX / subSteps;
   const stepZ = moveZ / subSteps;
   const half = g.config.size / 2 - 0.5;
-  const COL_MARGIN = 0.5;
+  const COL_MARGIN = 0.8;
   let blocked = false;
 
   for (let step = 0; step < subSteps; step++) {
@@ -5028,22 +5032,27 @@ function updatePlayer(g, dt) {
     }
   }
 
-  // 全ステップ後もコライダー内にいる場合、前の有効位置に戻す
+  // 全ステップ後もコライダー内にいる場合、MTD押し出し（prevValidフォールバック付き）
   for (const col of g.colliders) {
     if (col.type === 'box') {
-      if (Math.abs(ctrl.position.x - col.x) < col.hw + 0.1 &&
-          Math.abs(ctrl.position.z - col.z) < col.hd + 0.1) {
-        ctrl.position.x = prevValidX;
-        ctrl.position.z = prevValidZ;
-        break;
+      const safeOX = col.hw + 0.3 - Math.abs(ctrl.position.x - col.x);
+      const safeOZ = col.hd + 0.3 - Math.abs(ctrl.position.z - col.z);
+      if (safeOX > 0 && safeOZ > 0) {
+        // 建物の物理的境界+0.3m内にいる = 危険。まずMTD押し出し
+        if (safeOX < safeOZ) {
+          ctrl.position.x += (Math.sign(ctrl.position.x - col.x) || 1) * safeOX;
+        } else {
+          ctrl.position.z += (Math.sign(ctrl.position.z - col.z) || 1) * safeOZ;
+        }
       }
     } else if (col.type === 'cylinder') {
       const dx = ctrl.position.x - col.x;
       const dz = ctrl.position.z - col.z;
-      if (Math.sqrt(dx*dx + dz*dz) < col.r + 0.1) {
-        ctrl.position.x = prevValidX;
-        ctrl.position.z = prevValidZ;
-        break;
+      const cDist = Math.sqrt(dx*dx + dz*dz);
+      if (cDist < col.r + 0.3) {
+        const push = col.r + 0.3 - cDist;
+        if (cDist > 0.01) { ctrl.position.x += (dx/cDist)*push; ctrl.position.z += (dz/cDist)*push; }
+        else ctrl.position.x += 0.5;
       }
     }
   }
@@ -5306,13 +5315,23 @@ function updateCamera(g, dt) {
     const hits = raycaster.intersectObjects(g.cameraMeshes, false);
     for (const hit of hits) {
       if (hit.object === fig.shadow) continue;
-      if (hit.distance < finalDist && hit.distance > 0.5) {
-        finalDist = hit.distance - 0.3;
+      // プレイヤーキャラの体メッシュをスキップ
+      let isPlayerPart = false;
+      let p = hit.object.parent;
+      while (p) { if (p === fig.group) { isPlayerPart = true; break; } p = p.parent; }
+      if (isPlayerPart) continue;
+      // 鬼・味方キャラのメッシュもスキップ
+      let isCharPart = false;
+      if (g.onis) for (const o of g.onis) { let pp = hit.object.parent; while (pp) { if (pp === o.fig.group) { isCharPart = true; break; } pp = pp.parent; } if (isCharPart) break; }
+      if (!isCharPart && g.cpuAllies) for (const a of g.cpuAllies) { let pp = hit.object.parent; while (pp) { if (pp === a.fig.group) { isCharPart = true; break; } pp = pp.parent; } if (isCharPart) break; }
+      if (isCharPart) continue;
+      if (hit.distance < finalDist && hit.distance > 0.15) {
+        finalDist = Math.max(0.15, hit.distance - 0.3);
       }
     }
   }
 
-  const actualCam = playerHead.clone().add(dir.multiplyScalar(Math.max(0.5, finalDist)));
+  const actualCam = playerHead.clone().add(dir.multiplyScalar(Math.max(0.25, finalDist)));
 
   // Smooth interpolation
   const lerpSpeed = 8 * dt;
@@ -5897,7 +5916,7 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   oni.position.z = Math.max(-half, Math.min(half, oni.position.z));
 
   // コライダー押し出し（複数パス + マージン拡大）
-  const ONI_MARGIN = 0.5;
+  const ONI_MARGIN = 0.8;
   for (let pass = 0; pass < 3; pass++) {
     let anyPush = false;
     for (const col of g.colliders) {
@@ -6157,7 +6176,7 @@ function moveCpuAlly(ally, targetX, targetZ, speed, dt, g) {
   newZ = Math.max(-half, Math.min(half, newZ));
 
   // コライダー押し出し（複数パス + マージン拡大）
-  const ALLY_MARGIN = 0.5;
+  const ALLY_MARGIN = 0.8;
   for (let pass = 0; pass < 3; pass++) {
     let anyPush = false;
     for (const col of g.colliders) {
@@ -7392,6 +7411,10 @@ function updateHUD(g) {
     const total = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
     capEl.textContent = '捕獲: ' + g.capturedCount + '/' + total;
   }
+
+  // Debug position display
+  const dbgEl = document.getElementById('hud-debug-pos');
+  if (dbgEl) dbgEl.textContent = 'X:' + g.player.position.x.toFixed(1) + ' Z:' + g.player.position.z.toFixed(1);
 
   // Can direction
   const canDirEl = document.getElementById('hud-can-dir');
