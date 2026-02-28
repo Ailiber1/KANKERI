@@ -2714,7 +2714,7 @@ function createGameScene(stageConfig) {
   // Scene
   g.scene = new THREE.Scene();
   g.scene.background = new THREE.Color(0x87ceeb);
-  g.scene.fog = new THREE.FogExp2(0x87ceeb, stageNum === 4 ? 0.006 : 0.012);
+  g.scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
 
   // Camera (TPS)
   g.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -4392,6 +4392,9 @@ function buildAlleyObjects(g) {
 function buildSchoolObjects(g) {
   const gH = (x, z) => getGroundHeight(g, x, z);
   const texLoader = new THREE.TextureLoader();
+
+  // Stage 4: フォグ密度を軽減（深夜でも遠くが見えるように）
+  g.scene.fog.density = 0.006;
 
   // === PBRテクスチャのロード ===
   const loadPBR = (name, repS, repT) => {
