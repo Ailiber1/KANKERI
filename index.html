@@ -3850,8 +3850,7 @@ function buildAlleyObjects(g) {
       normalMap: pbr.nor, normalScale: new THREE.Vector2(0.8, 0.8),
       roughnessMap: pbr.rough,
       aoMap: pbr.ao, aoMapIntensity: 0.6,
-      emissive: 0x050508, emissiveIntensity: 0.2,
-      side: THREE.DoubleSide
+      emissive: 0x050508, emissiveIntensity: 0.2
     });
     const mesh = new THREE.Mesh(bGeo, bMat);
     mesh.position.set(b.x, b.h / 2, b.z);
@@ -4156,13 +4155,11 @@ function buildAlleyObjects(g) {
   });
   g.materials.push(pipMat);
   for (const pp of pipeDefs) {
-    const pipGeo = new THREE.CylinderGeometry(0.15, 0.15, pp.h, 8);
+    const pipGeo = new THREE.CylinderGeometry(0.06, 0.06, pp.h, 6);
     const pipe = new THREE.Mesh(pipGeo, pipMat);
     pipe.position.set(pp.x, pp.h / 2, pp.z);
-    pipe.castShadow = true;
     g.scene.add(pipe);
     g.geometries.push(pipGeo);
-    g.colliders.push({ type:'cylinder', x:pp.x, z:pp.z, r:0.15, h:pp.h });
   }
 
   // === 猫シルエット（装飾）===
@@ -4995,7 +4992,7 @@ function updatePlayer(g, dt) {
   const stepX = moveX / subSteps;
   const stepZ = moveZ / subSteps;
   const half = g.config.size / 2 - 0.5;
-  const COL_MARGIN = 0.8;
+  const COL_MARGIN = 0.5;
   let blocked = false;
 
   for (let step = 0; step < subSteps; step++) {
@@ -5010,12 +5007,11 @@ function updatePlayer(g, dt) {
         if (col.type === 'box') {
           const overX = col.hw + COL_MARGIN - Math.abs(ctrl.position.x - col.x);
           const overZ = col.hd + COL_MARGIN - Math.abs(ctrl.position.z - col.z);
-          // コーナーすり抜け防止: overlap=0でも衝突判定を維持
-          if (overX > -0.001 && overZ > -0.001 && (overX > 0 || overZ > 0)) {
-            if (overZ <= 0 || (overX > 0 && overX < overZ)) {
-              ctrl.position.x += (Math.sign(ctrl.position.x - col.x) || 1) * Math.max(overX, 0.001);
+          if (overX > 0 && overZ > 0) {
+            if (overX < overZ) {
+              ctrl.position.x += (Math.sign(ctrl.position.x - col.x) || 1) * overX;
             } else {
-              ctrl.position.z += (Math.sign(ctrl.position.z - col.z) || 1) * Math.max(overZ, 0.001);
+              ctrl.position.z += (Math.sign(ctrl.position.z - col.z) || 1) * overZ;
             }
             anyPush = true;
           }
@@ -5039,18 +5035,14 @@ function updatePlayer(g, dt) {
     }
   }
 
-  // 全ステップ後もコライダー内にいる場合、MTD押し出し（prevValidフォールバック付き）
+  // 全ステップ後もコライダー内にいる場合、前の有効位置に戻す
   for (const col of g.colliders) {
     if (col.type === 'box') {
-      const safeOX = col.hw + 0.3 - Math.abs(ctrl.position.x - col.x);
-      const safeOZ = col.hd + 0.3 - Math.abs(ctrl.position.z - col.z);
-      if (safeOX > 0 && safeOZ > 0) {
-        // 建物の物理的境界+0.3m内にいる = 危険。まずMTD押し出し
-        if (safeOX < safeOZ) {
-          ctrl.position.x += (Math.sign(ctrl.position.x - col.x) || 1) * safeOX;
-        } else {
-          ctrl.position.z += (Math.sign(ctrl.position.z - col.z) || 1) * safeOZ;
-        }
+      if (Math.abs(ctrl.position.x - col.x) < col.hw + 0.1 &&
+          Math.abs(ctrl.position.z - col.z) < col.hd + 0.1) {
+        ctrl.position.x = prevValidX;
+        ctrl.position.z = prevValidZ;
+        break;
       }
     } else if (col.type === 'cylinder') {
       const dx = ctrl.position.x - col.x;
@@ -5923,19 +5915,18 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   oni.position.z = Math.max(-half, Math.min(half, oni.position.z));
 
   // コライダー押し出し（複数パス + マージン拡大）
-  const ONI_MARGIN = 0.8;
+  const ONI_MARGIN = 0.5;
   for (let pass = 0; pass < 3; pass++) {
     let anyPush = false;
     for (const col of g.colliders) {
       if (col.type === 'box') {
         const overX = col.hw + ONI_MARGIN - Math.abs(oni.position.x - col.x);
         const overZ = col.hd + ONI_MARGIN - Math.abs(oni.position.z - col.z);
-        // コーナーすり抜け防止: overlap=0でも衝突判定を維持
-        if (overX > -0.001 && overZ > -0.001 && (overX > 0 || overZ > 0)) {
-          if (overZ <= 0 || (overX > 0 && overX < overZ)) {
-            oni.position.x += (Math.sign(oni.position.x - col.x) || 1) * Math.max(overX, 0.001);
+        if (overX > 0 && overZ > 0) {
+          if (overX < overZ) {
+            oni.position.x += (Math.sign(oni.position.x - col.x) || 1) * overX;
           } else {
-            oni.position.z += (Math.sign(oni.position.z - col.z) || 1) * Math.max(overZ, 0.001);
+            oni.position.z += (Math.sign(oni.position.z - col.z) || 1) * overZ;
           }
           anyPush = true;
         }
@@ -6183,19 +6174,18 @@ function moveCpuAlly(ally, targetX, targetZ, speed, dt, g) {
   newZ = Math.max(-half, Math.min(half, newZ));
 
   // コライダー押し出し（複数パス + マージン拡大）
-  const ALLY_MARGIN = 0.8;
+  const ALLY_MARGIN = 0.5;
   for (let pass = 0; pass < 3; pass++) {
     let anyPush = false;
     for (const col of g.colliders) {
       if (col.type === 'box') {
         const overX = col.hw + ALLY_MARGIN - Math.abs(newX - col.x);
         const overZ = col.hd + ALLY_MARGIN - Math.abs(newZ - col.z);
-        // コーナーすり抜け防止: overlap=0でも衝突判定を維持
-        if (overX > -0.001 && overZ > -0.001 && (overX > 0 || overZ > 0)) {
-          if (overZ <= 0 || (overX > 0 && overX < overZ)) {
-            newX += (Math.sign(newX - col.x) || 1) * Math.max(overX, 0.001);
+        if (overX > 0 && overZ > 0) {
+          if (overX < overZ) {
+            newX += (Math.sign(newX - col.x) || 1) * overX;
           } else {
-            newZ += (Math.sign(newZ - col.z) || 1) * Math.max(overZ, 0.001);
+            newZ += (Math.sign(newZ - col.z) || 1) * overZ;
           }
           anyPush = true;
         }
