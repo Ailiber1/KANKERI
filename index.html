@@ -769,7 +769,7 @@ html, body {
       <option value="1">Stage 1 — 児童公園</option>
       <option value="2">Stage 2 — 雨上がりの神社</option>
       <option value="3">Stage 3 — ネオン商店街の裏路地</option>
-      <option value="4" disabled>Stage 4 — 廃校の校庭 🔒</option>
+      <option value="4">Stage 4 — 廃校の校庭</option>
       <option value="5" disabled>Stage 5 — 団地 🔒</option>
     </select>
 
@@ -2412,6 +2412,48 @@ const STAGE_CONFIGS = {
       { type:'pipe', x:22, z:5, radius:15, label:'配管', sound:'metal' },
       { type:'fence', x:0, z:-29, radius:20, label:'フェンス', sound:'metal' }
     ]
+  },
+  4: {
+    name: '廃校の校庭', nameEn: "Abandoned School",
+    size: 70, timeLimit: 180,
+    initialOni: 2, maxOni: 4, oniAddAt: [null, null, 90, 50],
+    startPhase: 3, cycleDuration: 180,
+    canPositions: [
+      { x: 0, z: 0, label: '① 校庭の中央', labelEn: '① School Grounds Center' },
+      { x: -5, z: 22, label: '② 校舎の正面玄関前', labelEn: '② Front of School' },
+      { x: 22, z: -12, label: '③ プール跡の横', labelEn: '③ Near Old Pool' }
+    ],
+    waypoints: [
+      // メイン巡回（校庭の外周）
+      {x:0,z:-30},{x:15,z:-30},{x:30,z:-30},{x:30,z:0},{x:30,z:20},
+      {x:15,z:20},{x:0,z:20},{x:-15,z:20},{x:-30,z:0},{x:-30,z:-15},
+      {x:-15,z:-30},
+      // 校舎裏（校舎z:24~32のさらに北側）
+      {x:-15,z:33},{x:0,z:33},{x:15,z:33},
+      // 体育倉庫周辺
+      {x:-28,z:8},{x:-20,z:4},{x:-28,z:-5},
+      // プール周辺（フェンスの外側）
+      {x:15,z:-16},{x:25,z:-11},{x:28,z:-22},{x:18,z:-25},
+      // 校庭中央
+      {x:0,z:5},{x:8,z:-5},{x:-8,z:-8}
+    ],
+    interactables: [
+      { type:'door', x:-5, z:23, radius:20, label:'教室のドア', sound:'thud' },
+      { type:'door', x:5, z:23, radius:20, label:'教室のドア', sound:'thud' },
+      { type:'ironbar', x:8, z:10, radius:25, label:'鉄棒', sound:'metal' },
+      { type:'ironbar', x:12, z:10, radius:25, label:'鉄棒', sound:'metal' },
+      { type:'wall', x:-25, z:3, radius:20, label:'体育倉庫の壁', sound:'thud' },
+      { type:'fence', x:22, z:-10, radius:15, label:'プールフェンス', sound:'metal' },
+      { type:'fence', x:0, z:-33, radius:20, label:'校門フェンス', sound:'metal' },
+      { type:'pole', x:-12, z:-5, radius:15, label:'校庭のポール', sound:'metal' },
+      { type:'pole', x:12, z:-5, radius:15, label:'校庭のポール', sound:'metal' },
+      { type:'bench', x:-15, z:18, radius:12, label:'ベンチ', sound:'thud' },
+      { type:'crate', x:-24, z:2, radius:12, label:'跳び箱', sound:'thud' },
+      { type:'barrel', x:-26, z:5, radius:12, label:'マット', sound:'thud' },
+      { type:'sign', x:0, z:-15, radius:25, label:'朝礼台', sound:'metal' },
+      { type:'sign', x:-8, z:-12, radius:20, label:'花壇の柵', sound:'metal' },
+      { type:'sign', x:8, z:-12, radius:20, label:'花壇の柵', sound:'metal' }
+    ]
   }
 };
 
@@ -2716,7 +2758,27 @@ function buildTerrain(g, stageNum) {
   const groundGeo = new THREE.PlaneGeometry(size, size, segments, segments);
   const verts = groundGeo.attributes.position.array;
 
-  if (stageNum === 3) {
+  if (stageNum === 4) {
+    // === STAGE 4: 廃校の校庭 ===
+    // 校庭の砂地（ほぼ平坦、微細な凹凸）
+    for (let i = 0; i < verts.length; i += 3) {
+      const x = verts[i], y = verts[i+1];
+      const wz = -y;
+      let h = noise.noise2D(x * 0.08, wz * 0.08) * 0.06;
+      h += noise2.noise2D(x * 0.3, wz * 0.3) * 0.015;
+      // プール跡の凹み (x:18~28, z:-22~-14) → 深さ-1.5m
+      if (x > 18 && x < 28 && wz > -22 && wz < -14) {
+        h -= 1.5;
+      } else if (x > 16 && x < 30 && wz > -24 && wz < -12) {
+        // プール周辺のスロープ
+        const edgeX = Math.min(x - 16, 30 - x, 2) / 2;
+        const edgeZ = Math.min(wz + 24, -12 - wz, 2) / 2;
+        const edge = Math.min(edgeX, edgeZ);
+        if (edge < 1) h -= 1.5 * (1 - edge);
+      }
+      verts[i+2] = h;
+    }
+  } else if (stageNum === 3) {
     // === STAGE 3: ネオン商店街の裏路地 ===
     // アスファルト地面 — ほぼ平坦だが排水勾配と微細な凹凸あり
     for (let i = 0; i < verts.length; i += 3) {
@@ -2782,7 +2844,21 @@ function buildTerrain(g, stageNum) {
       tex.anisotropy = 4;
       return tex;
     };
-    if (stageNum === 3) {
+    if (stageNum === 4) {
+      // ステージ4: 校庭の砂地（dirt PBRテクスチャ）
+      const rep4 = 18;
+      const d4Diff = setRepeat(loader.load('textures/dirt_diff.jpg'), rep4);
+      const d4Nor  = setRepeat(loader.load('textures/dirt_nor.jpg'), rep4);
+      const d4Rough = setRepeat(loader.load('textures/dirt_rough.jpg'), rep4);
+      const d4Ao   = setRepeat(loader.load('textures/dirt_ao.jpg'), rep4);
+      g.textures.push(d4Diff, d4Nor, d4Rough, d4Ao);
+      groundMat = new THREE.MeshStandardMaterial({
+        map: d4Diff, normalMap: d4Nor,
+        normalScale: new THREE.Vector2(1.0, 1.0),
+        roughnessMap: d4Rough, roughness: 0.95,
+        aoMap: d4Ao, aoMapIntensity: 0.8, metalness: 0.0
+      });
+    } else if (stageNum === 3) {
       // ステージ3: アスファルト（濡れた路面 — 低roughnessで反射感）
       const rep = 16;
       const gDiff = setRepeat(loader.load('textures/asphalt_diff.jpg'), rep);
@@ -2989,10 +3065,33 @@ function buildTerrain(g, stageNum) {
 
   // Boundary walls (all stages)
   const half = size / 2;
-  const wallH = stageNum === 3 ? 12 : (stageNum === 2 ? 2.5 : 2);
+  const wallH = stageNum === 4 ? 3 : (stageNum === 3 ? 12 : (stageNum === 2 ? 2.5 : 2));
   const fenceGeo = new THREE.BoxGeometry(size + 2, wallH, 0.1);
   let fenceMat;
-  if (stageNum === 3) {
+  if (stageNum === 4) {
+    // ステージ4: コンクリート壁（学校の外塀）
+    const wLoader4 = new THREE.TextureLoader();
+    const setWallRep4 = (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(16, 1);
+      tex.anisotropy = 4;
+      return tex;
+    };
+    const w4Diff  = setWallRep4(wLoader4.load('textures/concrete_diff.jpg'));
+    const w4Nor   = setWallRep4(wLoader4.load('textures/concrete_nor.jpg'));
+    const w4Rough = setWallRep4(wLoader4.load('textures/concrete_rough.jpg'));
+    const w4Ao    = setWallRep4(wLoader4.load('textures/concrete_ao.jpg'));
+    g.textures.push(w4Diff, w4Nor, w4Rough, w4Ao);
+    fenceGeo.setAttribute('uv2', fenceGeo.attributes.uv);
+    fenceMat = new THREE.MeshStandardMaterial({
+      map: w4Diff, roughness: 0.9, metalness: 0.0,
+      normalMap: w4Nor, normalScale: new THREE.Vector2(0.8, 0.8),
+      roughnessMap: w4Rough,
+      aoMap: w4Ao, aoMapIntensity: 0.6,
+      emissive: 0x030305, emissiveIntensity: 0.1
+    });
+    g.materials.push(fenceMat);
+  } else if (stageNum === 3) {
     // ステージ3: コンクリート壁PBRテクスチャ（Poly Haven CC0）
     const wLoader3 = new THREE.TextureLoader();
     const setWallRep3 = (tex) => {
@@ -4289,6 +4388,454 @@ function buildAlleyObjects(g) {
   }
 }
 
+// --- STAGE 4: 廃校の校庭オブジェクト ---
+function buildSchoolObjects(g) {
+  const gH = (x, z) => getGroundHeight(g, x, z);
+  const texLoader = new THREE.TextureLoader();
+
+  // === PBRテクスチャのロード ===
+  const loadPBR = (name, repS, repT) => {
+    const setRep = (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(repS, repT);
+      tex.anisotropy = 4;
+      return tex;
+    };
+    const diff  = setRep(texLoader.load('textures/' + name + '_diff.jpg'));
+    const nor   = setRep(texLoader.load('textures/' + name + '_nor.jpg'));
+    const rough = setRep(texLoader.load('textures/' + name + '_rough.jpg'));
+    const ao    = setRep(texLoader.load('textures/' + name + '_ao.jpg'));
+    g.textures.push(diff, nor, rough, ao);
+    return { diff, nor, rough, ao };
+  };
+  const plasterPBR  = loadPBR('plaster', 4, 2);
+  const concretePBR = loadPBR('concrete', 2, 2);
+  const metalPBR    = loadPBR('metal', 3, 2);
+  const woodPBR     = loadPBR('wood', 2, 2);
+  const grassPBR    = loadPBR('grass', 2, 2);
+
+  // ヘルパー: PBRマテリアル作成
+  const makePBRMat = (pbr, opts) => {
+    const mat = new THREE.MeshStandardMaterial({
+      map: pbr.diff,
+      normalMap: pbr.nor, normalScale: new THREE.Vector2(0.8, 0.8),
+      roughnessMap: pbr.rough, roughness: opts.roughness || 0.9,
+      aoMap: pbr.ao, aoMapIntensity: opts.aoIntensity || 0.6,
+      metalness: opts.metalness || 0.0,
+      ...(opts.emissive ? { emissive: opts.emissive, emissiveIntensity: opts.emissiveIntensity || 0.1 } : {})
+    });
+    g.materials.push(mat);
+    return mat;
+  };
+
+  // ヘルパー: ボックスオブジェクト追加
+  const addBox = (x, z, hw, hd, h, mat, addCollider) => {
+    const geo = new THREE.BoxGeometry(hw * 2, h, hd * 2);
+    geo.setAttribute('uv2', geo.attributes.uv);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, gH(x, z) + h / 2, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    g.scene.add(mesh);
+    g.geometries.push(geo);
+    g.cameraMeshes.push(mesh);
+    if (addCollider !== false) {
+      g.colliders.push({ type:'box', x:x, z:z, hw:hw, hd:hd, h:h });
+    }
+    return mesh;
+  };
+
+  // === 校舎（メインビル）: x:0, z:28, hw:20, hd:4, h:8 ===
+  const schoolMat = makePBRMat(plasterPBR, { roughness: 0.92, emissive: 0x030305, emissiveIntensity: 0.1 });
+
+  // 校舎を3パーツに分割（中央に入口の隙間を作る）
+  // 左翼: x:-20~-3, z:24~32 → center x:-11.5, hw:8.5, hd:4
+  addBox(-11.5, 28, 8.5, 4, 8, schoolMat);
+  // 右翼: x:3~20, z:24~32 → center x:11.5, hw:8.5, hd:4
+  addBox(11.5, 28, 8.5, 4, 8, schoolMat);
+  // 上部（入口の上、2F部分）: x:-3~3, z:24~32, y:4~8 → h:4
+  const upperGeo = new THREE.BoxGeometry(6, 4, 8);
+  upperGeo.setAttribute('uv2', upperGeo.attributes.uv);
+  const upperMesh = new THREE.Mesh(upperGeo, schoolMat);
+  upperMesh.position.set(0, gH(0, 28) + 6, 28);
+  upperMesh.castShadow = true;
+  upperMesh.receiveShadow = true;
+  g.scene.add(upperMesh);
+  g.geometries.push(upperGeo);
+  g.cameraMeshes.push(upperMesh);
+  // 入口のコライダーは高さ4m（1F天井まで）で中央に隙間を確保
+  // 入口上部のコライダーは不要（高さ4m以上にプレイヤーは行かない）
+
+  // 校舎の窓（各面に配置）
+  const windowMat = new THREE.MeshStandardMaterial({
+    color: 0x111118, roughness: 0.5, metalness: 0.0
+  });
+  g.materials.push(windowMat);
+  const litWindowMat = new THREE.MeshStandardMaterial({
+    color: 0xeedd88, emissive: 0xddcc55, emissiveIntensity: 0.6,
+    roughness: 0.3, metalness: 0.0
+  });
+  g.materials.push(litWindowMat);
+
+  // 校舎前面（z:24側）に窓
+  const winGeo = new THREE.PlaneGeometry(1.2, 1.0);
+  g.geometries.push(winGeo);
+  for (let floor = 0; floor < 2; floor++) {
+    for (let wx = -18; wx <= 18; wx += 3) {
+      // 入口部分はスキップ
+      if (Math.abs(wx) < 4 && floor === 0) continue;
+      const lit = Math.random() < 0.12; // 廃校なのでほとんど暗い
+      const wMesh = new THREE.Mesh(winGeo, lit ? litWindowMat : windowMat);
+      wMesh.position.set(wx, gH(0, 28) + 2.5 + floor * 3.5, 23.98);
+      g.scene.add(wMesh);
+    }
+  }
+  // 校舎裏面（z:32側）にも窓
+  for (let floor = 0; floor < 2; floor++) {
+    for (let wx = -18; wx <= 18; wx += 3) {
+      const lit = Math.random() < 0.08;
+      const wMesh = new THREE.Mesh(winGeo, lit ? litWindowMat : windowMat);
+      wMesh.position.set(wx, gH(0, 28) + 2.5 + floor * 3.5, 32.02);
+      wMesh.rotation.y = Math.PI;
+      g.scene.add(wMesh);
+    }
+  }
+
+  // === 体育倉庫: x:-25, z:3, hw:4, hd:3, h:4 ===
+  const storageMat = makePBRMat(metalPBR, { roughness: 0.6, metalness: 0.5, emissive: 0x020205, emissiveIntensity: 0.1 });
+  // 倉庫を3パーツに分割（前面に開口部）
+  // 左壁: x:-29~-27, z:0~6 → center x:-28, hw:1, hd:3
+  addBox(-28, 3, 1, 3, 4, storageMat);
+  // 右壁: x:-23~-21, z:0~6 → center x:-22, hw:1, hd:3
+  addBox(-22, 3, 1, 3, 4, storageMat);
+  // 背面壁: x:-29~-21, z:5~6 → center x:-25, z:5.5, hw:4, hd:0.5
+  addBox(-25, 5.5, 4, 0.5, 4, storageMat);
+  // 屋根: x:-29~-21, z:0~6
+  const roofGeo = new THREE.BoxGeometry(8, 0.15, 6);
+  const roofMat = makePBRMat(metalPBR, { roughness: 0.5, metalness: 0.6 });
+  const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+  roofMesh.position.set(-25, gH(-25, 3) + 4, 3);
+  roofMesh.castShadow = true;
+  roofMesh.receiveShadow = true;
+  g.scene.add(roofMesh);
+  g.geometries.push(roofGeo);
+  g.cameraMeshes.push(roofMesh);
+
+  // === プールフェンス ===
+  // プール周囲にワイヤーフェンス (x:16~30, z:-24~-12)
+  const fenceMat = new THREE.MeshStandardMaterial({
+    color: 0x888888, roughness: 0.6, metalness: 0.7,
+    transparent: true, opacity: 0.4, wireframe: true
+  });
+  g.materials.push(fenceMat);
+  const fenceH = 2.0;
+  const poolFenceDefs = [
+    { x:23, z:-12, hw:7, hd:0.1 }, // 北辺
+    { x:23, z:-24, hw:7, hd:0.1 }, // 南辺
+    { x:16, z:-18, hw:0.1, hd:6 }, // 西辺
+    { x:30, z:-18, hw:0.1, hd:6 }, // 東辺
+  ];
+  for (const pf of poolFenceDefs) {
+    const pfGeo = new THREE.BoxGeometry(pf.hw * 2, fenceH, pf.hd * 2);
+    const pfMesh = new THREE.Mesh(pfGeo, fenceMat);
+    pfMesh.position.set(pf.x, gH(pf.x, pf.z) + fenceH / 2, pf.z);
+    pfMesh.castShadow = false;
+    g.scene.add(pfMesh);
+    g.geometries.push(pfGeo);
+    g.cameraMeshes.push(pfMesh);
+    g.colliders.push({ type:'box', x:pf.x, z:pf.z, hw:pf.hw, hd:pf.hd, h:fenceH });
+  }
+
+  // フェンス支柱
+  const fencePostGeo = new THREE.CylinderGeometry(0.05, 0.05, fenceH, 6);
+  const fencePostMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.5, metalness: 0.8 });
+  g.geometries.push(fencePostGeo);
+  g.materials.push(fencePostMat);
+  const fencePostPositions = [
+    {x:16,z:-12},{x:20,z:-12},{x:23,z:-12},{x:26,z:-12},{x:30,z:-12},
+    {x:16,z:-24},{x:20,z:-24},{x:23,z:-24},{x:26,z:-24},{x:30,z:-24},
+    {x:16,z:-15},{x:16,z:-18},{x:16,z:-21},
+    {x:30,z:-15},{x:30,z:-18},{x:30,z:-21}
+  ];
+  for (const fp of fencePostPositions) {
+    const post = new THREE.Mesh(fencePostGeo, fencePostMat);
+    post.position.set(fp.x, gH(fp.x, fp.z) + fenceH / 2, fp.z);
+    g.scene.add(post);
+  }
+
+  // プール底のタイルテクスチャ
+  const poolGeo = new THREE.PlaneGeometry(10, 8);
+  const poolTilePBR = loadPBR('tile', 3, 2);
+  const poolMat = new THREE.MeshStandardMaterial({
+    map: poolTilePBR.diff,
+    normalMap: poolTilePBR.nor, normalScale: new THREE.Vector2(0.5, 0.5),
+    roughnessMap: poolTilePBR.rough, roughness: 0.8,
+    aoMap: poolTilePBR.ao, aoMapIntensity: 0.5,
+    metalness: 0.0, color: 0x88aaaa
+  });
+  poolGeo.setAttribute('uv2', poolGeo.attributes.uv);
+  const poolFloor = new THREE.Mesh(poolGeo, poolMat);
+  poolFloor.rotation.x = -Math.PI / 2;
+  poolFloor.position.set(23, gH(23, -18) + 0.01, -18);
+  poolFloor.receiveShadow = true;
+  g.scene.add(poolFloor);
+  g.geometries.push(poolGeo);
+  g.materials.push(poolMat);
+
+  // === 鉄棒（2セット）: x:8,z:10 と x:12,z:10 ===
+  const ironMat = new THREE.MeshStandardMaterial({
+    color: 0x888888, roughness: 0.4, metalness: 0.9
+  });
+  g.materials.push(ironMat);
+
+  for (const ibx of [8, 12]) {
+    const ibGroup = new THREE.Group();
+    // 支柱2本
+    const pillarGeo = new THREE.CylinderGeometry(0.04, 0.04, 2.2, 8);
+    g.geometries.push(pillarGeo);
+    const pillar1 = new THREE.Mesh(pillarGeo, ironMat);
+    pillar1.position.set(-0.8, 1.1, 0);
+    ibGroup.add(pillar1);
+    const pillar2 = new THREE.Mesh(pillarGeo, ironMat);
+    pillar2.position.set(0.8, 1.1, 0);
+    ibGroup.add(pillar2);
+    // 横棒
+    const barGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.6, 8);
+    g.geometries.push(barGeo);
+    const bar = new THREE.Mesh(barGeo, ironMat);
+    bar.rotation.z = Math.PI / 2;
+    bar.position.set(0, 2.0, 0);
+    ibGroup.add(bar);
+
+    ibGroup.position.set(ibx, gH(ibx, 10), 10);
+    ibGroup.castShadow = true;
+    g.scene.add(ibGroup);
+    g.colliders.push({ type:'cylinder', x:ibx, z:10, r:0.8, h:2.2 });
+    g.cameraMeshes.push(pillar1, pillar2, bar);
+  }
+
+  // === 花壇: x:-8~8, z:-12, 低い壁(h:0.5) + 草テクスチャ上面 ===
+  const flowerWallMat = makePBRMat(concretePBR, { roughness: 0.9 });
+  // 花壇の外枠
+  const fbDefs = [
+    { x:0, z:-10.25, hw:8, hd:0.25 }, // 北辺
+    { x:0, z:-13.75, hw:8, hd:0.25 }, // 南辺
+    { x:-8, z:-12, hw:0.25, hd:2 },   // 西辺
+    { x:8, z:-12, hw:0.25, hd:2 },    // 東辺
+  ];
+  for (const fb of fbDefs) {
+    addBox(fb.x, fb.z, fb.hw, fb.hd, 0.5, flowerWallMat);
+  }
+  // 花壇の上面（草テクスチャ）
+  const flowerTopGeo = new THREE.PlaneGeometry(16, 3.5);
+  flowerTopGeo.setAttribute('uv2', flowerTopGeo.attributes.uv);
+  const flowerTopMat = new THREE.MeshStandardMaterial({
+    map: grassPBR.diff,
+    normalMap: grassPBR.nor, normalScale: new THREE.Vector2(1.0, 1.0),
+    roughnessMap: grassPBR.rough, roughness: 0.85,
+    aoMap: grassPBR.ao, aoMapIntensity: 0.5,
+    metalness: 0.0
+  });
+  g.materials.push(flowerTopMat);
+  const flowerTop = new THREE.Mesh(flowerTopGeo, flowerTopMat);
+  flowerTop.rotation.x = -Math.PI / 2;
+  flowerTop.position.set(0, gH(0, -12) + 0.51, -12);
+  flowerTop.receiveShadow = true;
+  g.scene.add(flowerTop);
+  g.geometries.push(flowerTopGeo);
+
+  // === 朝礼台: BoxGeometry(3, 0.5, 2) at x:0, z:-15 ===
+  const podiumMat = makePBRMat(concretePBR, { roughness: 0.85 });
+  const podium = addBox(0, -15, 1.5, 1, 0.5, podiumMat);
+
+  // === 校門: 南端にゲート構造 ===
+  const gateMat = makePBRMat(metalPBR, { roughness: 0.5, metalness: 0.7 });
+  // 門柱2本
+  addBox(-3, -34, 0.4, 0.4, 3.5, gateMat);
+  addBox(3, -34, 0.4, 0.4, 3.5, gateMat);
+  // 門の横棒（上部）
+  const gateBarGeo = new THREE.BoxGeometry(6, 0.3, 0.3);
+  const gateBarMesh = new THREE.Mesh(gateBarGeo, gateMat);
+  gateBarMesh.position.set(0, gH(0, -34) + 3.2, -34);
+  gateBarMesh.castShadow = true;
+  g.scene.add(gateBarMesh);
+  g.geometries.push(gateBarGeo);
+  g.cameraMeshes.push(gateBarMesh);
+  // 門扉（半開き）
+  const gateDoorGeo = new THREE.BoxGeometry(2.5, 2.5, 0.08);
+  const gateDoorMat = new THREE.MeshStandardMaterial({
+    color: 0x555555, roughness: 0.5, metalness: 0.7,
+    transparent: true, opacity: 0.6
+  });
+  g.materials.push(gateDoorMat);
+  g.geometries.push(gateDoorGeo);
+  const gateDoorL = new THREE.Mesh(gateDoorGeo, gateDoorMat);
+  gateDoorL.position.set(-1.8, gH(-2, -34) + 1.25, -34);
+  gateDoorL.rotation.y = 0.4; // 少し開いている
+  g.scene.add(gateDoorL);
+  g.cameraMeshes.push(gateDoorL);
+
+  // === ベンチ: x:-15, z:18 ===
+  const benchMat = makePBRMat(woodPBR, { roughness: 0.8 });
+  // 座面
+  addBox(-15, 18, 1.2, 0.4, 0.45, benchMat);
+  // 脚
+  const benchLegGeo = new THREE.BoxGeometry(0.15, 0.45, 0.6);
+  g.geometries.push(benchLegGeo);
+  const benchLeg1 = new THREE.Mesh(benchLegGeo, benchMat);
+  benchLeg1.position.set(-16, gH(-16, 18) + 0.225, 18);
+  g.scene.add(benchLeg1);
+  g.cameraMeshes.push(benchLeg1);
+  const benchLeg2 = new THREE.Mesh(benchLegGeo, benchMat);
+  benchLeg2.position.set(-14, gH(-14, 18) + 0.225, 18);
+  g.scene.add(benchLeg2);
+  g.cameraMeshes.push(benchLeg2);
+
+  // === 跳び箱: x:-24, z:2 ===
+  const vaultMat = makePBRMat(woodPBR, { roughness: 0.75 });
+  addBox(-24, 2, 0.5, 0.4, 0.8, vaultMat);
+
+  // === マット（ドラム缶のような筒状）: x:-26, z:5 ===
+  const matGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 12);
+  const matMat = new THREE.MeshStandardMaterial({ color: 0x336633, roughness: 0.9, metalness: 0.0 });
+  g.geometries.push(matGeo);
+  g.materials.push(matMat);
+  const matRoll = new THREE.Mesh(matGeo, matMat);
+  matRoll.rotation.z = Math.PI / 2;
+  matRoll.position.set(-26, gH(-26, 5) + 0.5, 5);
+  matRoll.castShadow = true;
+  g.scene.add(matRoll);
+  g.cameraMeshes.push(matRoll);
+  g.colliders.push({ type:'cylinder', x:-26, z:5, r:0.5, h:0.6 });
+
+  // === ポール（旗竿）2本: x:-12,z:-5 と x:12,z:-5 ===
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3, metalness: 0.9 });
+  g.materials.push(poleMat);
+  const poleGeo = new THREE.CylinderGeometry(0.05, 0.06, 6, 8);
+  g.geometries.push(poleGeo);
+  for (const px of [-12, 12]) {
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(px, gH(px, -5) + 3, -5);
+    pole.castShadow = true;
+    g.scene.add(pole);
+    g.cameraMeshes.push(pole);
+    g.colliders.push({ type:'cylinder', x:px, z:-5, r:0.1, h:6 });
+  }
+
+  // === 月（emissive sphere）===
+  const moonGeo = new THREE.SphereGeometry(4, 16, 16);
+  const moonMat = new THREE.MeshStandardMaterial({
+    color: 0xffffee, emissive: 0xeeeedd, emissiveIntensity: 1.0,
+    roughness: 1.0, metalness: 0.0
+  });
+  g.geometries.push(moonGeo);
+  g.materials.push(moonMat);
+  const moon = new THREE.Mesh(moonGeo, moonMat);
+  moon.position.set(30, 60, 20);
+  g.scene.add(moon);
+
+  // === 校庭の照明 ===
+  // メインのSpotLight（月光色）
+  const moonLight = new THREE.SpotLight(0x8888cc, 1.5, 120, Math.PI / 3, 0.5, 1);
+  moonLight.position.set(30, 50, 20);
+  moonLight.target.position.set(0, 0, 0);
+  moonLight.castShadow = true;
+  moonLight.shadow.mapSize.width = 1024;
+  moonLight.shadow.mapSize.height = 1024;
+  g.scene.add(moonLight);
+  g.scene.add(moonLight.target);
+
+  // 校庭の街灯（少しだけ暖色）
+  const lampPostPositions = [
+    { x: -20, z: -20 },
+    { x: 20, z: -20 },
+    { x: -20, z: 15 },
+    { x: 20, z: 15 }
+  ];
+  const lampPostGeo = new THREE.CylinderGeometry(0.08, 0.1, 5, 8);
+  g.geometries.push(lampPostGeo);
+  const lampPostMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.5, metalness: 0.8 });
+  g.materials.push(lampPostMat);
+
+  for (const lp of lampPostPositions) {
+    const post = new THREE.Mesh(lampPostGeo, lampPostMat);
+    post.position.set(lp.x, gH(lp.x, lp.z) + 2.5, lp.z);
+    post.castShadow = true;
+    g.scene.add(post);
+    g.cameraMeshes.push(post);
+    g.colliders.push({ type:'cylinder', x:lp.x, z:lp.z, r:0.15, h:5 });
+
+    // 街灯頭部
+    const lampHeadGeo = new THREE.BoxGeometry(0.6, 0.15, 0.3);
+    g.geometries.push(lampHeadGeo);
+    const lampHeadMat = new THREE.MeshStandardMaterial({
+      color: 0x666666, emissive: 0xffeecc, emissiveIntensity: 0.3,
+      roughness: 0.3, metalness: 0.5
+    });
+    g.materials.push(lampHeadMat);
+    const lampHead = new THREE.Mesh(lampHeadGeo, lampHeadMat);
+    lampHead.position.set(lp.x, gH(lp.x, lp.z) + 5, lp.z);
+    g.scene.add(lampHead);
+
+    // 街灯の光（弱め — 廃校なので減衰）
+    const lampLight = new THREE.PointLight(0xffeecc, 0.4, 15);
+    lampLight.position.set(lp.x, gH(lp.x, lp.z) + 4.8, lp.z);
+    g.scene.add(lampLight);
+    g.streetLights.push({ spot: lampLight, fixture: lampHead, fixMat: lampHeadMat });
+  }
+
+  // === kickableSigns の初期化 ===
+  g.kickableSigns = g.kickableSigns || [];
+
+  // 立て看板（朝礼台ラベル、花壇の柵）
+  const signDefs = [
+    { x:0, z:-15, ry:0, text:'朝礼台', color:0x888888 },
+    { x:-8, z:-12, ry:0.3, text:'花壇', color:0x448844 },
+    { x:8, z:-12, ry:-0.3, text:'花壇', color:0x448844 }
+  ];
+
+  for (const sd of signDefs) {
+    const signGroup = new THREE.Group();
+    const boardGeo = new THREE.BoxGeometry(0.8, 0.5, 0.05);
+    const boardMat = new THREE.MeshStandardMaterial({
+      color: sd.color, roughness: 0.7, metalness: 0.1
+    });
+    const board = new THREE.Mesh(boardGeo, boardMat);
+    board.position.y = 0.8;
+    signGroup.add(board);
+
+    const legGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 4);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.6, metalness: 0.3 });
+    const legL = new THREE.Mesh(legGeo, legMat);
+    legL.position.set(-0.3, 0.4, 0);
+    signGroup.add(legL);
+    const legR = new THREE.Mesh(legGeo, legMat);
+    legR.position.set(0.3, 0.4, 0);
+    signGroup.add(legR);
+
+    g.geometries.push(boardGeo, legGeo);
+    g.materials.push(boardMat, legMat);
+
+    const groundY = gH(sd.x, sd.z);
+    signGroup.position.set(sd.x, groundY, sd.z);
+    signGroup.rotation.y = sd.ry;
+    signGroup.castShadow = true;
+    g.scene.add(signGroup);
+    g.cameraMeshes.push(board);
+
+    g.kickableSigns.push({
+      group: signGroup,
+      light: null,
+      x: sd.x, z: sd.z,
+      fallen: false,
+      fallTimer: 0,
+      originalY: groundY,
+      text: sd.text,
+      color: sd.color
+    });
+  }
+}
+
 // --- CAN ---
 function createCan(g) {
   const canGroup = new THREE.Group();
@@ -5187,6 +5734,22 @@ function getGroundHeight(g, x, z) {
   // Sample from ground geometry (must match buildTerrain displacement)
   const noise = g._noise || (g._noise = new SimplexNoise2D(42));
   const noise2 = g._noise2 || (g._noise2 = new SimplexNoise2D(137));
+
+  if (g._stageNum === 4) {
+    // Stage 4: 廃校の校庭 — ほぼ平坦な砂地
+    let h = noise.noise2D(x * 0.08, z * 0.08) * 0.06;
+    h += noise2.noise2D(x * 0.3, z * 0.3) * 0.015;
+    // プール跡の凹み
+    if (x > 18 && x < 28 && z > -22 && z < -14) {
+      h -= 1.5;
+    } else if (x > 16 && x < 30 && z > -24 && z < -12) {
+      const edgeX = Math.min(x - 16, 30 - x, 2) / 2;
+      const edgeZ = Math.min(z + 24, -12 - z, 2) / 2;
+      const edge = Math.min(edgeX, edgeZ);
+      if (edge < 1) h -= 1.5 * (1 - edge);
+    }
+    return h;
+  }
 
   if (g._stageNum === 3) {
     // Stage 3: ネオン商店街 — ほぼ平坦なアスファルト
@@ -7686,7 +8249,9 @@ function startGame(stageNum, mode) {
 
   // Build stage — dispatch by stage number
   buildTerrain(G, stageNum);
-  if (stageNum === 3) {
+  if (stageNum === 4) {
+    buildSchoolObjects(G);
+  } else if (stageNum === 3) {
     buildAlleyObjects(G);
   } else if (stageNum === 2) {
     buildShrineObjects(G);
