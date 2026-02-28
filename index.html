@@ -2335,9 +2335,16 @@ const STAGE_CONFIGS = {
       { x: 18, z: 12, label: '③ 手水舎の裏', labelEn: '③ Behind Chozuya' }
     ],
     waypoints: [
-      {x:-15,z:-15},{x:15,z:-15},{x:15,z:15},{x:-15,z:15},
-      {x:0,z:8},{x:-8,z:-10},{x:10,z:0},{x:-10,z:12},{x:8,z:-12},
-      {x:0,z:-18},{x:12,z:16}
+      // 外周巡回（反時計回り）
+      {x:-18,z:-18},{x:18,z:-18},{x:18,z:18},{x:-18,z:18},
+      // 参道〜階段（中央を通る: |x|<2.5で階段上を歩く）
+      {x:0,z:-18},{x:0,z:-12},{x:0,z:-7},{x:0,z:-3},
+      // 上段エリア（境内）
+      {x:0,z:5},{x:-8,z:8},{x:8,z:8},{x:-12,z:4},{x:12,z:4},
+      // 本殿の周囲（裏側まで覗く）
+      {x:-10,z:14},{x:-10,z:20},{x:0,z:22},{x:10,z:20},{x:10,z:14},
+      // 手水舎・御神木方面
+      {x:18,z:12},{x:-18,z:14}
     ],
     interactables: [
       { type:'torii', x:0, z:-20, radius:25, label:'鳥居の柱', sound:'thud' },
@@ -4883,33 +4890,38 @@ function updateOni(g, oni, dt) {
 
       // --- Search behind covers: searcher role searches more often ---
       if (!canSeeAny && !loudestFootTarget) {
-        const searchInterval = oni.role === 'searcher' ? 8 : 15;
+        const searchInterval = oni.role === 'searcher' ? 6 : 12;
         if (oni.searchTimer > searchInterval) {
-          // Find a nearby tall cover to search behind
+          // Find a nearby tall cover to search behind（範囲拡大: 25m）
           const coverCandidates = g.colliders.filter(c => {
             if (c.h < 1.0) return false;
             const cd = Math.sqrt((c.x - oni.position.x)**2 + (c.z - oni.position.z)**2);
-            if (cd > 15 || cd < 2) return false;
+            if (cd > 25 || cd < 2) return false;
             // Skip recently searched covers
             if (oni.searchedCovers.some(sc => sc.x === c.x && sc.z === c.z)) return false;
             return true;
           });
+          // 大きい構造物（本殿など）を優先的に覗きに行く
+          coverCandidates.sort((a, b) => {
+            const sizeA = a.type === 'box' ? a.hw * a.hd : a.r * a.r;
+            const sizeB = b.type === 'box' ? b.hw * b.hd : b.r * b.r;
+            return sizeB - sizeA; // 大きい順
+          });
           if (coverCandidates.length > 0) {
-            // Pick the closest unsearched cover
-            coverCandidates.sort((a, b) => {
-              const da = (a.x - oni.position.x)**2 + (a.z - oni.position.z)**2;
-              const db = (b.x - oni.position.x)**2 + (b.z - oni.position.z)**2;
-              return da - db;
-            });
-            // Add randomness — don't always go to the closest one
-            const pick = coverCandidates[Math.floor(Math.random() * Math.min(3, coverCandidates.length))];
+            // 大きい構造物を50%の確率で選び、それ以外はランダム
+            let pick;
+            if (coverCandidates.length > 1 && Math.random() < 0.5) {
+              pick = coverCandidates[0]; // 最大の構造物
+            } else {
+              pick = coverCandidates[Math.floor(Math.random() * Math.min(4, coverCandidates.length))];
+            }
             oni.searchTarget = pick;
             oni.state = 'search';
             oni.stateTimer = 0;
             oni.searchTimer = 0;
-            // Remember this cover (forget after 3 searches to allow re-visits)
+            // Remember this cover (forget after 5 searches to allow re-visits)
             oni.searchedCovers.push({ x: pick.x, z: pick.z });
-            if (oni.searchedCovers.length > 3) oni.searchedCovers.shift();
+            if (oni.searchedCovers.length > 5) oni.searchedCovers.shift();
           }
         }
       }
@@ -5067,13 +5079,35 @@ function updateOni(g, oni, dt) {
 
       // Phase 1: Move to the far side of the cover (opposite from oni's approach)
       if (oni.stateTimer < 0.1 && !oni._searchDest) {
-        // Calculate the peek position: walk around the cover to the far side
         const approachAngle = Math.atan2(oni.position.x - col.x, oni.position.z - col.z);
-        const coverR = col.type === 'cylinder' ? col.r : Math.max(col.hw, col.hd);
-        // Go to the opposite side + slight offset to peek
-        const peekX = col.x - Math.sin(approachAngle) * (coverR + 1.2);
-        const peekZ = col.z - Math.cos(approachAngle) * (coverR + 1.2);
         const half = g.config.size / 2 - 1;
+        let peekX, peekZ;
+
+        if (col.type === 'box' && col.hw > 3) {
+          // 大きなbox（本殿など）: 4つの角をランダムに選んで覗く
+          const corners = [
+            { x: col.x - col.hw - 1.5, z: col.z - col.hd - 1.5 },
+            { x: col.x + col.hw + 1.5, z: col.z - col.hd - 1.5 },
+            { x: col.x - col.hw - 1.5, z: col.z + col.hd + 1.5 },
+            { x: col.x + col.hw + 1.5, z: col.z + col.hd + 1.5 }
+          ];
+          // 鬼から最も遠い角（裏側）を優先
+          corners.sort((a, b) => {
+            const da = (a.x - oni.position.x)**2 + (a.z - oni.position.z)**2;
+            const db = (b.x - oni.position.x)**2 + (b.z - oni.position.z)**2;
+            return db - da;
+          });
+          // 最も遠い2つの角からランダム選択
+          const pick = corners[Math.floor(Math.random() * 2)];
+          peekX = pick.x;
+          peekZ = pick.z;
+        } else {
+          // 通常のコライダー: 反対側に回り込む
+          const coverR = col.type === 'cylinder' ? col.r : Math.max(col.hw, col.hd);
+          peekX = col.x - Math.sin(approachAngle) * (coverR + 1.5);
+          peekZ = col.z - Math.cos(approachAngle) * (coverR + 1.5);
+        }
+
         oni._searchDest = new THREE.Vector3(
           Math.max(-half, Math.min(half, peekX)), 0,
           Math.max(-half, Math.min(half, peekZ))
@@ -5115,8 +5149,8 @@ function updateOni(g, oni, dt) {
         oni.searchTarget = null;
       }
 
-      // Timeout
-      if (oni.stateTimer > 8) {
+      // Timeout（大きな構造物は到達に時間がかかるため12秒）
+      if (oni.stateTimer > 12) {
         oni.state = 'patrol';
         oni.stateTimer = 0;
         oni._searchDest = null;
@@ -5143,9 +5177,64 @@ function updateOni(g, oni, dt) {
 }
 
 function moveOni(oni, targetX, targetZ, speed, dt, g) {
-  const dx = targetX - oni.position.x;
-  const dz = targetZ - oni.position.z;
-  const dist = Math.sqrt(dx*dx + dz*dz);
+  let dx = targetX - oni.position.x;
+  let dz = targetZ - oni.position.z;
+  let dist = Math.sqrt(dx*dx + dz*dz);
+  if (dist < 0.1) return;
+
+  // コライダー回避: 進行方向に大きなコライダーがある場合、迂回する
+  const margin = 1.5; // 鬼とコライダーの最小距離
+  for (const col of g.colliders) {
+    if (col.h < 0.5) continue; // 低いコライダーは無視
+    const cx = oni.position.x - col.x;
+    const cz = oni.position.z - col.z;
+    if (col.type === 'box') {
+      const overlapX = col.hw + margin - Math.abs(cx);
+      const overlapZ = col.hd + margin - Math.abs(cz);
+      if (overlapX > 0 && overlapZ > 0) {
+        // コライダー内にいる → 最短方向に押し出す
+        if (overlapX < overlapZ) {
+          oni.position.x += (cx > 0 ? overlapX : -overlapX) * 0.5;
+        } else {
+          oni.position.z += (cz > 0 ? overlapZ : -overlapZ) * 0.5;
+        }
+      } else {
+        // 進行方向にコライダーがある場合、迂回方向を計算
+        const futureX = oni.position.x + (dx / dist) * 2;
+        const futureZ = oni.position.z + (dz / dist) * 2;
+        const fOverlapX = col.hw + margin - Math.abs(futureX - col.x);
+        const fOverlapZ = col.hd + margin - Math.abs(futureZ - col.z);
+        if (fOverlapX > 0 && fOverlapZ > 0) {
+          // 迂回: コライダーの角を目指す
+          const sideX = cx > 0 ? col.x + col.hw + margin : col.x - col.hw - margin;
+          const sideZ = cz > 0 ? col.z + col.hd + margin : col.z - col.hd - margin;
+          // 短い方の辺を回り込む
+          if (Math.abs(oni.position.x - sideX) < Math.abs(oni.position.z - sideZ)) {
+            dx = sideX - oni.position.x;
+            dz = oni.position.z > col.z ? col.z + col.hd + margin - oni.position.z : col.z - col.hd - margin - oni.position.z;
+          } else {
+            dx = oni.position.x > col.x ? col.x + col.hw + margin - oni.position.x : col.x - col.hw - margin - oni.position.x;
+            dz = sideZ - oni.position.z;
+          }
+          dist = Math.sqrt(dx*dx + dz*dz);
+          if (dist < 0.1) return;
+        }
+      }
+    } else if (col.type === 'cylinder') {
+      const cDist = Math.sqrt(cx*cx + cz*cz);
+      if (cDist < col.r + margin && cDist > 0.01) {
+        // 押し出す
+        const pushDist = col.r + margin - cDist;
+        oni.position.x += (cx / cDist) * pushDist * 0.5;
+        oni.position.z += (cz / cDist) * pushDist * 0.5;
+      }
+    }
+  }
+
+  // 再計算（コライダー回避後）
+  dx = targetX - oni.position.x;
+  dz = targetZ - oni.position.z;
+  dist = Math.sqrt(dx*dx + dz*dz);
   if (dist < 0.1) return;
 
   const moveSpeed = Math.min(speed * dt, dist);
