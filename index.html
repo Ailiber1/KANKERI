@@ -4967,13 +4967,21 @@ function updateOni(g, oni, dt) {
       }
 
       // If continuously seeing for 1.5s and close enough → go to can touch
+      // ただし缶が未回収の場合は捕獲できない（缶を先に回収する必要がある）
       if ((canSeeChaseTarget || canSeeAny) && oni.seeTimer > 1.5 && chaseTargetDist < viewDist) {
-        oni.state = 'canTouch';
-        oni.foundTarget = oni.chaseTarget || closestVisibleTarget;
-        oni.foundName = (oni.chaseTarget === 'player') ? (gameState.username || 'Player') : (oni.chaseTarget && oni.chaseTarget.name ? oni.chaseTarget.name : closestVisibleName);
-        oni.stateTimer = 0;
-        showNotification('見つけた！ ' + oni.foundName);
-        SoundManager.playGameSE('found');
+        if (!g.can.isAtHome) {
+          // 缶未回収 → 捕獲不可、回収を優先
+          oni.state = 'recovery';
+          oni.stateTimer = 0;
+          showCenterAlert('缶が未回収！', '鬼は捕獲できない！', 2000);
+        } else {
+          oni.state = 'canTouch';
+          oni.foundTarget = oni.chaseTarget || closestVisibleTarget;
+          oni.foundName = (oni.chaseTarget === 'player') ? (gameState.username || 'Player') : (oni.chaseTarget && oni.chaseTarget.name ? oni.chaseTarget.name : closestVisibleName);
+          oni.stateTimer = 0;
+          showNotification('見つけた！ ' + oni.foundName);
+          SoundManager.playGameSE('found');
+        }
       }
       // Lost target - return to patrol after searching
       const cDist = Math.sqrt(
@@ -5059,9 +5067,9 @@ function updateOni(g, oni, dt) {
       break;
     }
     case 'recovery': {
-      // Go to can, pick up, return
+      // 缶回収を最優先 — 缶に向かって走る（通常より速い）
       const canPos = g.can.group.position;
-      moveOni(oni, canPos.x, canPos.z, oni.speed * fatigueMult, dt, g);
+      moveOni(oni, canPos.x, canPos.z, oni.canTouchSpeed * fatigueMult, dt, g);
       const dist = Math.sqrt(
         (oni.position.x - canPos.x)**2 + (oni.position.z - canPos.z)**2
       );
@@ -5069,8 +5077,15 @@ function updateOni(g, oni, dt) {
         // Return can to home
         g.can.group.position.copy(g.can.homePos);
         g.can.isAtHome = true;
+        g._canRecoveryTimer = 0;
+        showCenterAlert('鬼が缶を回収した！', null, 2000);
         oni.state = 'patrol';
         oni.fatigue = Math.max(0, oni.fatigue - 15);
+      }
+      // 缶が既に回収済みならpatrolへ
+      if (g.can.isAtHome) {
+        oni.state = 'patrol';
+        oni.stateTimer = 0;
       }
       break;
     }
@@ -5476,8 +5491,14 @@ function cpuPerformKick(g, ally) {
   else if (power >= 30) { quality = 'GOOD'; hideTime = 6; }
   else { quality = 'MISS'; hideTime = 3; }
 
-  showNotification(ally.name + ' が缶を蹴った！ ' + quality + '!');
   SoundManager.playGameSE('kick');
+
+  // 画面中央に通知
+  if (g.gamePhase === 'seek' && g.capturedCount > 0) {
+    showCenterAlert(ally.name + ' が缶を蹴った！', '捕虜が全員解放された！ ' + quality + '!', 3000);
+  } else {
+    showCenterAlert(ally.name + ' が缶を蹴った！', quality + '!', 2500);
+  }
 
   // Can physics
   const kickAngle = ally.rotation + (Math.random() - 0.5) * 0.5;
@@ -5489,13 +5510,15 @@ function cpuPerformKick(g, ally) {
   );
   g.can.isFlying = true;
   g.can.isAtHome = false;
+  g._canRecoveryTimer = 0;
+  g._oniRecoveryDeadline = 10; // 鬼に10秒の回収期限
 
   // Free all captured (rescue kick during seek phase)
   if (g.gamePhase === 'seek' && g.capturedCount > 0) {
     freeAllCaptured(g);
   }
 
-  // Reset oni to recovery mode
+  // Reset oni to recovery mode — 全鬼が缶回収を最優先
   for (const oni of g.onis) {
     oni.state = 'recovery';
     oni.stateTimer = 0;
@@ -6004,7 +6027,7 @@ function updateKickGauge(g, dt) {
   // Confirm kick on F / Space
   const kickConfirm = g.player.keys['KeyF'] || g.player.keys['Space'];
   if (kickConfirm && !g._kickFPrev) {
-    performCanKick(g, g.kickGaugeValue);
+    performCanKick(g, g.kickGaugeValue, 'プレイヤー');
     g.kickGaugeActive = false;
     const wrap = document.getElementById('kick-gauge-wrap');
     if (wrap) wrap.style.display = 'none';
@@ -6012,7 +6035,7 @@ function updateKickGauge(g, dt) {
   g._kickFPrev = kickConfirm;
 }
 
-function performCanKick(g, power) {
+function performCanKick(g, power, kickerName) {
   // Determine quality
   let quality, hideTime;
   if (power >= 80) { quality = 'PERFECT'; hideTime = 15; }
@@ -6020,7 +6043,9 @@ function performCanKick(g, power) {
   else if (power >= 30) { quality = 'GOOD'; hideTime = 6; }
   else { quality = 'MISS'; hideTime = 3; }
 
-  showNotification(quality + '!');
+  // 画面中央に通知（誰が蹴ったか＋評価）
+  const kicker = kickerName || 'プレイヤー';
+  showCenterAlert(kicker + ' が缶を蹴った！', quality + '!', 2500);
 
   // Can physics
   const kickAngle = g.player.rotation;
@@ -6032,11 +6057,24 @@ function performCanKick(g, power) {
   );
   g.can.isFlying = true;
   g.can.isAtHome = false;
+  g._canRecoveryTimer = 0; // 回収タイマーリセット
+
+  // 鬼にペナルティタイマー開始（回収しないとペナルティ）
+  g._oniRecoveryDeadline = 10; // 10秒以内に回収しないとペナルティ
 
   // If in seek phase (rescue kick), free all captured
   if (g.gamePhase === 'seek' && g.capturedCount > 0) {
     freeAllCaptured(g);
     hideTime = 0; // No hide time for rescue kick during seek
+    showCenterAlert(kicker + ' が缶を蹴った！', '捕虜が全員解放された！', 3000);
+  }
+
+  // Reset oni to recovery mode — 全鬼が缶回収を最優先
+  for (const oni of g.onis) {
+    oni.state = 'recovery';
+    oni.stateTimer = 0;
+    oni.foundTarget = null;
+    oni.chaseTarget = null;
   }
 
   // If initial kick phase, transition to hide phase
@@ -6344,10 +6382,14 @@ function updateGamePhases(g, dt) {
         showHideCountdown(g, false);
         showNotification('鬼が動き出した！');
         SoundManager.playGameSE('notify');
-        // Oni starts seeking — 3s look-around delay before active patrol
-        for (const oni of g.onis) {
-          oni.state = 'patrol';
-          oni.restTimer = 3; // 見回し時間
+        // 缶が未回収なら最初の鬼をrecoveryに、残りはpatrolに
+        for (let i = 0; i < g.onis.length; i++) {
+          if (i === 0 && !g.can.isAtHome) {
+            g.onis[i].state = 'recovery';
+          } else {
+            g.onis[i].state = 'patrol';
+          }
+          g.onis[i].restTimer = 3;
         }
       }
       // Oni walks to can during hide phase
@@ -6358,6 +6400,7 @@ function updateGamePhases(g, dt) {
         if (Math.sqrt(crx*crx + crz*crz) < 1.5 && !g.can.isAtHome) {
           g.can.group.position.copy(g.can.homePos);
           g.can.isAtHome = true;
+          showCenterAlert('鬼が缶を回収した！', null, 2000);
         }
       }
       break;
@@ -6365,6 +6408,35 @@ function updateGamePhases(g, dt) {
     case 'seek':
       g.gameTimer -= dt;
       updateKickGauge(g, dt); // Rescue kick gauge update
+
+      // 缶が未回収の場合: 鬼は捕獲不可 + 回収強制 + 長期未回収で捕虜解放
+      if (!g.can.isAtHome && !g.can.isFlying) {
+        g._canRecoveryTimer = (g._canRecoveryTimer || 0) + dt;
+        // 少なくとも1体の鬼がrecoveryに向かうよう強制
+        const anyRecovery = g.onis.some(o => o.state === 'recovery');
+        if (!anyRecovery && g.onis.length > 0) {
+          let closest = g.onis[0], minD = Infinity;
+          for (const o of g.onis) {
+            const d = (o.position.x - g.can.group.position.x)**2 + (o.position.z - g.can.group.position.z)**2;
+            if (d < minD) { minD = d; closest = o; }
+          }
+          closest.state = 'recovery';
+          closest.stateTimer = 0;
+        }
+        // 15秒以上未回収 → 捕虜全員解放 + 缶を自動回収
+        if (g._canRecoveryTimer > 15) {
+          if (g.capturedCount > 0) {
+            freeAllCaptured(g);
+            showCenterAlert('⚠ 鬼のペナルティ！', '缶の回収が遅い！ 捕虜が全員解放された！', 3500);
+          }
+          g.can.group.position.copy(g.can.homePos);
+          g.can.isAtHome = true;
+          g._canRecoveryTimer = 0;
+        }
+      } else {
+        g._canRecoveryTimer = 0;
+      }
+
       // Update onis
       for (const oni of g.onis) {
         updateOni(g, oni, dt);
