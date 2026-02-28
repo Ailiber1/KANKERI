@@ -957,8 +957,8 @@ html, body {
       <h2 id="result-title" style="font-family:'Cinzel Decorative',serif;text-align:center;margin-bottom:16px;font-size:28px;"></h2>
       <div id="result-stats" style="font-family:'Share Tech Mono',monospace;color:#ccc;line-height:2;"></div>
       <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
-        <button id="btn-retry" class="btn btn-neon" style="width:100%;">RETRY</button>
-        <button id="btn-to-title" class="btn btn-neon" style="width:100%;">TITLE</button>
+        <button id="btn-retry" class="btn btn-neon" data-i18n="BTN_RETRY" style="width:100%;">もう一度</button>
+        <button id="btn-to-title" class="btn btn-neon" data-i18n="BTN_TITLE" style="width:100%;">タイトルへ</button>
       </div>
     </div>
   </div>
@@ -1931,6 +1931,18 @@ const I18N = {
     RULE_TIP3: '心拍が速くなったら鬼が近い。隠れろ！',
     RANKING_TITLE: 'RANKING',
     RANKING_EMPTY: 'まだ記録がありません',
+    RESULT_CLEAR: 'ステージクリア！',
+    RESULT_GAMEOVER: 'ゲームオーバー',
+    RESULT_SURVIVED: '逃げ切り',
+    RESULT_YES: '✓ 成功',
+    RESULT_NO: '✗ 失敗',
+    RESULT_TIME: '生存時間',
+    RESULT_CAPTURED: '捕獲された数',
+    RESULT_ALLY_HEADER: '── 味方CPU ──',
+    RESULT_ALLY_CAPTURED: '捕獲',
+    RESULT_ALLY_SURVIVED: '生存',
+    BTN_RETRY: 'もう一度',
+    BTN_TITLE: 'タイトルへ',
     NOTIFY_REGISTERED: '登録完了！',
     NOTIFY_GUEST: 'ゲストモードで開始',
     ERROR_NAME: '名前を入力してください（1〜16文字）',
@@ -1985,6 +1997,18 @@ const I18N = {
     RULE_TIP3: 'Faster heartbeat = the "it" is close. HIDE!',
     RANKING_TITLE: 'RANKING',
     RANKING_EMPTY: 'No records yet',
+    RESULT_CLEAR: 'STAGE CLEAR!',
+    RESULT_GAMEOVER: 'GAME OVER',
+    RESULT_SURVIVED: 'Survived',
+    RESULT_YES: '✓ YES',
+    RESULT_NO: '✗ NO',
+    RESULT_TIME: 'Survival Time',
+    RESULT_CAPTURED: 'Captured',
+    RESULT_ALLY_HEADER: '── Ally CPU ──',
+    RESULT_ALLY_CAPTURED: 'Captured',
+    RESULT_ALLY_SURVIVED: 'Alive',
+    BTN_RETRY: 'RETRY',
+    BTN_TITLE: 'TITLE',
     NOTIFY_REGISTERED: 'Registered!',
     NOTIFY_GUEST: 'Playing as Guest',
     ERROR_NAME: 'Please enter a name (1-16 characters)',
@@ -5637,7 +5661,7 @@ function endGame(g, playerWon) {
   const stats = document.getElementById('result-stats');
 
   if (title) {
-    title.textContent = playerWon ? 'STAGE CLEAR!' : 'GAME OVER';
+    title.textContent = playerWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
     title.style.color = playerWon ? '#00ff41' : '#ff4444';
     title.style.textShadow = playerWon
       ? '0 0 20px rgba(0,255,65,0.5)'
@@ -5650,15 +5674,17 @@ function endGame(g, playerWon) {
     const ss = Math.floor(survived % 60);
     const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
     let html = `
-      逃げ切り: ${playerWon ? '✓ YES' : '✗ NO'}<br>
-      生存時間: ${mm}:${String(ss).padStart(2,'0')}<br>
-      捕獲された数: ${g.capturedCount}/${totalPlayers}
+      ${t('RESULT_SURVIVED')}: ${playerWon ? t('RESULT_YES') : t('RESULT_NO')}<br>
+      ${t('RESULT_TIME')}: ${mm}:${String(ss).padStart(2,'0')}<br>
+      ${t('RESULT_CAPTURED')}: ${g.capturedCount}/${totalPlayers}
     `;
     // Show individual ally status
     if (g.cpuAllies && g.cpuAllies.length > 0) {
-      html += '<br><span style="color:var(--neon-cyan);font-size:12px">── 味方CPU ──</span><br>';
+      html += `<br><span style="color:var(--neon-cyan);font-size:12px">${t('RESULT_ALLY_HEADER')}</span><br>`;
       for (const ally of g.cpuAllies) {
-        const status = ally.captured ? '<span style="color:#ff4444">捕獲</span>' : '<span style="color:#44ffaa">生存</span>';
+        const status = ally.captured
+          ? `<span style="color:#ff4444">${t('RESULT_ALLY_CAPTURED')}</span>`
+          : `<span style="color:#44ffaa">${t('RESULT_ALLY_SURVIVED')}</span>`;
         html += `${escapeHTML(ally.name)}: ${status}<br>`;
       }
     }
