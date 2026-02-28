@@ -6317,10 +6317,12 @@ function updateOni(g, oni, dt) {
   else if (oni.fatigue > 60) fatigueMult = 0.8;
   else if (oni.fatigue > 30) fatigueMult = 0.9;
 
-  // Vision distance (night = shorter)
+  // 夜間強化: 鬼は夜になると強くなる（全ステージ共通）
   const timeOfDay = g.dayNight ? g.dayNight.phase : 'day';
-  let viewDist = oni.viewDist;
-  if (timeOfDay === 'night') viewDist = 15;
+  const isNight = (timeOfDay === 'night' || timeOfDay === 'evening');
+  let viewDist = isNight ? 25 : oni.viewDist;  // 夜: 視野距離UP（暗闘に慣れた目）
+  const nightSpeedMult = isNight ? 1.25 : 1.0;  // 夜: 速度UP
+  const nightAngleMult = isNight ? 1.25 : 1.0;  // 夜: 視野角UP（120°→150°）
 
   // --- Multi-target vision check (player + CPU allies) ---
   const oniEyePos = new THREE.Vector3(oni.position.x, oni.position.y + 1.5, oni.position.z);
@@ -6336,7 +6338,8 @@ function updateOni(g, oni, dt) {
     while (tAngleDiff < -Math.PI) tAngleDiff += Math.PI * 2;
     tAngleDiff = Math.abs(tAngleDiff);
 
-    if (tDist >= viewDist || tAngleDiff >= oni.viewAngle / 2) return false;
+    const effectiveAngle = oni.viewAngle * nightAngleMult;
+    if (tDist >= viewDist || tAngleDiff >= effectiveAngle / 2) return false;
     const effectiveDist = targetIsCrouching ? viewDist * 0.5 : viewDist;
     if (tDist >= effectiveDist) return false;
 
@@ -6453,13 +6456,13 @@ function updateOni(g, oni, dt) {
           // Patrol in a circle around the can (radius ~6-8m)
           const guardX = canPos.x + Math.sin(backAngle + Math.PI * 0.3) * 7;
           const guardZ = canPos.z + Math.cos(backAngle + Math.PI * 0.3) * 7;
-          moveOni(oni, guardX, guardZ, oni.speed * fatigueMult, dt, g);
+          moveOni(oni, guardX, guardZ, oni.speed * nightSpeedMult * fatigueMult, dt, g);
         } else {
-          const speed = oni.speed * fatigueMult;
+          const speed = oni.speed * nightSpeedMult * fatigueMult;
           moveOni(oni, wp.x, wp.z, speed, dt, g);
         }
       } else {
-        const speed = oni.speed * fatigueMult;
+        const speed = oni.speed * nightSpeedMult * fatigueMult;
         moveOni(oni, wp.x, wp.z, speed, dt, g);
       }
 
@@ -6547,7 +6550,7 @@ function updateOni(g, oni, dt) {
       } else {
         oni.seeTimer = 0;
       }
-      const speed = oni.chaseSpeed * fatigueMult;
+      const speed = oni.chaseSpeed * nightSpeedMult * fatigueMult;
       moveOni(oni, oni.chasedPlayer.x, oni.chasedPlayer.z, speed, dt, g);
 
       // Determine distance to chase target
@@ -6595,7 +6598,7 @@ function updateOni(g, oni, dt) {
     case 'canTouch': {
       // Run to can
       const canPos = g.can.group.position;
-      const speed = oni.canTouchSpeed * fatigueMult;
+      const speed = oni.canTouchSpeed * nightSpeedMult * fatigueMult;
       moveOni(oni, canPos.x, canPos.z, speed, dt, g);
       const cDist = Math.sqrt(
         (oni.position.x - canPos.x)**2 + (oni.position.z - canPos.z)**2
@@ -6621,7 +6624,7 @@ function updateOni(g, oni, dt) {
     case 'footSound': {
       if (oni._skipWaypoint) { oni._skipWaypoint = false; oni.state = 'patrol'; oni.stateTimer = 0; break; }
       if (oni.targetPos) {
-        moveOni(oni, oni.targetPos.x, oni.targetPos.z, oni.speed * fatigueMult, dt, g);
+        moveOni(oni, oni.targetPos.x, oni.targetPos.z, oni.speed * nightSpeedMult * fatigueMult, dt, g);
         const dist = Math.sqrt(
           (oni.position.x - oni.targetPos.x)**2 + (oni.position.z - oni.targetPos.z)**2
         );
@@ -6643,7 +6646,7 @@ function updateOni(g, oni, dt) {
     case 'distraction': {
       if (oni._skipWaypoint) { oni._skipWaypoint = false; oni.state = 'patrol'; oni.stateTimer = 0; break; }
       if (oni.distractionPos) {
-        moveOni(oni, oni.distractionPos.x, oni.distractionPos.z, oni.speed * fatigueMult, dt, g);
+        moveOni(oni, oni.distractionPos.x, oni.distractionPos.z, oni.speed * nightSpeedMult * fatigueMult, dt, g);
         const dist = Math.sqrt(
           (oni.position.x - oni.distractionPos.x)**2 + (oni.position.z - oni.distractionPos.z)**2
         );
@@ -6665,7 +6668,7 @@ function updateOni(g, oni, dt) {
     case 'recovery': {
       // 缶回収を最優先 — 缶に向かって走る（通常より速い）
       const canPos = g.can.group.position;
-      moveOni(oni, canPos.x, canPos.z, oni.canTouchSpeed * fatigueMult, dt, g);
+      moveOni(oni, canPos.x, canPos.z, oni.canTouchSpeed * nightSpeedMult * fatigueMult, dt, g);
       const dist = Math.sqrt(
         (oni.position.x - canPos.x)**2 + (oni.position.z - canPos.z)**2
       );
@@ -6738,7 +6741,7 @@ function updateOni(g, oni, dt) {
           oni.searchTarget = null;
           break;
         }
-        moveOni(oni, oni._searchDest.x, oni._searchDest.z, oni.speed * 1.1 * fatigueMult, dt, g);
+        moveOni(oni, oni._searchDest.x, oni._searchDest.z, oni.speed * 1.1 * nightSpeedMult * fatigueMult, dt, g);
         // 2D距離で到着判定（高低差があっても正しく判定）
         const sDx = oni.position.x - oni._searchDest.x, sDz = oni.position.z - oni._searchDest.z;
         const sDist = Math.sqrt(sDx*sDx + sDz*sDz);
@@ -8177,9 +8180,11 @@ function updateGamePhases(g, dt) {
         }
       }
       // Oni walks to can during hide phase
+      const hideTimeOfDay = g.dayNight ? g.dayNight.phase : 'day';
+      const hideNightMult = (hideTimeOfDay === 'night' || hideTimeOfDay === 'evening') ? 1.25 : 1.0;
       for (const oni of g.onis) {
         const canPos = g.can.isAtHome ? g.can.homePos : g.can.group.position;
-        moveOni(oni, canPos.x, canPos.z, oni.speed * 0.8, dt, g);
+        moveOni(oni, canPos.x, canPos.z, oni.speed * 0.8 * hideNightMult, dt, g);
         const crx = oni.position.x - canPos.x, crz = oni.position.z - canPos.z;
         if (Math.sqrt(crx*crx + crz*crz) < 1.5 && !g.can.isAtHome) {
           g.can.group.position.copy(g.can.homePos);
