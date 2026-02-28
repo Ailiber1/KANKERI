@@ -7523,21 +7523,13 @@ function updateMinimap(g) {
     }
   }
 
-  // Oni direction arrows (don't show exact position, just direction)
+  // Oni positions on minimap (always show)
   for (const oni of g.onis) {
-    const dx = oni.position.x - g.player.position.x;
-    const dz = oni.position.z - g.player.position.z;
-    const dist = Math.sqrt(dx*dx + dz*dz);
-    if (dist < 30) {
-      const angle = Math.atan2(dx, dz);
-      const arrowDist = Math.min(dist / mapSize * w, w * 0.4);
-      const ax = pp.x + Math.sin(angle) * arrowDist;
-      const ay = pp.y + Math.cos(angle) * arrowDist;
-      ctx.fillStyle = '#ff4444';
-      ctx.beginPath();
-      ctx.arc(ax, ay, 3, 0, Math.PI*2);
-      ctx.fill();
-    }
+    const op = toMap(oni.position.x, oni.position.z);
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(op.x, op.y, 3, 0, Math.PI*2);
+    ctx.fill();
   }
 
   // Border
@@ -7686,16 +7678,7 @@ function startGame(stageNum, mode) {
   // Create player controller
   G.player = createPlayerController(G);
 
-  // Create initial oni — spawn at map edge so player has time to hide
-  for (let i = 0; i < config.initialOni; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = config.size / 2 - 3; // マップ端付近
-    const oni = createOni(G, Math.cos(angle) * dist, Math.sin(angle) * dist);
-    oni.state = 'patrol'; // Will walk to can during hide phase
-    G.onis.push(oni);
-  }
-
-  // スポーン安全チェック: コライダー内部でない位置を探す
+  // スポーン安全チェック: コライダー内部でない位置を探す（鬼にも使うため先に定義）
   function findSafeSpawn(g, baseX, baseZ) {
     let sx = baseX, sz = baseZ;
     for (let attempt = 0; attempt < 20; attempt++) {
@@ -7720,6 +7703,18 @@ function startGame(stageNum, mode) {
       sz = Math.max(-half, Math.min(half, sz));
     }
     return { x: 0, z: 0 }; // フォールバック: 中心
+  }
+
+  // Create initial oni — spawn at map edge (findSafeSpawnでビル内回避)
+  for (let i = 0; i < config.initialOni; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = config.size / 2 - 3; // マップ端付近
+    const baseX = Math.cos(angle) * dist;
+    const baseZ = Math.sin(angle) * dist;
+    const safe = findSafeSpawn(G, baseX, baseZ);
+    const oni = createOni(G, safe.x, safe.z);
+    oni.state = 'patrol'; // Will walk to can during hide phase
+    G.onis.push(oni);
   }
 
   // Create CPU allies
