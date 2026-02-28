@@ -3430,9 +3430,12 @@ function buildShrineObjects(g) {
   bell.castShadow = true;
   hondenGroup.add(bell);
   const hondenZ = 16;
-  hondenGroup.position.set(0, gH(0, hondenZ), hondenZ);
+  // 基壇高さはgetGroundHeightに含まれるため、本殿配置には基壇なしの地面高(≈2.0)を使用
+  // gH()を使うと基壇オフセット分が二重加算されて浮く
+  hondenGroup.position.set(0, 2.0, hondenZ);
   g.scene.add(hondenGroup);
-  g.colliders.push({ type: 'box', x: 0, z: hondenZ, hw: 6.5, hd: 5.5, h: 8 });
+  // コライダーをplat1の範囲に合わせる（基壇の端まで）
+  g.colliders.push({ type: 'box', x: 0, z: hondenZ, hw: 7.2, hd: 5.2, h: 8 });
 
   // ═══ 手水舎 ═══
   const chozuyaGroup = new THREE.Group();
@@ -3632,13 +3635,24 @@ function createCan(g) {
   canMesh.castShadow = true;
   canGroup.add(canMesh);
 
-  // === 地面の発光サークル（大きく目立つ） ===
-  // 外側の大きなグロー円
-  const glowGeo = new THREE.CircleGeometry(1.5, 32);
+  // === 光柱ビーム（遠くからでも目立つ垂直の光） ===
+  const beamGeo = new THREE.CylinderGeometry(0.15, 0.4, 6, 16, 1, true);
+  g.geometries.push(beamGeo);
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0x00ff88, transparent: true, opacity: 0.2,
+    side: THREE.DoubleSide, depthWrite: false
+  });
+  g.materials.push(beamMat);
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  beam.position.y = 3.0;
+  canGroup.add(beam);
+
+  // === 地面の発光サークル（大きく明るい） ===
+  const glowGeo = new THREE.CircleGeometry(2.0, 32);
   g.geometries.push(glowGeo);
   const glowMat = new THREE.MeshBasicMaterial({
-    color: 0x00ff66, transparent: true, opacity: 0.25,
-    side: THREE.DoubleSide
+    color: 0x00ff66, transparent: true, opacity: 0.35,
+    side: THREE.DoubleSide, depthWrite: false
   });
   g.materials.push(glowMat);
   const glowCircle = new THREE.Mesh(glowGeo, glowMat);
@@ -3647,29 +3661,29 @@ function createCan(g) {
   canGroup.add(glowCircle);
 
   // 内側の明るいリング
-  const innerRingGeo = new THREE.RingGeometry(0.5, 0.8, 32);
+  const innerRingGeo = new THREE.RingGeometry(0.3, 1.0, 32);
   g.geometries.push(innerRingGeo);
   const innerRingMat = new THREE.MeshBasicMaterial({
-    color: 0x00ff88, transparent: true, opacity: 0.5,
-    side: THREE.DoubleSide
+    color: 0x00ffaa, transparent: true, opacity: 0.6,
+    side: THREE.DoubleSide, depthWrite: false
   });
   g.materials.push(innerRingMat);
   const innerRing = new THREE.Mesh(innerRingGeo, innerRingMat);
   innerRing.rotation.x = -Math.PI / 2;
-  innerRing.position.y = -0.07;
+  innerRing.position.y = -0.06;
   canGroup.add(innerRing);
 
-  // ネオンリング（缶の周り）
-  const ringGeo = new THREE.TorusGeometry(0.35, 0.03, 8, 32);
+  // ネオンリング（缶の周り、太め）
+  const ringGeo = new THREE.TorusGeometry(0.4, 0.04, 8, 32);
   g.geometries.push(ringGeo);
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.7 });
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.8 });
   g.materials.push(ringMat);
   const ring = new THREE.Mesh(ringGeo, ringMat);
   ring.rotation.x = Math.PI / 2;
   canGroup.add(ring);
 
-  // ポイントライト（明るく、広範囲）
-  const canLight = new THREE.PointLight(0x00ff66, 1.0, 8);
+  // ポイントライト（明るく広範囲）
+  const canLight = new THREE.PointLight(0x00ff66, 1.5, 12);
   canLight.position.y = 0.5;
   canGroup.add(canLight);
 
@@ -3678,7 +3692,7 @@ function createCan(g) {
 
   g.can = {
     group: canGroup, mesh: canMesh, ring, light: canLight,
-    glowCircle, innerRing, glowMat, innerRingMat,
+    beam, beamMat, glowCircle, innerRing, glowMat, innerRingMat,
     homePos: new THREE.Vector3(0, 0.1, 2),
     velocity: new THREE.Vector3(),
     isFlying: false, isAtHome: true
@@ -4465,6 +4479,16 @@ function getGroundHeight(g, x, z) {
         // 石段の外側はsmoothstep（地面の傾斜）
         const t = (z + 10) / 5;
         h += 2.0 * t * t * (3 - 2 * t);
+      }
+    }
+    // 本殿の基壇エリア: プレイヤーが基壇の上に乗れるようにする
+    // plat1: BoxGeometry(14, 0.5, 10) → |x|<7, z:11~21, 上面+0.5
+    // plat2: BoxGeometry(12, 0.5, 8) → |x|<6, z:12~20, 上面+1.0
+    const hz = 16; // hondenZ
+    if (Math.abs(x) < 7 && z > hz - 5 && z < hz + 5) {
+      h += 0.5;
+      if (Math.abs(x) < 6 && z > hz - 4 && z < hz + 4) {
+        h += 0.5;
       }
     }
     return h;
@@ -6493,26 +6517,33 @@ function updateMinimap(g) {
 // --- CAN NEON RING ANIMATION ---
 function updateCanEffects(g, dt) {
   if (!g.can) return;
-  g.can.ring.rotation.z += dt * 1.5;
-  const t = performance.now() * 0.002;
+  g.can.ring.rotation.z += dt * 2.0;
+  const t = performance.now() * 0.003;
   const pulse = 0.5 + Math.sin(t) * 0.5; // 0→1の脈動
+  const atHome = g.can.isAtHome;
   // ポイントライト脈動
-  g.can.light.intensity = 0.8 + pulse * 0.5;
+  g.can.light.intensity = 1.0 + pulse * 0.8;
   // 発光サークル脈動
   if (g.can.glowMat) {
-    g.can.glowMat.opacity = 0.15 + pulse * 0.15;
-    g.can.innerRingMat.opacity = 0.3 + pulse * 0.3;
+    g.can.glowMat.opacity = 0.25 + pulse * 0.2;
+    g.can.innerRingMat.opacity = 0.4 + pulse * 0.3;
   }
   // 発光サークルのスケール脈動
   if (g.can.glowCircle) {
-    const s = 1.0 + pulse * 0.15;
+    const s = 1.0 + pulse * 0.2;
     g.can.glowCircle.scale.set(s, s, 1);
   }
-  // 飛行中は発光を非表示
-  if (g.can.glowCircle) {
-    g.can.glowCircle.visible = g.can.isAtHome;
-    g.can.innerRing.visible = g.can.isAtHome;
+  // 光柱のアニメーション（回転＋脈動）
+  if (g.can.beam) {
+    g.can.beam.rotation.y += dt * 0.5;
+    g.can.beamMat.opacity = 0.12 + pulse * 0.12;
   }
+  // 飛行中はエフェクトを非表示
+  if (g.can.glowCircle) {
+    g.can.glowCircle.visible = atHome;
+    g.can.innerRing.visible = atHome;
+  }
+  if (g.can.beam) g.can.beam.visible = atHome;
 }
 
 // --- SWING ANIMATION ---
