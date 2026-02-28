@@ -3815,9 +3815,9 @@ function buildAlleyObjects(g) {
   // === ビル群（建物ブロック）===
   // 最低4mの通路幅を確保した配置
   const buildingDefs = [
-    // NW区画（メイン通りから4m以上離す）
-    { x:-19, z:16, hw:7, hd:6, h:10, texType:'concrete' },  // edge x=-12
-    { x:-7, z:24, hw:3, hd:3, h:8, texType:'brick' },       // edge x=-10, gap=2m + z差で回避可能
+    // NW区画（メイン通りから4m以上離す、ビル間最低4m）
+    { x:-20, z:16, hw:7, hd:6, h:10, texType:'concrete' },  // edge x=-13
+    { x:-6, z:25, hw:3, hd:2, h:8, texType:'brick' },       // edge x=-9, gap=4m
     { x:-21, z:27, hw:7, hd:2, h:7, texType:'concrete' },
     // NE区画
     { x:15, z:14, hw:5, hd:5, h:11, texType:'brick' },      // edge x=20
@@ -4180,22 +4180,6 @@ function buildAlleyObjects(g) {
   catGroup.add(eyeR);
   catGroup.position.set(-20, gH(-20, 20) + 0.8, 20);
   g.scene.add(catGroup);
-
-  // === 2階テラスの手すり ===
-  const terraceRailGeo = new THREE.BoxGeometry(6, 1, 0.1);
-  const terraceRailMat = new THREE.MeshStandardMaterial({ color: 0x555560, roughness: 0.5, metalness: 0.5 });
-  g.geometries.push(terraceRailGeo);
-  g.materials.push(terraceRailMat);
-  // テラス南側手すり
-  const rail1 = new THREE.Mesh(terraceRailGeo, terraceRailMat);
-  rail1.position.set(25, 4.5, 5);
-  g.scene.add(rail1);
-  // テラス西側手すり
-  const rail2Geo = new THREE.BoxGeometry(0.1, 1, 7);
-  const rail2 = new THREE.Mesh(rail2Geo, terraceRailMat);
-  rail2.position.set(22, 4.5, 8.5);
-  g.scene.add(rail2);
-  g.geometries.push(rail2Geo);
 
   // === 湯気エフェクト（排気口から）===
   // パーティクルの代わりに半透明シリンダー
@@ -5162,13 +5146,6 @@ function getGroundHeight(g, x, z) {
     h += noise2.noise2D(x * 0.4, z * 0.4) * 0.008;
     // 排水勾配
     if (Math.abs(x) < 3) h += (1 - Math.abs(x) / 3) * 0.03;
-    // 2階テラス
-    if (x > 22 && x < 28 && z > 5 && z < 12) {
-      h += 4.0;
-    } else if (x > 20 && x < 22 && z > 7 && z < 10) {
-      const t = (x - 20) / 2;
-      h += 4.0 * t * t * (3 - 2 * t);
-    }
     return h;
   }
 
