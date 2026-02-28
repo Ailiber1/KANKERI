@@ -515,6 +515,41 @@ html, body {
 @keyframes slideDown { to { transform: translateX(-50%) translateY(0); } }
 @keyframes slideUp { from { transform: translateX(-50%) translateY(0); } to { transform: translateX(-50%) translateY(-100px); } }
 
+/* Center alert (鬼追加通知など) */
+.center-alert {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.5);
+  background: rgba(0,0,0,0.85);
+  border: 2px solid #ff3366;
+  padding: 20px 50px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 28px;
+  font-weight: bold;
+  color: #ff3366;
+  z-index: 400;
+  text-align: center;
+  border-radius: 8px;
+  box-shadow: 0 0 40px rgba(255,51,102,0.6), inset 0 0 20px rgba(255,51,102,0.1);
+  opacity: 0;
+  animation: centerAlertIn 0.4s ease forwards;
+  text-shadow: 0 0 15px rgba(255,51,102,0.8);
+  pointer-events: none;
+}
+.center-alert .sub-text {
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+  margin-top: 8px;
+  text-shadow: none;
+}
+@keyframes centerAlertIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes centerAlertOut {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+}
+
 /* Loading screen */
 #loading-screen {
   z-index: 300;
@@ -1831,6 +1866,28 @@ function showNotification(msg) {
     el.style.animation = 'slideUp 0.3s ease forwards';
     setTimeout(() => el.remove(), 300);
   }, 2500);
+}
+
+function showCenterAlert(mainText, subText, duration) {
+  duration = duration || 2500;
+  const existing = document.querySelector('.center-alert');
+  if (existing) existing.remove();
+
+  const el = document.createElement('div');
+  el.className = 'center-alert';
+  el.textContent = mainText;
+  if (subText) {
+    const sub = document.createElement('div');
+    sub.className = 'sub-text';
+    sub.textContent = subText;
+    el.appendChild(sub);
+  }
+  document.body.appendChild(el);
+
+  setTimeout(() => {
+    el.style.animation = 'centerAlertOut 0.5s ease forwards';
+    setTimeout(() => el.remove(), 500);
+  }, duration);
 }
 
 // ============================================================
@@ -6286,7 +6343,7 @@ function checkOniSpawn(g) {
       } while (Math.sqrt((spawnX - canPos.x) ** 2 + (spawnZ - canPos.z) ** 2) < 15 && attempts < 10);
       const oni = createOni(g, spawnX, spawnZ);
       g.onis.push(oni);
-      showNotification('新たな鬼が現れた！');
+      showCenterAlert('⚠ 新たな鬼が現れた！', '鬼が' + g.onis.length + '体になった', 3000);
     }
   }
 }
@@ -6611,6 +6668,10 @@ function startGame(stageNum, mode) {
   showScreen('game-screen');
   stopBGM();
   playBGM('stage' + stageNum);
+
+  // Update stage name display
+  const stageNameEl = document.getElementById('hud-stage-name');
+  if (stageNameEl) stageNameEl.textContent = 'Stage ' + stageNum + ' — ' + config.name;
 
   // Create scene
   G = createGameScene(config);
