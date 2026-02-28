@@ -4008,8 +4008,15 @@ function buildAlleyObjects(g) {
     sLight.shadow.mapSize.set(512, 512);
     g.scene.add(sLight);
     g.scene.add(sLight.target);
+    // 灯具メッシュ
+    const fixGeo = new THREE.SphereGeometry(0.2, 6, 6);
+    const fixMat = new THREE.MeshStandardMaterial({ color: 0xffddaa, emissive: 0xffddaa, emissiveIntensity: 1.0 });
+    const fix = new THREE.Mesh(fixGeo, fixMat);
+    fix.position.set(sl.x, gH(sl.x, sl.z) + 6.8, sl.z);
+    g.scene.add(fix);
+    g.geometries.push(fixGeo);
     g.streetLights = g.streetLights || [];
-    g.streetLights.push(sLight);
+    g.streetLights.push({ spot: sLight, fixture: fix, fixMat });
   }
 
   // === ドラム缶 ===
@@ -5327,7 +5334,8 @@ function updateOni(g, oni, dt) {
       const dx = wp.x - oni.position.x;
       const dz = wp.z - oni.position.z;
       const dist = Math.sqrt(dx*dx + dz*dz);
-      if (dist < 1.5) {
+      if (dist < 1.5 || oni._skipWaypoint) {
+        oni._skipWaypoint = false;
         oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
       }
 
@@ -5506,6 +5514,7 @@ function updateOni(g, oni, dt) {
       break;
     }
     case 'footSound': {
+      if (oni._skipWaypoint) { oni._skipWaypoint = false; oni.state = 'patrol'; oni.stateTimer = 0; break; }
       if (oni.targetPos) {
         moveOni(oni, oni.targetPos.x, oni.targetPos.z, oni.speed * fatigueMult, dt, g);
         const dist = Math.sqrt(
@@ -5527,6 +5536,7 @@ function updateOni(g, oni, dt) {
       break;
     }
     case 'distraction': {
+      if (oni._skipWaypoint) { oni._skipWaypoint = false; oni.state = 'patrol'; oni.stateTimer = 0; break; }
       if (oni.distractionPos) {
         moveOni(oni, oni.distractionPos.x, oni.distractionPos.z, oni.speed * fatigueMult, dt, g);
         const dist = Math.sqrt(
@@ -5614,6 +5624,15 @@ function updateOni(g, oni, dt) {
 
       oni.stateTimer += dt; // 常にタイマー加算（到着できなくてもタイムアウトする）
       if (oni._searchDest) {
+        // スタック検出: 壁越しの目標を放棄
+        if (oni._skipWaypoint) {
+          oni._skipWaypoint = false;
+          oni.state = 'patrol';
+          oni.stateTimer = 0;
+          oni._searchDest = null;
+          oni.searchTarget = null;
+          break;
+        }
         moveOni(oni, oni._searchDest.x, oni._searchDest.z, oni.speed * 1.1 * fatigueMult, dt, g);
         // 2D距離で到着判定（高低差があっても正しく判定）
         const sDx = oni.position.x - oni._searchDest.x, sDz = oni.position.z - oni._searchDest.z;
@@ -5680,6 +5699,9 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   const dist = Math.sqrt(dx*dx + dz*dz);
   if (dist < 0.1) return;
 
+  const prevX = oni.position.x;
+  const prevZ = oni.position.z;
+
   const moveSpeed = Math.min(speed * dt, dist);
   oni.position.x += (dx / dist) * moveSpeed;
   oni.position.z += (dz / dist) * moveSpeed;
@@ -5712,6 +5734,19 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
         oni.position.z += (cz / cDist) * push;
       }
     }
+  }
+
+  // スタック検出: 移動前後でほぼ動いていなければスタックカウント加算
+  const movedDist = Math.sqrt((oni.position.x - prevX)**2 + (oni.position.z - prevZ)**2);
+  if (movedDist < speed * dt * 0.1 && speed * dt > 0.05) {
+    oni._stuckCount = (oni._stuckCount || 0) + 1;
+    // 1.5秒以上スタック → ウェイポイントをスキップ
+    if (oni._stuckCount > 90) {
+      oni._stuckCount = 0;
+      oni._skipWaypoint = true;
+    }
+  } else {
+    oni._stuckCount = 0;
   }
 
   // Ground height
