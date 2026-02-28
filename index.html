@@ -2417,7 +2417,7 @@ const STAGE_CONFIGS = {
     name: '廃校の校庭', nameEn: "Abandoned School",
     size: 70, timeLimit: 180,
     initialOni: 2, maxOni: 4, oniAddAt: [null, null, 90, 50],
-    startPhase: 3, cycleDuration: 180,
+    startPhase: 3, cycleDuration: 999999, // 深夜固定（昼夜サイクルなし）
     canPositions: [
       { x: 0, z: 0, label: '① 校庭の中央', labelEn: '① School Grounds Center' },
       { x: -5, z: 22, label: '② 校舎の正面玄関前', labelEn: '② Front of School' },
@@ -2435,7 +2435,11 @@ const STAGE_CONFIGS = {
       // プール周辺（フェンスの外側）
       {x:15,z:-16},{x:25,z:-11},{x:28,z:-22},{x:18,z:-25},
       // 校庭中央
-      {x:0,z:5},{x:8,z:-5},{x:-8,z:-8}
+      {x:0,z:5},{x:8,z:-5},{x:-8,z:-8},
+      // 校舎内巡回（1F廊下）
+      {x:-15,z:25.5},{x:-5,z:25.5},{x:5,z:25.5},{x:12,z:25.5},
+      // 教室内偵察
+      {x:-13,z:29},{x:0,z:29},{x:10,z:29}
     ],
     interactables: [
       { type:'door', x:-5, z:23, radius:20, label:'教室のドア', sound:'thud' },
@@ -2452,6 +2456,10 @@ const STAGE_CONFIGS = {
       { type:'barrel', x:-26, z:5, radius:12, label:'マット', sound:'thud' },
       { type:'sign', x:0, z:-15, radius:25, label:'朝礼台', sound:'metal' },
       { type:'sign', x:-8, z:-12, radius:20, label:'花壇の柵', sound:'metal' },
+      // 教室内キック可能な机
+      { type:'desk', x:-13, z:29, radius:30, label:'机', sound:'thud' },
+      { type:'desk', x:0, z:30, radius:30, label:'机', sound:'thud' },
+      { type:'desk', x:10, z:29, radius:30, label:'机', sound:'thud' },
       { type:'sign', x:8, z:-12, radius:20, label:'花壇の柵', sound:'metal' }
     ]
   }
@@ -2746,6 +2754,8 @@ function createGameScene(stageConfig) {
   // Camera raycasting meshes & kickable signs (pre-init for all stages)
   g.cameraMeshes = [];
   g.kickableSigns = [];
+  g.playerFloor = 0;
+  g.flickeringLights = [];
 
   return g;
 }
@@ -4451,57 +4461,315 @@ function buildSchoolObjects(g) {
     return mesh;
   };
 
-  // === 校舎（メインビル）: x:0, z:28, hw:20, hd:4, h:8 ===
+  // === 校舎（Interior Structure）===
+  // Building: x:-20 to 20, z:24 to 32, height 8m (2 floors @ 4m each)
+  // 1F: 廊下(z:24.5~27) + 教室A/B/C(z:27~31.5) + 階段室(x:14~19.5)
+  // 2F: 同レイアウト at y=4
+  const FLOOR_H = 4.0;
+  const WT = 0.15; // wall half-thickness
   const schoolMat = makePBRMat(plasterPBR, { roughness: 0.92, emissive: 0x030305, emissiveIntensity: 0.1 });
+  const schoolDirtyMat = makePBRMat(plasterPBR, { roughness: 0.95, emissive: 0x020204, emissiveIntensity: 0.05 });
 
-  // 校舎を3パーツに分割（中央に入口の隙間を作る）
-  // 左翼: x:-20~-3, z:24~32 → center x:-11.5, hw:8.5, hd:4
-  addBox(-11.5, 28, 8.5, 4, 8, schoolMat);
-  // 右翼: x:3~20, z:24~32 → center x:11.5, hw:8.5, hd:4
-  addBox(11.5, 28, 8.5, 4, 8, schoolMat);
-  // 上部（入口の上、2F部分）: x:-3~3, z:24~32, y:4~8 → h:4
-  const upperGeo = new THREE.BoxGeometry(6, 4, 8);
-  upperGeo.setAttribute('uv2', upperGeo.attributes.uv);
-  const upperMesh = new THREE.Mesh(upperGeo, schoolMat);
-  upperMesh.position.set(0, gH(0, 28) + 6, 28);
-  upperMesh.castShadow = true;
-  upperMesh.receiveShadow = true;
-  g.scene.add(upperMesh);
-  g.geometries.push(upperGeo);
-  g.cameraMeshes.push(upperMesh);
-  // 入口のコライダーは高さ4m（1F天井まで）で中央に隙間を確保
-  // 入口上部のコライダーは不要（高さ4m以上にプレイヤーは行かない）
+  // --- 外壁 ---
+  // 南壁（正面玄関 x:-2~2 に開口部）
+  addBox(-11, 24, 9, WT, 8, schoolMat);    // 左: x:-20 ~ -2
+  addBox(11, 24, 9, WT, 8, schoolMat);     // 右: x:2 ~ 20
+  // まぐさ（入口上部 y:3~8）
+  const lintelGeo = new THREE.BoxGeometry(4, 5, WT * 2);
+  lintelGeo.setAttribute('uv2', lintelGeo.attributes.uv);
+  const lintelMesh = new THREE.Mesh(lintelGeo, schoolMat);
+  lintelMesh.position.set(0, gH(0, 24) + 5.5, 24);
+  lintelMesh.castShadow = true; lintelMesh.receiveShadow = true;
+  g.scene.add(lintelMesh); g.geometries.push(lintelGeo); g.cameraMeshes.push(lintelMesh);
+  // 北壁
+  addBox(0, 32, 20, WT, 8, schoolMat);
+  // 西壁
+  addBox(-20, 28, WT, 4, 8, schoolMat);
+  // 東壁
+  addBox(20, 28, WT, 4, 8, schoolMat);
 
-  // 校舎の窓（各面に配置）
-  const windowMat = new THREE.MeshStandardMaterial({
-    color: 0x111118, roughness: 0.5, metalness: 0.0
+  // --- 廊下・教室仕切り壁 z=27（ドア開口部付き）---
+  // ドア: ClassA x:-8±0.75, ClassB x:0±0.75, ClassC x:10±0.75, 階段室 x:14+
+  addBox(-14.1, 27, 5.4, WT, 8, schoolDirtyMat);   // x:-19.5 ~ -8.7
+  addBox(-4, 27, 3.25, WT, 8, schoolDirtyMat);      // x:-7.25 ~ -0.75
+  addBox(5, 27, 4.25, WT, 8, schoolDirtyMat);       // x:0.75 ~ 9.25
+  addBox(12.4, 27, 1.6, WT, 8, schoolDirtyMat);     // x:10.8 ~ 14
+
+  // --- 教室仕切り壁（南北方向）---
+  addBox(-6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);  // A / B 間
+  addBox(6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);   // B / C 間
+  addBox(13.5, 29.5, WT, 2.5, 8, schoolDirtyMat);  // C / 階段室
+
+  // --- 2F床 / 1F天井 (y=4, 階段室 x:14~20 を除く) ---
+  const f2Geo = new THREE.PlaneGeometry(33.5, 8);
+  f2Geo.setAttribute('uv2', f2Geo.attributes.uv);
+  const f2Mat = makePBRMat(concretePBR, { roughness: 0.85 });
+  const f2Mesh = new THREE.Mesh(f2Geo, f2Mat);
+  f2Mesh.rotation.x = -Math.PI / 2;
+  f2Mesh.position.set(-3.25, FLOOR_H, 28);
+  f2Mesh.receiveShadow = true;
+  g.scene.add(f2Mesh); g.geometries.push(f2Geo);
+  // 1F天井面（下から見える）
+  const c1Geo = new THREE.PlaneGeometry(33.5, 8);
+  const c1Mat = new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.95 });
+  g.materials.push(c1Mat);
+  const c1Mesh = new THREE.Mesh(c1Geo, c1Mat);
+  c1Mesh.rotation.x = Math.PI / 2;
+  c1Mesh.position.set(-3.25, FLOOR_H - 0.01, 28);
+  g.scene.add(c1Mesh); g.geometries.push(c1Geo);
+  // 2F天井 (y=7.8)
+  const c2Geo = new THREE.PlaneGeometry(40, 8);
+  const c2Mat = new THREE.MeshStandardMaterial({ color: 0x776655, roughness: 0.95 });
+  g.materials.push(c2Mat);
+  const c2Mesh = new THREE.Mesh(c2Geo, c2Mat);
+  c2Mesh.rotation.x = Math.PI / 2;
+  c2Mesh.position.set(0, 7.8, 28);
+  g.scene.add(c2Mesh); g.geometries.push(c2Geo);
+
+  // --- 1Fインテリア床タイル ---
+  const floorTileMat = new THREE.MeshStandardMaterial({
+    color: 0x8a7d6b, roughness: 0.88, metalness: 0.0,
+    emissive: 0x050504, emissiveIntensity: 0.05
   });
+  g.materials.push(floorTileMat);
+  const f1TGeo = new THREE.PlaneGeometry(39, 7);
+  f1TGeo.setAttribute('uv2', f1TGeo.attributes.uv);
+  const f1TMesh = new THREE.Mesh(f1TGeo, floorTileMat);
+  f1TMesh.rotation.x = -Math.PI / 2;
+  f1TMesh.position.set(0, 0.02, 27.5);
+  f1TMesh.receiveShadow = true;
+  g.scene.add(f1TMesh); g.geometries.push(f1TGeo);
+  // 2F床タイル
+  const f2TGeo = new THREE.PlaneGeometry(39, 7);
+  f2TGeo.setAttribute('uv2', f2TGeo.attributes.uv);
+  const f2TMesh = new THREE.Mesh(f2TGeo, floorTileMat);
+  f2TMesh.rotation.x = -Math.PI / 2;
+  f2TMesh.position.set(0, FLOOR_H + 0.02, 27.5);
+  f2TMesh.receiveShadow = true;
+  g.scene.add(f2TMesh); g.geometries.push(f2TGeo);
+
+  // --- 階段（10段の階段メッシュ）---
+  const stepMat = makePBRMat(concretePBR, { roughness: 0.8 });
+  const NUM_STEPS = 10;
+  const stZs = 27, stZe = 31.5;
+  const stDep = (stZe - stZs) / NUM_STEPS;
+  const stRise = FLOOR_H / NUM_STEPS;
+  for (let i = 0; i < NUM_STEPS; i++) {
+    const sZ = stZs + (i + 0.5) * stDep;
+    const sY = (i + 0.5) * stRise;
+    const sGeo = new THREE.BoxGeometry(5.5, stRise, stDep);
+    sGeo.setAttribute('uv2', sGeo.attributes.uv);
+    const sMesh = new THREE.Mesh(sGeo, stepMat);
+    sMesh.position.set(16.75, sY, sZ);
+    sMesh.castShadow = true; sMesh.receiveShadow = true;
+    g.scene.add(sMesh); g.geometries.push(sGeo); g.cameraMeshes.push(sMesh);
+  }
+  // 階段手すり（階段の西側 x=14）
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.4, metalness: 0.8 });
+  g.materials.push(railMat);
+  const railGeo = new THREE.BoxGeometry(0.05, 1, 4.5);
+  g.geometries.push(railGeo);
+  const rail1F = new THREE.Mesh(railGeo, railMat);
+  rail1F.position.set(14, 2.5, 29.25);
+  rail1F.rotation.x = Math.atan2(FLOOR_H, stZe - stZs);
+  g.scene.add(rail1F); g.cameraMeshes.push(rail1F);
+
+  // --- 教室内装（1F × 3教室 + 2F × 3教室）---
+  const deskMat = makePBRMat(woodPBR, { roughness: 0.75 });
+  const chairMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.6, metalness: 0.7 });
+  g.materials.push(chairMat);
+  const bbMat = new THREE.MeshStandardMaterial({ color: 0x1a3a1a, roughness: 0.8 });
+  g.materials.push(bbMat);
+  const classrooms = [
+    { xMin: -19, xMax: -7.5, zMin: 27.5, zMax: 31 },
+    { xMin: -5.5, xMax: 5.5, zMin: 27.5, zMax: 31 },
+    { xMin: 7.5, xMax: 13, zMin: 27.5, zMax: 31 }
+  ];
+  for (let fl = 0; fl < 2; fl++) {
+    const yOff = fl * FLOOR_H;
+    for (const room of classrooms) {
+      const rcx = (room.xMin + room.xMax) / 2;
+      const rw = room.xMax - room.xMin;
+      // 黒板
+      const bbW = Math.min(rw - 1, 4.5);
+      const bbGeo = new THREE.PlaneGeometry(bbW, 1.2);
+      g.geometries.push(bbGeo);
+      const bb = new THREE.Mesh(bbGeo, bbMat);
+      bb.position.set(rcx, yOff + 1.8, room.zMin + 0.05);
+      g.scene.add(bb);
+      // 教卓
+      const tdGeo = new THREE.BoxGeometry(1.2, 0.75, 0.6);
+      tdGeo.setAttribute('uv2', tdGeo.attributes.uv);
+      g.geometries.push(tdGeo);
+      const td = new THREE.Mesh(tdGeo, deskMat);
+      td.position.set(rcx, yOff + 0.375, room.zMin + 0.8);
+      td.castShadow = true; td.receiveShadow = true;
+      g.scene.add(td); g.cameraMeshes.push(td);
+      // 生徒の机と椅子
+      const numCols = Math.max(2, Math.floor((rw - 2) / 1.4));
+      const startX = room.xMin + 1.2;
+      const colSp = (rw - 2.4) / Math.max(numCols - 1, 1);
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < numCols; col++) {
+          if (Math.random() < 0.15) continue;
+          const dx = startX + col * colSp;
+          const dz = room.zMin + 2 + row * 1.4;
+          const toppled = Math.random() < 0.2;
+          const sdGeo = new THREE.BoxGeometry(0.6, 0.05, 0.45);
+          g.geometries.push(sdGeo);
+          const sdMesh = new THREE.Mesh(sdGeo, deskMat);
+          sdMesh.position.set(dx, yOff + (toppled ? 0.15 : 0.68), dz);
+          if (toppled) { sdMesh.rotation.z = (Math.random()-0.5)*1.5; sdMesh.rotation.x = (Math.random()-0.5)*0.5; }
+          sdMesh.castShadow = true;
+          g.scene.add(sdMesh); g.cameraMeshes.push(sdMesh);
+          // 椅子
+          if (Math.random() < 0.6) {
+            const chGeo = new THREE.BoxGeometry(0.35, 0.38, 0.35);
+            g.geometries.push(chGeo);
+            const ch = new THREE.Mesh(chGeo, chairMat);
+            const chToppled = toppled || Math.random() < 0.25;
+            ch.position.set(dx, yOff + (chToppled ? 0.12 : 0.22), dz - 0.5);
+            if (chToppled) ch.rotation.z = (Math.random()-0.5)*2;
+            ch.castShadow = true;
+            g.scene.add(ch); g.cameraMeshes.push(ch);
+          }
+          // 机の脚（金属パイプ）
+          const legGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.68, 4);
+          g.geometries.push(legGeo);
+          if (!toppled) {
+            for (const [lx,lz] of [[-0.25,-0.18],[0.25,-0.18],[-0.25,0.18],[0.25,0.18]]) {
+              const leg = new THREE.Mesh(legGeo, chairMat);
+              leg.position.set(dx+lx, yOff+0.34, dz+lz);
+              g.scene.add(leg);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // --- 内部照明（廊下の蛍光灯）---
+  if (!g.flickeringLights) g.flickeringLights = [];
+  for (let fl = 0; fl < 2; fl++) {
+    const yOff = fl * FLOOR_H;
+    for (let lx = -16; lx <= 16; lx += 8) {
+      const flLight = new THREE.PointLight(0xccddff, fl === 0 ? 0.5 : 0.3, 10);
+      flLight.position.set(lx, yOff + 3.5, 25.75);
+      g.scene.add(flLight);
+      const flGeo = new THREE.BoxGeometry(1.0, 0.06, 0.12);
+      g.geometries.push(flGeo);
+      const flMat2 = new THREE.MeshStandardMaterial({
+        color: 0xaaccee, emissive: 0x889dbb, emissiveIntensity: fl === 0 ? 0.5 : 0.3, roughness: 0.3
+      });
+      g.materials.push(flMat2);
+      const flMesh = new THREE.Mesh(flGeo, flMat2);
+      flMesh.position.set(lx, yOff + 3.5, 25.75);
+      g.scene.add(flMesh);
+      if (Math.random() < 0.4) {
+        g.flickeringLights.push({ light: flLight, fixMat: flMat2, timer: 0, interval: 0.3 + Math.random() * 0.5, baseIntensity: flLight.intensity });
+      }
+    }
+    // 教室にも薄暗い照明
+    for (const room of classrooms) {
+      const rcx = (room.xMin + room.xMax) / 2;
+      const rmLight = new THREE.PointLight(0xccddee, 0.2, 8);
+      rmLight.position.set(rcx, yOff + 3.5, 29);
+      g.scene.add(rmLight);
+    }
+  }
+
+  // --- 廃校ディテール ---
+  // 瓦礫（廊下に散乱）
+  const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x777766, roughness: 0.95 });
+  g.materials.push(rubbleMat);
+  for (let i = 0; i < 20; i++) {
+    const rx = -18 + Math.random() * 36;
+    const rz = 25 + Math.random() * 2;
+    const rs = 0.08 + Math.random() * 0.2;
+    const rGeo = new THREE.BoxGeometry(rs, rs * 0.4, rs * 0.7);
+    g.geometries.push(rGeo);
+    const rMesh = new THREE.Mesh(rGeo, rubbleMat);
+    rMesh.position.set(rx, rs * 0.2, rz);
+    rMesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+    g.scene.add(rMesh);
+  }
+  // 天井パネル落下
+  const panelMat = new THREE.MeshStandardMaterial({ color: 0x999988, roughness: 0.9 });
+  g.materials.push(panelMat);
+  for (let i = 0; i < 6; i++) {
+    const px = -15 + Math.random() * 28;
+    const pz = 25 + Math.random() * 6;
+    const pGeo = new THREE.BoxGeometry(0.5 + Math.random() * 0.4, 0.02, 0.5 + Math.random() * 0.4);
+    g.geometries.push(pGeo);
+    const pMesh = new THREE.Mesh(pGeo, panelMat);
+    pMesh.position.set(px, 0.01, pz);
+    pMesh.rotation.y = Math.random() * Math.PI;
+    g.scene.add(pMesh);
+  }
+  // 壁の染み・汚れ
+  const stainMat = new THREE.MeshStandardMaterial({
+    color: 0x221a0f, transparent: true, opacity: 0.25, roughness: 1.0, depthWrite: false
+  });
+  g.materials.push(stainMat);
+  for (let i = 0; i < 10; i++) {
+    const sGeo = new THREE.PlaneGeometry(1 + Math.random() * 2, 0.5 + Math.random() * 1.5);
+    g.geometries.push(sGeo);
+    const sMesh = new THREE.Mesh(sGeo, stainMat);
+    const side = Math.floor(Math.random() * 4);
+    if (side === 0) { sMesh.position.set(-18+Math.random()*36, 0.5+Math.random()*3, 24.02); }
+    else if (side === 1) { sMesh.position.set(-18+Math.random()*36, 0.5+Math.random()*3, 31.98); sMesh.rotation.y = Math.PI; }
+    else if (side === 2) { sMesh.position.set(-19.98, 0.5+Math.random()*3, 25+Math.random()*6); sMesh.rotation.y = Math.PI/2; }
+    else { sMesh.position.set(19.98, 0.5+Math.random()*3, 25+Math.random()*6); sMesh.rotation.y = -Math.PI/2; }
+    g.scene.add(sMesh);
+  }
+  // 校庭にも廃墟ディテール（ひび割れ、雑草）
+  const weedMat = new THREE.MeshStandardMaterial({ color: 0x2a3a1a, roughness: 0.9, side: THREE.DoubleSide });
+  g.materials.push(weedMat);
+  for (let i = 0; i < 30; i++) {
+    const wx = -30 + Math.random() * 60;
+    const wz = -30 + Math.random() * 50;
+    const wGeo = new THREE.PlaneGeometry(0.3 + Math.random() * 0.5, 0.4 + Math.random() * 0.6);
+    g.geometries.push(wGeo);
+    const wMesh = new THREE.Mesh(wGeo, weedMat);
+    wMesh.position.set(wx, gH(wx, wz) + 0.2, wz);
+    wMesh.rotation.y = Math.random() * Math.PI * 2;
+    wMesh.rotation.x = -0.3;
+    g.scene.add(wMesh);
+  }
+
+  // --- 窓（外壁）---
+  const windowMat = new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.5, metalness: 0.0 });
   g.materials.push(windowMat);
   const litWindowMat = new THREE.MeshStandardMaterial({
-    color: 0xeedd88, emissive: 0xddcc55, emissiveIntensity: 0.6,
-    roughness: 0.3, metalness: 0.0
+    color: 0xeedd88, emissive: 0xddcc55, emissiveIntensity: 0.6, roughness: 0.3
   });
   g.materials.push(litWindowMat);
-
-  // 校舎前面（z:24側）に窓
+  const brokenWindowMat = new THREE.MeshStandardMaterial({
+    color: 0x111118, roughness: 0.5, transparent: true, opacity: 0.3
+  });
+  g.materials.push(brokenWindowMat);
   const winGeo = new THREE.PlaneGeometry(1.2, 1.0);
   g.geometries.push(winGeo);
+  // 南面窓
   for (let floor = 0; floor < 2; floor++) {
     for (let wx = -18; wx <= 18; wx += 3) {
-      // 入口部分はスキップ
-      if (Math.abs(wx) < 4 && floor === 0) continue;
-      const lit = Math.random() < 0.12; // 廃校なのでほとんど暗い
-      const wMesh = new THREE.Mesh(winGeo, lit ? litWindowMat : windowMat);
-      wMesh.position.set(wx, gH(0, 28) + 2.5 + floor * 3.5, 23.98);
+      if (Math.abs(wx) < 3 && floor === 0) continue;
+      const broken = Math.random() < 0.35;
+      const lit = !broken && Math.random() < 0.08;
+      const wMat = broken ? brokenWindowMat : (lit ? litWindowMat : windowMat);
+      const wMesh = new THREE.Mesh(winGeo, wMat);
+      wMesh.position.set(wx, gH(0, 28) + 2.0 + floor * FLOOR_H, 23.97);
       g.scene.add(wMesh);
     }
   }
-  // 校舎裏面（z:32側）にも窓
+  // 北面窓
   for (let floor = 0; floor < 2; floor++) {
     for (let wx = -18; wx <= 18; wx += 3) {
-      const lit = Math.random() < 0.08;
-      const wMesh = new THREE.Mesh(winGeo, lit ? litWindowMat : windowMat);
-      wMesh.position.set(wx, gH(0, 28) + 2.5 + floor * 3.5, 32.02);
+      const broken = Math.random() < 0.4;
+      const lit = !broken && Math.random() < 0.05;
+      const wMat = broken ? brokenWindowMat : (lit ? litWindowMat : windowMat);
+      const wMesh = new THREE.Mesh(winGeo, wMat);
+      wMesh.position.set(wx, gH(0, 28) + 2.0 + floor * FLOOR_H, 32.03);
       wMesh.rotation.y = Math.PI;
       g.scene.add(wMesh);
     }
@@ -4854,6 +5122,41 @@ function buildSchoolObjects(g) {
       originalY: groundY,
       text: sd.text,
       color: sd.color
+    });
+  }
+
+  // === キック可能な教室の机 ===
+  const kickDeskDefs = [
+    { x: -13, z: 29 },
+    { x: 0, z: 30 },
+    { x: 10, z: 29 }
+  ];
+  const kdTopMat = new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.7, metalness: 0.1 });
+  const kdLegMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.5, metalness: 0.8 });
+  g.materials.push(kdTopMat, kdLegMat);
+  for (const kd of kickDeskDefs) {
+    const kdGroup = new THREE.Group();
+    const topGeo = new THREE.BoxGeometry(0.6, 0.05, 0.45);
+    g.geometries.push(topGeo);
+    const topM = new THREE.Mesh(topGeo, kdTopMat);
+    topM.position.y = 0.7;
+    kdGroup.add(topM);
+    const kdLegGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.7, 6);
+    g.geometries.push(kdLegGeo);
+    for (const [lx, lz] of [[-0.25, -0.18], [0.25, -0.18], [-0.25, 0.18], [0.25, 0.18]]) {
+      const leg = new THREE.Mesh(kdLegGeo, kdLegMat);
+      leg.position.set(lx, 0.35, lz);
+      kdGroup.add(leg);
+    }
+    kdGroup.position.set(kd.x, 0, kd.z);
+    kdGroup.castShadow = true;
+    g.scene.add(kdGroup);
+    g.cameraMeshes.push(topM);
+    g.kickableSigns.push({
+      group: kdGroup, light: null,
+      x: kd.x, z: kd.z,
+      fallen: false, fallTimer: 0, originalY: 0,
+      text: '机', color: 0x8b6914, isDesk: true
     });
   }
 }
@@ -5623,6 +5926,29 @@ function updatePlayer(g, dt) {
   // Get ground height at player position
   ctrl.position.y = getGroundHeight(g, ctrl.position.x, ctrl.position.z);
 
+  // Stage 4: 校舎内の高さオーバーライド
+  if (g._stageNum === 4) {
+    const px = ctrl.position.x, pz = ctrl.position.z;
+    const inBldg = px > -19.5 && px < 19.5 && pz > 24.5 && pz < 31.5;
+    if (inBldg) {
+      // 階段室 (x:14~19.5, z:27~31.5): ランプ
+      if (px > 14 && pz > 27) {
+        const progress = Math.max(0, Math.min(1, (pz - 27) / 4.5));
+        ctrl.position.y = progress * 4.0;
+        g.playerFloor = ctrl.position.y > 2 ? 1 : 0;
+      } else {
+        if (g.playerFloor === undefined) g.playerFloor = 0;
+        ctrl.position.y = g.playerFloor * 4.0;
+      }
+      // 2Fから入口方向への落下防止
+      if (g.playerFloor === 1 && Math.abs(px) < 2.5 && pz < 25) {
+        ctrl.position.z = 25;
+      }
+    } else {
+      g.playerFloor = 0;
+    }
+  }
+
   // Face movement direction
   if (ctrl.moveSpeed > 0.5) {
     ctrl.rotation = Math.atan2(moveX, moveZ);
@@ -5715,8 +6041,8 @@ function updatePlayer(g, dt) {
   ctrl.canHit = null;
   if (!ctrl.canKick && g.config.interactables) {
     for (const inter of g.config.interactables) {
-      // 倒れた看板はスキップ
-      if (inter.type === 'sign' && g.kickableSigns) {
+      // 倒れた看板・蹴り飛ばした机はスキップ
+      if ((inter.type === 'sign' || inter.type === 'desk') && g.kickableSigns) {
         const sign = g.kickableSigns.find(s =>
           Math.abs(s.x - inter.x) < 2 && Math.abs(s.z - inter.z) < 2
         );
@@ -6566,6 +6892,20 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
 
   // Ground height
   oni.position.y = getGroundHeight(g, oni.position.x, oni.position.z);
+
+  // Stage 4: 校舎内の高さオーバーライド（鬼は1Fのみ）
+  if (g._stageNum === 4) {
+    const ox = oni.position.x, oz = oni.position.z;
+    if (ox > -19.5 && ox < 19.5 && oz > 24.5 && oz < 31.5) {
+      if (ox > 14 && oz > 27) {
+        // 階段室ランプ
+        const p = Math.max(0, Math.min(1, (oz - 27) / 4.5));
+        oni.position.y = p * 4.0;
+      } else {
+        oni.position.y = 0; // 鬼は1Fのみ
+      }
+    }
+  }
 
   // Face direction (実際の移動方向を向く)
   const actualDx = oni.position.x - prevX;
@@ -7570,9 +7910,10 @@ function performHit(g, interactable) {
     spawnRollingPebbles(g, interactable.x, interactable.z, g.player.rotation || g.player.cameraYaw);
   }
 
-  // === 看板蹴り特別演出 ===
+  // === 看板・机 蹴り特別演出 ===
   let isSignKick = false;
-  if (interactable.type === 'sign' && g.kickableSigns) {
+  const isKickableType = (interactable.type === 'sign' || interactable.type === 'desk');
+  if (isKickableType && g.kickableSigns) {
     const sign = g.kickableSigns.find(s =>
       Math.abs(s.x - interactable.x) < 2 && Math.abs(s.z - interactable.z) < 2 && !s.fallen
     );
@@ -7580,16 +7921,18 @@ function performHit(g, interactable) {
       isSignKick = true;
       sign.fallen = true;
       sign.fallTimer = 0;
-      // 蹴り方向を計算（プレイヤーの向いている方向）
       const kickYaw = g.player.rotation || g.player.cameraYaw || 0;
       sign.fallAngle = kickYaw;
-      // 倒れアニメ開始（X軸回転で前に倒す）
       sign._fallPhase = 'falling';
 
-      showCenterAlert('看板を蹴り倒した！', '鬼の注意がそちらに…', 2500);
-      SoundManager.playGameSE('hit_metal');
+      if (sign.isDesk) {
+        showCenterAlert('机を蹴り飛ばした！', '大きな音が校舎に響き渡る…', 2500);
+        SoundManager.playGameSE('hit_thud');
+      } else {
+        showCenterAlert('看板を蹴り倒した！', '鬼の注意がそちらに…', 2500);
+        SoundManager.playGameSE('hit_metal');
+      }
 
-      // 小石飛散
       spawnRollingPebbles(g, sign.x, sign.z, kickYaw);
     }
   }
@@ -7598,10 +7941,10 @@ function performHit(g, interactable) {
     showNotification('💥 ' + interactable.label + ' を蹴った！');
   }
 
-  // Alert oni — 看板は範囲が広く、patrol以外の鬼も引き寄せる
+  // Alert oni — 看板/机は範囲が広く、patrol以外の鬼も引き寄せる
   const alertRadius = isSignKick ? interactable.radius * 2.5 : interactable.radius;
   const alertStates = isSignKick
-    ? ['patrol', 'search', 'footSound']  // 看板は広範囲の鬼に影響
+    ? ['patrol', 'search', 'footSound']  // 看板/机は広範囲の鬼に影響
     : ['patrol'];
   let alerted = 0;
   for (const oni of g.onis) {
@@ -7671,6 +8014,21 @@ function updateRollingPebbles(g, dt) {
     // Friction
     p.vx *= (1 - 2.0 * dt);
     p.vz *= (1 - 2.0 * dt);
+  }
+}
+
+// --- 廊下の蛍光灯チカチカ更新 ---
+function updateFlickeringLights(g, dt) {
+  if (!g.flickeringLights) return;
+  for (const fl of g.flickeringLights) {
+    fl.timer += dt;
+    if (fl.timer > fl.interval) {
+      fl.timer = 0;
+      fl.interval = 0.05 + Math.random() * 0.8;
+      const on = Math.random() < 0.7;
+      fl.light.intensity = on ? (fl.baseIntensity || 0.5) : 0;
+      fl.fixMat.emissiveIntensity = on ? 0.5 : 0.02;
+    }
   }
 }
 
@@ -8216,6 +8574,7 @@ function gameLoop(timestamp) {
     ['updateDayNight', () => updateDayNight(G, dt)],
     ['updateRollingPebbles', () => updateRollingPebbles(G, dt)],
     ['updateKickableSigns', () => updateKickableSigns(G, dt)],
+    ['updateFlickeringLights', () => updateFlickeringLights(G, dt)],
     ['updateGamePhases', () => updateGamePhases(G, dt)],
     ['updateHUD', () => updateHUD(G)]
   ];
