@@ -907,7 +907,7 @@ html, body {
     <div id="hud-info-bar">
       <div id="hud-capture">捕獲: 0/0</div>
       <div id="hud-can-dir"></div>
-      <div id="hud-debug-pos" style="font-size:10px;color:#88ff88;opacity:0.7;"></div>
+      <div id="hud-debug-pos" style="font-size:12px;color:#88ff88;opacity:0.9;"></div>
     </div>
     <div id="hud-action-prompt" style="display:none;"></div>
     <div id="hud-peek-prompt" style="display:none;"></div>
@@ -7402,7 +7402,16 @@ function updateHUD(g) {
 
   // Debug position display
   const dbgEl = document.getElementById('hud-debug-pos');
-  if (dbgEl) dbgEl.textContent = 'X:' + g.player.position.x.toFixed(1) + ' Z:' + g.player.position.z.toFixed(1);
+  if (dbgEl) {
+    let dbg = 'P X:' + g.player.position.x.toFixed(1) + ' Z:' + g.player.position.z.toFixed(1);
+    if (g.onis) {
+      for (let i = 0; i < g.onis.length; i++) {
+        const o = g.onis[i];
+        dbg += ' | 鬼' + i + ' X:' + o.position.x.toFixed(1) + ' Y:' + o.position.y.toFixed(1) + ' Z:' + o.position.z.toFixed(1) + ' ' + o.state;
+      }
+    }
+    dbgEl.textContent = dbg;
+  }
 
   // Can direction
   const canDirEl = document.getElementById('hud-can-dir');
