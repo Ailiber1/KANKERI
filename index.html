@@ -3815,22 +3815,22 @@ function buildAlleyObjects(g) {
   // === ビル群（建物ブロック）===
   // 最低4mの通路幅を確保した配置
   const buildingDefs = [
-    // NW区画（メイン通りから4m以上離す、ビル間最低4m）
+    // NW区画（端ビルは境界壁まで延長）
     { x:-20, z:16, hw:7, hd:6, h:10, texType:'concrete' },  // edge x=-13
     { x:-6, z:25, hw:3, hd:2, h:8, texType:'brick' },       // edge x=-9, gap=4m
-    { x:-21, z:27, hw:7, hd:2, h:7, texType:'concrete' },
-    // NE区画
+    { x:-21, z:27, hw:7, hd:3, h:7, texType:'concrete' },   // z:[24,30] 境界壁まで埋める
+    // NE区画（端ビルは境界壁まで延長して隙間をなくす）
     { x:15, z:14, hw:5, hd:5, h:11, texType:'brick' },      // edge x=20
-    { x:26, z:15, hw:2, hd:6, h:8, texType:'concrete' },    // edge x=24, gap=4m
-    { x:17, z:26, hw:7, hd:2, h:9, texType:'brick' },
-    // SW区画（隙間0m→4mに修正）
+    { x:27, z:15, hw:3, hd:6, h:8, texType:'concrete' },    // x:[24,30] 境界壁まで埋める
+    { x:17, z:27, hw:7, hd:3, h:9, texType:'brick' },       // z:[24,30] 境界壁まで埋める
+    // SW区画
     { x:-16, z:-14, hw:6, hd:5, h:9, texType:'concrete' },  // edge x=-22
-    { x:-27, z:-15, hw:2, hd:7, h:7, texType:'brick' },     // edge x=-25, gap=3m
-    { x:-18, z:-26, hw:7, hd:2, h:8, texType:'concrete' },
+    { x:-27, z:-15, hw:3, hd:7, h:7, texType:'brick' },     // x:[-30,-24] 境界壁まで埋める
+    { x:-18, z:-27, hw:7, hd:3, h:8, texType:'concrete' },  // z:[-30,-24] 境界壁まで埋める
     // SE区画
     { x:16, z:-14, hw:6, hd:5, h:12, texType:'brick' },     // edge x=22
-    { x:27, z:-13, hw:2, hd:4, h:6, texType:'concrete' },   // edge x=25, gap=3m
-    { x:18, z:-26, hw:7, hd:2, h:9, texType:'brick' },
+    { x:27, z:-13, hw:3, hd:4, h:6, texType:'concrete' },   // x:[24,30] 境界壁まで埋める
+    { x:18, z:-27, hw:7, hd:3, h:9, texType:'brick' },      // z:[-30,-24] 境界壁まで埋める
   ];
 
   for (const b of buildingDefs) {
