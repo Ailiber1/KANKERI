@@ -2516,19 +2516,19 @@ const STAGE_CONFIGS = {
       // 棟間通路（表→裏のショートカット）
       {x:-25,z:-15},{x:-25,z:15},
       {x:25,z:-15},{x:25,z:15},
-      // 階段室巡回（1棟: L=-34, R=-16、南面突出z=-9入口）
-      {x:-34,z:-9},{x:-16,z:-9},
+      // 階段室巡回（1棟: L=-34, R=-16、入口z=-5）
+      {x:-34,z:-5},{x:-16,z:-5},
       // 階段室巡回（2棟: L=16, R=34）
-      {x:16,z:-9},{x:34,z:-9},
+      {x:16,z:-5},{x:34,z:-5},
       // 外周（size=100、フェンスは±50）
       {x:-48,z:-48},{x:48,z:-48},{x:48,z:48},{x:-48,z:48}
     ],
     interactables: [
       // 階段室の手すり（1棟L=-34, R=-16、2棟L=16, R=34）
-      { type:'railing', x:-34, z:-6.5, radius:30, label:'階段室の手すり', sound:'metal' },
-      { type:'railing', x:-16, z:-6.5, radius:30, label:'階段室の手すり', sound:'metal' },
-      { type:'railing', x:16, z:-6.5, radius:30, label:'階段室の手すり', sound:'metal' },
-      { type:'railing', x:34, z:-6.5, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:-34, z:-2.5, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:-16, z:-2.5, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:16, z:-2.5, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:34, z:-2.5, radius:30, label:'階段室の手すり', sound:'metal' },
       // ゴミ捨て場のフェンス
       { type:'fence', x:-20, z:-28, radius:25, label:'ゴミ捨て場のフェンス', sound:'metal' },
       { type:'fence', x:20, z:-28, radius:25, label:'ゴミ捨て場のフェンス', sound:'metal' },
@@ -5849,27 +5849,8 @@ function buildDanchiObjects(g) {
     numMesh2.rotation.y = -Math.PI/2;
     g.scene.add(numMesh2);
 
-    // --- 各階の窓（南北面 × 5階）---
-    const windowMat = new THREE.MeshStandardMaterial({
-      color: 0x223344, roughness: 0.1, metalness: 0.8,
-      emissive: 0x000000, emissiveIntensity: 0
-    });
-    g.materials.push(windowMat);
-    const winGeo = addGeo(new THREE.PlaneGeometry(1.2, 1.0));
-    for (let floor = 0; floor < 5; floor++) {
-      const fy = floor * FLOOR_H + 2.0;
-      for (let wx = -12; wx <= 12; wx += 3) {
-        // 南面の窓
-        const wS = new THREE.Mesh(winGeo, windowMat);
-        wS.position.set(bx + wx, fy, bz - BLDG_D/2 - 0.22);
-        g.scene.add(wS);
-        // 北面の窓
-        const wN = new THREE.Mesh(winGeo, windowMat);
-        wN.position.set(bx + wx, fy, bz + BLDG_D/2 + 0.22);
-        wN.rotation.y = Math.PI;
-        g.scene.add(wN);
-      }
-    }
+    // --- 各階の窓 ---
+    // ※窓メッシュは夜の窓明かりシステム（後段）で一括生成。ここでは重複配置しない。
 
     // --- ベランダ手すり（南面、各階）---
     const railMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.7 });
@@ -5892,7 +5873,7 @@ function buildDanchiObjects(g) {
     const STEP_RISE = (FLOOR_H * TOTAL_FLIGHTS) / TOTAL_STEPS; // 0.3m
     const STEP_RUN = STAIR_D / TOTAL_STEPS; // 0.125m
 
-    const stairCZ = bz - BLDG_D/2 - STAIR_D/2; // 階段室z中心（南面から突出）
+    const stairCZ = bz - BLDG_D/2 + STAIR_D/2 - 1.0; // 階段室z中心（建物内部に埋め込み、入口1mだけ突出）
     const stairDefs = [
       { sx: bx - 9, label: 'L' },
       { sx: bx + 9, label: 'R' }
@@ -6594,7 +6575,7 @@ function buildDanchiObjects(g) {
   const canopyBracketGeo = addGeo(new THREE.BoxGeometry(0.08, 0.6, 1.2));
   for (const bldg of buildings) {
     const bx = bldg.cx, bz = bldg.cz;
-    const sSouthZ = bz - BLDG_D/2 - STAIR_D; // 階段室南端（入口）
+    const sSouthZ = bz - BLDG_D/2 + STAIR_D/2 - 1.0 - STAIR_D/2; // 階段室南端（入口）= -5.0
     const stairXs = [bx - 9, bx + 9]; // 階段室x位置（建物内側）
     for (const sx of stairXs) {
       // 庇本体（階段入口の上）
@@ -7492,10 +7473,10 @@ function updatePlayer(g, dt) {
   }
 
   // Stage 5: 団地の階段室の高さオーバーライド（5F=+12mまで）
-  // 階段室: 建物内側（bx±9）に配置、南面から突出（z = -6.5中心、-9〜-4）
+  // 階段室: 建物内側（bx±9）に配置、建物内部埋め込み（z = -2.5中心、-5〜0）
   // 40段(10段×4区間)、STEP_RISE=0.3m
   if (g._stageNum === 5) {
-    const stairCZ5 = -6.5; // 階段室z中心（bz=0, BLDG_D=8, STAIR_D=5）
+    const stairCZ5 = -2.5; // 階段室z中心（建物内部埋め込み）
     const stairZones5 = [
       { sx: -25 - 9, sz: stairCZ5 }, { sx: -25 + 9, sz: stairCZ5 },
       { sx:  25 - 9, sz: stairCZ5 }, { sx:  25 + 9, sz: stairCZ5 }
@@ -8532,9 +8513,9 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   }
 
   // Stage 5: 団地の階段室の高さオーバーライド（鬼も5Fまで巡回可能）
-  // 階段室: bx±9、z中心=-6.5（南面突出）
+  // 階段室: bx±9、z中心=-2.5（建物内部埋め込み）
   if (g._stageNum === 5) {
-    const stairCZ5 = -6.5;
+    const stairCZ5 = -2.5;
     const stairZones5 = [
       { sx: -25 - 9, sz: stairCZ5 }, { sx: -25 + 9, sz: stairCZ5 },
       { sx:  25 - 9, sz: stairCZ5 }, { sx:  25 + 9, sz: stairCZ5 }
@@ -8571,9 +8552,9 @@ function getFootSoundRange(g) {
   else if (g._stageNum === 2) baseRange = 18;
   else if (g._stageNum === 5) {
     // 階段室内ならエコーで足音が響く (25m)
-    // 階段室: bx±9、z中心=-6.5（南面突出）
+    // 階段室: bx±9、z中心=-2.5（建物内部埋め込み）
     const px = g.player.position.x, pz = g.player.position.z;
-    const stairCZ5 = -6.5;
+    const stairCZ5 = -2.5;
     const stairZones = [
       { sx: -25 - 9, sz: stairCZ5 }, { sx: -25 + 9, sz: stairCZ5 },
       { sx:  25 - 9, sz: stairCZ5 }, { sx:  25 + 9, sz: stairCZ5 }
