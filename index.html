@@ -6375,8 +6375,8 @@ function updatePlayer(g, dt) {
       // 2F通路プレイヤーの階段室侵入防止（壁 z:27）
       // _onStairs=前フレームで階段上にいたか。降下中は通過許可、通路からは侵入不可
       if (g.playerFloor === 1 && !g._onStairs) {
-        if (px > 14 && px < 20 && ctrl.position.z > 26.5) ctrl.position.z = 26.5;
-        if (px < -14 && px > -20 && ctrl.position.z > 26.5) ctrl.position.z = 26.5;
+        if (px > 14 && px < 20 && ctrl.position.z > 26.5 && ctrl.position.z < 30) ctrl.position.z = 26.5;
+        if (px < -14 && px > -20 && ctrl.position.z > 26.5 && ctrl.position.z < 30) ctrl.position.z = 26.5;
       }
       // 侵入防止後のZ座標で階段判定（>=で z:27.0 も階段として扱う）
       const curZ = ctrl.position.z;
