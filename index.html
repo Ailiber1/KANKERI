@@ -5806,8 +5806,10 @@ function buildDanchiObjects(g) {
       g.colliders.push({ type:'box', x:seg.cx, z:southZ, hw:seg.w/2+0.1, hd:0.5, h:BLDG_H });
     }
 
-    // 北面（裏側）
-    const northWall = new THREE.Mesh(southWallGeo, plasterMat);
+    // 北面（裏側）— 北壁は開口なし（1枚物）
+    const northWallGeo = addGeo(new THREE.BoxGeometry(BLDG_W, BLDG_H, 0.4));
+    northWallGeo.setAttribute('uv2', northWallGeo.attributes.uv);
+    const northWall = new THREE.Mesh(northWallGeo, plasterMat);
     northWall.position.set(bx, BLDG_H/2, bz + BLDG_D/2);
     northWall.castShadow = true; northWall.receiveShadow = true;
     g.scene.add(northWall);
