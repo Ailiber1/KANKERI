@@ -2446,10 +2446,10 @@ const STAGE_CONFIGS = {
       {x:-10,z:25.5},{x:0,z:25.5},{x:10,z:25.5},
       // 1F教室内偵察
       {x:-10,z:29},{x:0,z:29},{x:10,z:29},
-      // 東階段室（z=30で壁があるため踊り場まで）
-      {x:16.75,z:28},{x:10,z:25.5},
-      // 西階段室
-      {x:-16.75,z:28},{x:-10,z:25.5},{x:0,z:25.5}
+      // 東階段室 → 踊り場 → 2F廊下
+      {x:16.75,z:28},{x:16.75,z:30.75},{x:10,z:29},
+      // 西階段室 → 踊り場 → 2F廊下
+      {x:-16.75,z:28},{x:-16.75,z:30.75},{x:-10,z:29},{x:0,z:29}
     ],
     interactables: [
       { type:'door', x:-5, z:23, radius:20, label:'教室のドア', sound:'thud' },
@@ -4561,10 +4561,17 @@ function buildSchoolObjects(g) {
   addBox(13.5, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30（フル高さ）
   // 西階段室 / A 仕切り壁（z:27~30）
   addBox(-13.5, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30（フル高さ）
-  // 東階段室 閉鎖壁（z=30 — 階段上を浮遊して見える問題を解消）
-  addBox(16.75, 30, 2.75, WT, 8, schoolDirtyMat);  // x:14~19.5
-  // 西階段室 閉鎖壁（同上）
-  addBox(-16.75, 30, 2.75, WT, 8, schoolDirtyMat); // x:-19.5~-14
+  // --- 踊り場の床（z:30→31.5, y=FLOOR_H）---
+  const landingGeo = new THREE.BoxGeometry(5.5, 0.2, 1.5);
+  landingGeo.setAttribute('uv2', landingGeo.attributes.uv);
+  const landingMatE = new THREE.Mesh(landingGeo, stepMat);
+  landingMatE.position.set(16.75, FLOOR_H, 30.75);
+  landingMatE.castShadow = true; landingMatE.receiveShadow = true;
+  g.scene.add(landingMatE); g.geometries.push(landingGeo); g.cameraMeshes.push(landingMatE);
+  const landingMatW = new THREE.Mesh(landingGeo, stepMat);
+  landingMatW.position.set(-16.75, FLOOR_H, 30.75);
+  landingMatW.castShadow = true; landingMatW.receiveShadow = true;
+  g.scene.add(landingMatW); g.cameraMeshes.push(landingMatW);
 
   // --- 2F床 / 1F天井 (y=4, 東階段室 x:14~20 と西階段室 x:-20~-14 を除く) ---
   const f2Geo = new THREE.PlaneGeometry(27, 8);
