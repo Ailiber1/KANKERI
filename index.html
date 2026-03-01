@@ -4559,12 +4559,12 @@ function buildSchoolObjects(g) {
   addBox(6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);   // B / C 間
   // C / 東階段室仕切り壁（z:27~30）
   addBox(14, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30
-  // 東階段室仕切り壁 上部（z:31~32, 踊り場出口 z:30~31 は開口）
-  addBox(14, 31.5, WT, 0.5, 8, schoolDirtyMat);   // z:31~32
+  // 東階段室仕切り壁 上部（z:30.5~32, 踊り場出口 z:30~30.5 は開口）
+  addBox(14, 31.25, WT, 0.75, 8, schoolDirtyMat);  // z:30.5~32
   // 西階段室 / A 仕切り壁（z:27~30）
   addBox(-14, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30
-  // 西階段室仕切り壁 上部（z:31~32, 踊り場出口 z:30~31 は開口）
-  addBox(-14, 31.5, WT, 0.5, 8, schoolDirtyMat);  // z:31~32
+  // 西階段室仕切り壁 上部（z:30.5~32, 踊り場出口 z:30~30.5 は開口）
+  addBox(-14, 31.25, WT, 0.75, 8, schoolDirtyMat); // z:30.5~32
   // --- 2F床 / 1F天井 (y=4, 東階段室 x:14~20 と西階段室 x:-20~-14 を除く) ---
   const f2Geo = new THREE.PlaneGeometry(28, 8);
   f2Geo.setAttribute('uv2', f2Geo.attributes.uv);
@@ -4713,6 +4713,20 @@ function buildSchoolObjects(g) {
   swGapFloorW.position.set(-17, FLOOR_H, 31.75);
   swGapFloorW.receiveShadow = true;
   g.scene.add(swGapFloorW); g.cameraMeshes.push(swGapFloorW);
+
+  // --- 2F階段室南壁（z:27）— 2Fのみ。1Fからの階段出入りは妨げない ---
+  const sw2FWallGeo = new THREE.BoxGeometry(5.5, FLOOR_H, WT * 2);
+  g.geometries.push(sw2FWallGeo);
+  const sw2FWallE = new THREE.Mesh(sw2FWallGeo, schoolDirtyMat);
+  sw2FWallE.position.set(16.75, FLOOR_H + FLOOR_H / 2, 27);
+  sw2FWallE.castShadow = true; sw2FWallE.receiveShadow = true;
+  g.scene.add(sw2FWallE); g.cameraMeshes.push(sw2FWallE);
+  g.colliders.push({ type:'box', x:16.75, z:27, hw:2.75, hd:WT, h:FLOOR_H, floor:1 });
+  const sw2FWallW = new THREE.Mesh(sw2FWallGeo, schoolDirtyMat);
+  sw2FWallW.position.set(-16.75, FLOOR_H + FLOOR_H / 2, 27);
+  sw2FWallW.castShadow = true; sw2FWallW.receiveShadow = true;
+  g.scene.add(sw2FWallW); g.cameraMeshes.push(sw2FWallW);
+  g.colliders.push({ type:'box', x:-16.75, z:27, hw:2.75, hd:WT, h:FLOOR_H, floor:1 });
 
   // --- 教室内装（1F × 3教室 + 2F × 3教室）---
   const deskMat = makePBRMat(woodPBR, { roughness: 0.75 });
@@ -6376,9 +6390,9 @@ function updatePlayer(g, dt) {
           }
           ctrl.position.y = g.playerFloor * 4.0;
         } else {
-          // ランプゾーン (z:27~30): y=0→4
+          // 階段ゾーン (z:27~30): 10段の離散的な高さ
           const progress = Math.max(0, Math.min(1, (pz - 27) / 3));
-          ctrl.position.y = progress * 4.0;
+          ctrl.position.y = Math.ceil(progress * 10) * 0.4;
           if (progress >= 0.95) {
             g.playerFloor = 1;
           } else if (progress <= 0.05) {
@@ -7380,9 +7394,9 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
           if (oni.floor === 0) oni.floor = 1;
           oni.position.y = oni.floor * 4.0;
         } else {
-          // ランプ z:27~30
+          // 階段 z:27~30: 10段の離散的な高さ
           const p = Math.max(0, Math.min(1, (oz - 27) / 3));
-          oni.position.y = p * 4.0;
+          oni.position.y = Math.ceil(p * 10) * 0.4;
           if (p >= 0.95) oni.floor = 1;
           else if (p <= 0.05) oni.floor = 0;
         }
