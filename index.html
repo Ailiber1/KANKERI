@@ -5415,7 +5415,8 @@ function buildSchoolObjects(g) {
   });
   g.materials.push(ivyMat);
   for (let i = 0; i < 12; i++) {
-    const ix = -18 + Math.random() * 36;
+    let ix;
+    do { ix = -18 + Math.random() * 36; } while (Math.abs(ix) < 3);
     const iz = Math.random() < 0.5 ? 23.95 : 32.05;
     const ih = 1.5 + Math.random() * 4;
     const iw = 1 + Math.random() * 2;
