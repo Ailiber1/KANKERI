@@ -4643,19 +4643,6 @@ function buildSchoolObjects(g) {
   swCeilingW.position.set(-17, FLOOR_H - 0.01, 25.65);
   g.scene.add(swCeilingW);
 
-  // --- 2F階段室開口部の落下防止壁（z=27, 2Fレベル）---
-  const swWallGeo = new THREE.BoxGeometry(6, 4, 0.3);
-  swWallGeo.setAttribute('uv2', swWallGeo.attributes.uv);
-  g.geometries.push(swWallGeo);
-  const swWallE = new THREE.Mesh(swWallGeo, schoolDirtyMat);
-  swWallE.position.set(17, FLOOR_H + 2, 27);
-  swWallE.castShadow = true; swWallE.receiveShadow = true;
-  g.scene.add(swWallE); g.cameraMeshes.push(swWallE);
-  const swWallW = new THREE.Mesh(swWallGeo, schoolDirtyMat);
-  swWallW.position.set(-17, FLOOR_H + 2, 27);
-  swWallW.castShadow = true; swWallW.receiveShadow = true;
-  g.scene.add(swWallW); g.cameraMeshes.push(swWallW);
-
   // --- 階段（10段 z:27→30, y:0→4）+ 踊り場（z:30→31.5, y=4）---
   const stepMat = makePBRMat(concretePBR, { roughness: 0.8 });
   const NUM_STEPS = 10;
@@ -6389,21 +6376,6 @@ function updatePlayer(g, dt) {
       // 2Fから正面入口への落下防止
       if (g.playerFloor === 1 && Math.abs(px) < 2.5 && pz < 25) {
         ctrl.position.z = 25;
-      }
-      // 2F: 階段室壁(z=27)の貫通防止 — 廊下側からランプゾーンへの進入を阻止
-      const inStairwellX = (px > 14 && px < 19.5) || (px < -14 && px > -19.5);
-      if (g.playerFloor === 1 && inStairwellX && pz > 26.8 && pz < 30) {
-        if (!g._descendingStairs) {
-          ctrl.position.z = 26.8;
-        }
-      }
-      // 踊り場(z>=30)に到達したら下降フラグON
-      if (g.playerFloor === 1 && inStairwellX && pz >= 30) {
-        g._descendingStairs = true;
-      }
-      // 廊下に戻ったらフラグリセット
-      if (!inStairwellX || pz < 27 || g.playerFloor === 0) {
-        g._descendingStairs = false;
       }
     } else {
       g.playerFloor = 0;
