@@ -7813,24 +7813,46 @@ function updateCpuAlly(g, ally, dt) {
       if (ally.hideSpot) {
         ally.state = 'sneak';
         ally.targetPos = ally.hideSpot;
-        ally.isCrouching = true;
+        // hideフェーズ or 鬼が遠い → 立って走る、鬼が近い → しゃがむ
+        ally.isCrouching = (g.gamePhase === 'seek' && oniDist < 18);
       }
       break;
     }
 
     case 'sneak': {
-      // Crouch-walk to hiding spot (quiet, slow, stealthy)
-      ally.isCrouching = true;
+      // 鬼との距離に応じて立ち/しゃがみを動的に切り替え
+      if (g.gamePhase !== 'seek') {
+        // hideフェーズ中は鬼が探索していないので立って走る
+        ally.isCrouching = false;
+      } else if (oniDist > 22) {
+        // 鬼が非常に遠い → 立って素早く移動
+        ally.isCrouching = false;
+      } else if (oniDist > 12) {
+        // 鬼が中距離 → 鬼がこちらを向いていたらしゃがむ、そうでなければ立つ
+        ally.isCrouching = oniFacingAlly;
+      } else {
+        // 鬼が近い → しゃがんで慎重に移動
+        ally.isCrouching = true;
+      }
 
       // FREEZE if oni is very close and facing us — don't move, don't make sound
-      if (oniDist < 6 && oniFacingAlly) {
+      if (oniDist < 6 && oniFacingAlly && g.gamePhase === 'seek') {
         ally.moveSpeed = 0;
+        ally.isCrouching = true;
         // Stay frozen until oni turns away or moves past
         break;
       }
 
       if (ally.targetPos) {
-        moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, ally.sneakSpeed, dt, g);
+        // 移動速度も距離に応じて調整
+        let sneakMoveSpeed;
+        if (!ally.isCrouching) {
+          // 立っている → ダッシュ or 通常走り
+          sneakMoveSpeed = (g.gamePhase !== 'seek' || oniDist > 25) ? ally.sprintSpeed * 0.9 : ally.sneakSpeed * 1.8;
+        } else {
+          sneakMoveSpeed = ally.sneakSpeed;
+        }
+        moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, sneakMoveSpeed, dt, g);
         const dist = ally.position.distanceTo(ally.targetPos);
         if (dist < 0.5) {
           ally.moveSpeed = 0;
@@ -8060,9 +8082,17 @@ function updateCpuAlly(g, ally, dt) {
     }
 
     case 'relocate': {
-      // Smart escape: crouch when oni is far, sprint when oni is dangerously close
-      const urgentEscape = oniDist < 6 && oniFacingAlly;
-      ally.isCrouching = !urgentEscape;
+      // 鬼との距離に応じて走り/しゃがみを切り替え
+      const urgentEscape = oniDist < 8 && oniFacingAlly;
+      if (urgentEscape) {
+        ally.isCrouching = false; // 緊急時はダッシュで逃げる
+      } else if (oniDist > 18) {
+        ally.isCrouching = false; // 鬼が遠い → 立って素早く移動
+      } else if (oniDist > 10 && !oniFacingAlly) {
+        ally.isCrouching = false; // 鬼が中距離で背を向けている → 立って移動
+      } else {
+        ally.isCrouching = true;  // それ以外 → しゃがんで慎重に移動
+      }
 
       // Find new spot if we don't have one yet
       if (!ally.targetPos) {
@@ -8087,8 +8117,8 @@ function updateCpuAlly(g, ally, dt) {
       }
 
       if (ally.targetPos) {
-        // Speed: sprint if urgent, fast sneak otherwise
-        const relocSpeed = urgentEscape ? ally.sprintSpeed * 0.8 : ally.sneakSpeed * 1.5;
+        // 速度: 緊急ダッシュ / 立ち走り / しゃがみ移動
+        const relocSpeed = urgentEscape ? ally.sprintSpeed : (!ally.isCrouching ? ally.sneakSpeed * 1.8 : ally.sneakSpeed);
         moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, relocSpeed, dt, g);
         const dist = ally.position.distanceTo(ally.targetPos);
         if (dist < 1.0) {
