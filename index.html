@@ -9248,7 +9248,8 @@ function startGame(stageNum, mode) {
   const allyNames = ['味方A', '味方B', '味方C'];
   for (let i = 0; i < cpuCount; i++) {
     const angle = (i + 1) * Math.PI * 2 / (cpuCount + 1);
-    const baseX = Math.sin(angle) * 5, baseZ = Math.cos(angle) * 5 - 10;
+    const spawnCZ = stageNum === 4 ? 5 : -10; // Stage4: 花壇・朝礼台(z:-10~-15)を避けて校庭中央へ
+    const baseX = Math.sin(angle) * 5, baseZ = Math.cos(angle) * 5 + spawnCZ;
     const safe = findSafeSpawn(G, baseX, baseZ);
     const ally = createCpuAlly(G, allyNames[i], cpuLevels[i], safe.x, safe.z, i);
     G.cpuAllies.push(ally);
