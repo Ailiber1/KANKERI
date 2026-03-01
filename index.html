@@ -4468,6 +4468,11 @@ function buildSchoolObjects(g) {
 
   // Stage 4: フォグ密度を軽減（深夜でも遠くが見えるように）
   g.scene.fog.density = 0.006;
+  // Stage 4: sunLight（昼用ライト）のシャドウを無効化
+  // → シャドウカメラ(±25)が校舎(z:24~32)を十分にカバーできず黒い影アーティファクトが発生するため
+  // → 代わりにmoonDirLight(±40)が適切な影を提供
+  g.sunLight.castShadow = false;
+  g.sunLight.intensity = 0.05; // 深夜なのでほぼゼロに
 
   // === PBRテクスチャのロード ===
   const loadPBR = (name, repS, repT) => {
@@ -5191,6 +5196,9 @@ function buildSchoolObjects(g) {
   moonDirLight.shadow.camera.right = 40;
   moonDirLight.shadow.camera.top = 40;
   moonDirLight.shadow.camera.bottom = -40;
+  moonDirLight.shadow.camera.near = 1;
+  moonDirLight.shadow.camera.far = 120;
+  moonDirLight.shadow.bias = -0.001;
   g.scene.add(moonDirLight);
 
   // SpotLight（月光のハイライト — 校庭中央を重点的に照らす）
