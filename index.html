@@ -10687,8 +10687,8 @@ function updateTempleGimmicks(g, dt) {
         for (const oni of g.onis) {
           const d = Math.sqrt((oni.position.x - px) ** 2 + (oni.position.z - pz) ** 2);
           if (d < 12 && oni.state === 'patrol') {
-            oni.state = 'investigate';
-            oni.investigateTarget = { x: px, z: pz };
+            oni.state = 'footSound';
+            oni.targetPos = { x: px, z: pz };
             oni.stateTimer = 0;
           }
         }
@@ -10890,7 +10890,8 @@ function updateGamePhases(g, dt) {
           }
           if (closest) {
             closest.state = 'chase';
-            closest.chaseTarget = g.player.position;
+            closest.chaseTarget = 'player';
+            closest.chasedPlayer = g.player.position.clone();
             closest.stateTimer = 0;
           }
         }
@@ -11485,6 +11486,7 @@ function startGame(stageNum, mode) {
   if (G._isScoreAttack) {
     const spawnSafe = findSafeSpawn(G, 0, -30);
     G.playerFig.group.position.set(spawnSafe.x, 0, spawnSafe.z);
+    G.player.position.set(spawnSafe.x, 0, spawnSafe.z);
   }
 
   // Create CPU allies (Score Attack時はCPU味方なし)
