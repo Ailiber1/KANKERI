@@ -4597,7 +4597,7 @@ function buildSchoolObjects(g) {
   f1TGeo.setAttribute('uv2', f1TGeo.attributes.uv);
   const f1TMesh = new THREE.Mesh(f1TGeo, floorTileMat);
   f1TMesh.rotation.x = -Math.PI / 2;
-  f1TMesh.position.set(0, 0.02, 27.5);
+  f1TMesh.position.set(0, 0.15, 27.5);
   f1TMesh.receiveShadow = true;
   g.scene.add(f1TMesh); g.geometries.push(f1TGeo);
   // 2F床タイル（両階段室を除く → 幅28, center x=0）
@@ -4608,6 +4608,56 @@ function buildSchoolObjects(g) {
   f2TMesh.position.set(0, FLOOR_H + 0.02, 27.5);
   f2TMesh.receiveShadow = true;
   g.scene.add(f2TMesh); g.geometries.push(f2TGeo);
+
+  // --- 階段室上部の2F廊下床（z:24~27, 東西両側）---
+  // 東階段室上の2F廊下床
+  const swCorridorGeo = new THREE.PlaneGeometry(6, 3);
+  swCorridorGeo.setAttribute('uv2', swCorridorGeo.attributes.uv);
+  g.geometries.push(swCorridorGeo);
+  const swCorridorE = new THREE.Mesh(swCorridorGeo, f2Mat);
+  swCorridorE.rotation.x = -Math.PI / 2;
+  swCorridorE.position.set(17, FLOOR_H, 25.5);
+  swCorridorE.receiveShadow = true;
+  g.scene.add(swCorridorE);
+  // 東: 2F廊下床タイル
+  const swCorridorTileE = new THREE.Mesh(swCorridorGeo, floorTileMat);
+  swCorridorTileE.rotation.x = -Math.PI / 2;
+  swCorridorTileE.position.set(17, FLOOR_H + 0.02, 25.5);
+  swCorridorTileE.receiveShadow = true;
+  g.scene.add(swCorridorTileE);
+  // 東: 1F天井面
+  const swCeilingE = new THREE.Mesh(swCorridorGeo, c1Mat);
+  swCeilingE.rotation.x = Math.PI / 2;
+  swCeilingE.position.set(17, FLOOR_H - 0.01, 25.5);
+  g.scene.add(swCeilingE);
+  // 西階段室上の2F廊下床
+  const swCorridorW = new THREE.Mesh(swCorridorGeo, f2Mat);
+  swCorridorW.rotation.x = -Math.PI / 2;
+  swCorridorW.position.set(-17, FLOOR_H, 25.5);
+  swCorridorW.receiveShadow = true;
+  g.scene.add(swCorridorW);
+  const swCorridorTileW = new THREE.Mesh(swCorridorGeo, floorTileMat);
+  swCorridorTileW.rotation.x = -Math.PI / 2;
+  swCorridorTileW.position.set(-17, FLOOR_H + 0.02, 25.5);
+  swCorridorTileW.receiveShadow = true;
+  g.scene.add(swCorridorTileW);
+  const swCeilingW = new THREE.Mesh(swCorridorGeo, c1Mat);
+  swCeilingW.rotation.x = Math.PI / 2;
+  swCeilingW.position.set(-17, FLOOR_H - 0.01, 25.5);
+  g.scene.add(swCeilingW);
+
+  // --- 2F階段室開口部の落下防止壁（z=27, 2Fレベル）---
+  const swWallGeo = new THREE.BoxGeometry(6, 4, 0.3);
+  swWallGeo.setAttribute('uv2', swWallGeo.attributes.uv);
+  g.geometries.push(swWallGeo);
+  const swWallE = new THREE.Mesh(swWallGeo, schoolDirtyMat);
+  swWallE.position.set(17, FLOOR_H + 2, 27);
+  swWallE.castShadow = true; swWallE.receiveShadow = true;
+  g.scene.add(swWallE); g.cameraMeshes.push(swWallE);
+  const swWallW = new THREE.Mesh(swWallGeo, schoolDirtyMat);
+  swWallW.position.set(-17, FLOOR_H + 2, 27);
+  swWallW.castShadow = true; swWallW.receiveShadow = true;
+  g.scene.add(swWallW); g.cameraMeshes.push(swWallW);
 
   // --- 階段（10段 z:27→30, y:0→4）+ 踊り場（z:30→31.5, y=4）---
   const stepMat = makePBRMat(concretePBR, { roughness: 0.8 });
