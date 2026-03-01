@@ -5164,6 +5164,10 @@ function buildSchoolObjects(g) {
     g.streetLights.push({ spot: lampLight, fixture: lampHead, fixMat: lampHeadMat });
   }
 
+  // DEBUG: 黒帯の正体を特定するため背景を赤に、フォグ無効
+  g.scene.background = new THREE.Color(0xff0000);
+  g.scene.fog = null;
+
   // Stage 4 夜間シーンの露出 + ポストプロセッシング強化
   g.renderer.toneMappingExposure = 0.75;
   if (g.composer && g.bloomPass && g.filmPass) {
