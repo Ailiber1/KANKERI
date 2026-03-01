@@ -4611,36 +4611,36 @@ function buildSchoolObjects(g) {
 
   // --- 階段室上部の2F廊下床（z:24~27.3, 東西両側）---
   // z:27.3まで延長して壁(z:27)との隙間を完全に解消
-  const swCorridorGeo = new THREE.PlaneGeometry(6, 3.6);
+  const swCorridorGeo = new THREE.PlaneGeometry(6, 3.0);
   swCorridorGeo.setAttribute('uv2', swCorridorGeo.attributes.uv);
   g.geometries.push(swCorridorGeo);
   const swCorridorE = new THREE.Mesh(swCorridorGeo, f2Mat);
   swCorridorE.rotation.x = -Math.PI / 2;
-  swCorridorE.position.set(17, FLOOR_H, 25.65);
+  swCorridorE.position.set(17, FLOOR_H, 25.5);
   swCorridorE.receiveShadow = true;
   g.scene.add(swCorridorE);
   const swCorridorTileE = new THREE.Mesh(swCorridorGeo, floorTileMat);
   swCorridorTileE.rotation.x = -Math.PI / 2;
-  swCorridorTileE.position.set(17, FLOOR_H + 0.02, 25.65);
+  swCorridorTileE.position.set(17, FLOOR_H + 0.02, 25.5);
   swCorridorTileE.receiveShadow = true;
   g.scene.add(swCorridorTileE);
   const swCeilingE = new THREE.Mesh(swCorridorGeo, c1Mat);
   swCeilingE.rotation.x = Math.PI / 2;
-  swCeilingE.position.set(17, FLOOR_H - 0.01, 25.65);
+  swCeilingE.position.set(17, FLOOR_H - 0.01, 25.5);
   g.scene.add(swCeilingE);
   const swCorridorW = new THREE.Mesh(swCorridorGeo, f2Mat);
   swCorridorW.rotation.x = -Math.PI / 2;
-  swCorridorW.position.set(-17, FLOOR_H, 25.65);
+  swCorridorW.position.set(-17, FLOOR_H, 25.5);
   swCorridorW.receiveShadow = true;
   g.scene.add(swCorridorW);
   const swCorridorTileW = new THREE.Mesh(swCorridorGeo, floorTileMat);
   swCorridorTileW.rotation.x = -Math.PI / 2;
-  swCorridorTileW.position.set(-17, FLOOR_H + 0.02, 25.65);
+  swCorridorTileW.position.set(-17, FLOOR_H + 0.02, 25.5);
   swCorridorTileW.receiveShadow = true;
   g.scene.add(swCorridorTileW);
   const swCeilingW = new THREE.Mesh(swCorridorGeo, c1Mat);
   swCeilingW.rotation.x = Math.PI / 2;
-  swCeilingW.position.set(-17, FLOOR_H - 0.01, 25.65);
+  swCeilingW.position.set(-17, FLOOR_H - 0.01, 25.5);
   g.scene.add(swCeilingW);
 
   // --- 階段（10段 z:27→30, y:0→4）+ 踊り場（z:30→31.5, y=4）---
@@ -4717,12 +4717,10 @@ function buildSchoolObjects(g) {
   sw2FWallE.position.set(16.75, FLOOR_H + FLOOR_H / 2, 27);
   sw2FWallE.castShadow = true; sw2FWallE.receiveShadow = true;
   g.scene.add(sw2FWallE); g.cameraMeshes.push(sw2FWallE);
-  g.colliders.push({ type:'box', x:16.75, z:27, hw:2.75, hd:WT, h:FLOOR_H, floor:1 });
   const sw2FWallW = new THREE.Mesh(sw2FWallGeo, schoolDirtyMat);
   sw2FWallW.position.set(-16.75, FLOOR_H + FLOOR_H / 2, 27);
   sw2FWallW.castShadow = true; sw2FWallW.receiveShadow = true;
   g.scene.add(sw2FWallW); g.cameraMeshes.push(sw2FWallW);
-  g.colliders.push({ type:'box', x:-16.75, z:27, hw:2.75, hd:WT, h:FLOOR_H, floor:1 });
 
   // --- 教室内装（1F × 3教室 + 2F × 3教室）---
   const deskMat = makePBRMat(woodPBR, { roughness: 0.75 });
@@ -6401,6 +6399,16 @@ function updatePlayer(g, dt) {
       // 2Fから正面入口への落下防止
       if (g.playerFloor === 1 && Math.abs(px) < 2.5 && pz < 25) {
         ctrl.position.z = 25;
+      }
+      // 2F通路プレイヤーの階段室侵入防止（視覚壁 z:27 の位置）
+      // コライダーではなく移動制限で実装（階段降下時はinEastStair/inWestStairで除外される）
+      if (g.playerFloor === 1 && !inEastStair && !inWestStair) {
+        if (ctrl.position.x > 14 && ctrl.position.x < 20 && ctrl.position.z > 27) {
+          ctrl.position.z = 27;
+        }
+        if (ctrl.position.x < -14 && ctrl.position.x > -20 && ctrl.position.z > 27) {
+          ctrl.position.z = 27;
+        }
       }
     } else {
       g.playerFloor = 0;
