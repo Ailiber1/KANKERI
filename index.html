@@ -6372,11 +6372,18 @@ function updatePlayer(g, dt) {
     const inBldg = px > -19.5 && px < 19.5 && pz > 24.5 && pz < 32;
     if (inBldg) {
       if (g.playerFloor === undefined) g.playerFloor = 0;
-      // 東階段室 (x:14~19.5) or 西階段室 (x:-19.5~-14), z:27~31.5
-      const inEastStair = px > 14 && pz > 27;
-      const inWestStair = px < -14 && pz > 27;
+      // 2F通路プレイヤーの階段室侵入防止（壁 z:27）
+      // _onStairs=前フレームで階段上にいたか。降下中は通過許可、通路からは侵入不可
+      if (g.playerFloor === 1 && !g._onStairs) {
+        if (px > 14 && px < 20 && ctrl.position.z > 27) ctrl.position.z = 27;
+        if (px < -14 && px > -20 && ctrl.position.z > 27) ctrl.position.z = 27;
+      }
+      // 侵入防止後のZ座標で階段判定
+      const curZ = ctrl.position.z;
+      const inEastStair = px > 14 && curZ > 27;
+      const inWestStair = px < -14 && curZ > 27;
       if (inEastStair || inWestStair) {
-        if (pz >= 30) {
+        if (curZ >= 30) {
           // 踊り場ゾーン (z:30~31.5)
           if (g.playerFloor === 0) {
             g.playerFloor = 1;
@@ -6384,7 +6391,7 @@ function updatePlayer(g, dt) {
           ctrl.position.y = g.playerFloor === 0 ? 0.15 : 4.0;
         } else {
           // 階段ゾーン (z:27~30): 10段の離散的な高さ
-          const progress = Math.max(0, Math.min(1, (pz - 27) / 3));
+          const progress = Math.max(0, Math.min(1, (curZ - 27) / 3));
           ctrl.position.y = Math.ceil(progress * 10) * 0.4;
           if (progress >= 0.95) {
             g.playerFloor = 1;
@@ -6396,19 +6403,11 @@ function updatePlayer(g, dt) {
         // 教室・廊下エリア（1F床タイルはy:0.15）
         ctrl.position.y = g.playerFloor === 0 ? 0.15 : 4.0;
       }
+      // _onStairsフラグ更新（次フレームで階段降下の通過を許可するため）
+      g._onStairs = inEastStair || inWestStair;
       // 2Fから正面入口への落下防止
-      if (g.playerFloor === 1 && Math.abs(px) < 2.5 && pz < 25) {
+      if (g.playerFloor === 1 && Math.abs(px) < 2.5 && ctrl.position.z < 25) {
         ctrl.position.z = 25;
-      }
-      // 2F通路プレイヤーの階段室侵入防止（視覚壁 z:27 の位置）
-      // コライダーではなく移動制限で実装（階段降下時はinEastStair/inWestStairで除外される）
-      if (g.playerFloor === 1 && !inEastStair && !inWestStair) {
-        if (ctrl.position.x > 14 && ctrl.position.x < 20 && ctrl.position.z > 27) {
-          ctrl.position.z = 27;
-        }
-        if (ctrl.position.x < -14 && ctrl.position.x > -20 && ctrl.position.z > 27) {
-          ctrl.position.z = 27;
-        }
       }
     } else {
       g.playerFloor = 0;
