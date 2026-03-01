@@ -4559,12 +4559,8 @@ function buildSchoolObjects(g) {
   addBox(6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);   // B / C 間
   // C / 東階段室仕切り壁（z:27~30）
   addBox(14, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30
-  // 東階段室仕切り壁 上部（z:30.5~32, 踊り場出口 z:30~30.5 は開口）
-  addBox(14, 31.25, WT, 0.75, 8, schoolDirtyMat);  // z:30.5~32
   // 西階段室 / A 仕切り壁（z:27~30）
   addBox(-14, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30
-  // 西階段室仕切り壁 上部（z:30.5~32, 踊り場出口 z:30~30.5 は開口）
-  addBox(-14, 31.25, WT, 0.75, 8, schoolDirtyMat); // z:30.5~32
   // --- 2F床 / 1F天井 (y=4, 東階段室 x:14~20 と西階段室 x:-20~-14 を除く) ---
   const f2Geo = new THREE.PlaneGeometry(28, 8);
   f2Geo.setAttribute('uv2', f2Geo.attributes.uv);
