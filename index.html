@@ -4818,20 +4818,7 @@ function buildSchoolObjects(g) {
     else { sMesh.position.set(19.98, 0.5+Math.random()*3, 25+Math.random()*6); sMesh.rotation.y = -Math.PI/2; }
     g.scene.add(sMesh);
   }
-  // 校庭にも廃墟ディテール（ひび割れ、雑草）
-  const weedMat = new THREE.MeshStandardMaterial({ color: 0x2a3a1a, roughness: 0.9, side: THREE.DoubleSide });
-  g.materials.push(weedMat);
-  for (let i = 0; i < 30; i++) {
-    const wx = -30 + Math.random() * 60;
-    const wz = -30 + Math.random() * 50;
-    const wGeo = new THREE.PlaneGeometry(0.3 + Math.random() * 0.5, 0.4 + Math.random() * 0.6);
-    g.geometries.push(wGeo);
-    const wMesh = new THREE.Mesh(wGeo, weedMat);
-    wMesh.position.set(wx, gH(wx, wz) + 0.2, wz);
-    wMesh.rotation.y = Math.random() * Math.PI * 2;
-    wMesh.rotation.x = -0.3;
-    g.scene.add(wMesh);
-  }
+  // 校庭の廃墟ディテール（雑草は単色で不自然なため削除済み）
 
   // --- 窓（外壁）---
   const windowMat = new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.5, metalness: 0.0 });
