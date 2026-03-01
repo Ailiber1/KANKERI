@@ -4592,12 +4592,12 @@ function buildSchoolObjects(g) {
   f1TMesh.position.set(0, 0.02, 27.5);
   f1TMesh.receiveShadow = true;
   g.scene.add(f1TMesh); g.geometries.push(f1TGeo);
-  // 2F床タイル
-  const f2TGeo = new THREE.PlaneGeometry(39, 7);
+  // 2F床タイル（階段室 x:14~20 を除く → 幅33.5, center x=-3.25）
+  const f2TGeo = new THREE.PlaneGeometry(33.5, 7);
   f2TGeo.setAttribute('uv2', f2TGeo.attributes.uv);
   const f2TMesh = new THREE.Mesh(f2TGeo, floorTileMat);
   f2TMesh.rotation.x = -Math.PI / 2;
-  f2TMesh.position.set(0, FLOOR_H + 0.02, 27.5);
+  f2TMesh.position.set(-3.25, FLOOR_H + 0.02, 27.5);
   f2TMesh.receiveShadow = true;
   g.scene.add(f2TMesh); g.geometries.push(f2TGeo);
 
@@ -4726,13 +4726,13 @@ function buildSchoolObjects(g) {
   for (let fl = 0; fl < 2; fl++) {
     const yOff = fl * FLOOR_H;
     for (let lx = -16; lx <= 16; lx += 8) {
-      const flLight = new THREE.PointLight(0xccddff, fl === 0 ? 0.5 : 0.3, 10);
+      const flLight = new THREE.PointLight(0xccddff, fl === 0 ? 0.25 : 0.15, 8);
       flLight.position.set(lx, yOff + 3.5, 25.75);
       g.scene.add(flLight);
       const flGeo = new THREE.BoxGeometry(1.0, 0.06, 0.12);
       g.geometries.push(flGeo);
       const flMat2 = new THREE.MeshStandardMaterial({
-        color: 0xaaccee, emissive: 0x889dbb, emissiveIntensity: fl === 0 ? 0.5 : 0.3, roughness: 0.3
+        color: 0xaaccee, emissive: 0x556677, emissiveIntensity: fl === 0 ? 0.3 : 0.15, roughness: 0.3
       });
       g.materials.push(flMat2);
       const flMesh = new THREE.Mesh(flGeo, flMat2);
@@ -4745,7 +4745,7 @@ function buildSchoolObjects(g) {
     // 教室にも薄暗い照明
     for (const room of classrooms) {
       const rcx = (room.xMin + room.xMax) / 2;
-      const rmLight = new THREE.PointLight(0xccddee, 0.2, 8);
+      const rmLight = new THREE.PointLight(0xccddee, 0.1, 6);
       rmLight.position.set(rcx, yOff + 3.5, 29);
       g.scene.add(rmLight);
     }
@@ -4753,11 +4753,11 @@ function buildSchoolObjects(g) {
 
   // --- 階段室・踊り場の照明 ---
   // 1F階段室
-  const stairLight1 = new THREE.PointLight(0xddccaa, 0.4, 8);
+  const stairLight1 = new THREE.PointLight(0xddccaa, 0.2, 6);
   stairLight1.position.set(16.75, 3.0, 28.5);
   g.scene.add(stairLight1);
-  // 2F踊り場（明るめ — ドア位置が分かるように）
-  const stairLight2 = new THREE.PointLight(0xeeddaa, 0.6, 8);
+  // 2F踊り場
+  const stairLight2 = new THREE.PointLight(0xeeddaa, 0.3, 6);
   stairLight2.position.set(16.75, FLOOR_H + 3.0, 30.75);
   g.scene.add(stairLight2);
   // 踊り場に非常灯風の小さな赤いライト
@@ -5104,11 +5104,11 @@ function buildSchoolObjects(g) {
 
   // === 校庭の照明 ===
   // 廃校専用の環境光（月明かりの底上げ）
-  const schoolAmbient = new THREE.AmbientLight(0x223355, 0.8);
+  const schoolAmbient = new THREE.AmbientLight(0x223355, 0.4);
   g.scene.add(schoolAmbient);
 
   // メインのDirectionalLight（月光 — シーン全体を均一に照らす）
-  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 1.0);
+  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 0.5);
   moonDirLight.position.set(30, 50, 20);
   moonDirLight.castShadow = true;
   moonDirLight.shadow.mapSize.width = 1024;
@@ -5120,7 +5120,7 @@ function buildSchoolObjects(g) {
   g.scene.add(moonDirLight);
 
   // SpotLight（月光のハイライト — 校庭中央を重点的に照らす）
-  const moonLight = new THREE.SpotLight(0x8888cc, 3.0, 150, Math.PI / 3, 0.4, 0.5);
+  const moonLight = new THREE.SpotLight(0x8888cc, 1.5, 150, Math.PI / 3, 0.4, 0.5);
   moonLight.position.set(30, 50, 20);
   moonLight.target.position.set(0, 0, 0);
   g.scene.add(moonLight);
@@ -5166,17 +5166,17 @@ function buildSchoolObjects(g) {
   }
 
   // Stage 4 夜間シーンの露出 + ポストプロセッシング強化
-  g.renderer.toneMappingExposure = 1.1;
+  g.renderer.toneMappingExposure = 0.65;
   if (g.composer && g.bloomPass && g.filmPass) {
-    g.bloomPass.strength = 0.4;   // ホラー用ブルーム強め
-    g.bloomPass.radius = 0.5;
-    g.bloomPass.threshold = 0.7;
-    g.filmPass.uniforms.vignetteAmt.value = 0.9;  // 画面端を暗く
-    g.filmPass.uniforms.grainAmt.value = 0.06;    // フィルムグレイン強め
-    g.filmPass.uniforms.tintR.value = 0.88;        // 寒色系ティント
-    g.filmPass.uniforms.tintG.value = 0.92;
-    g.filmPass.uniforms.tintB.value = 1.08;
-    g.filmPass.uniforms.desaturation.value = 0.2;  // 彩度を落とす
+    g.bloomPass.strength = 0.12;  // 控えめなブルーム
+    g.bloomPass.radius = 0.3;
+    g.bloomPass.threshold = 0.92; // 非常に明るいもののみ
+    g.filmPass.uniforms.vignetteAmt.value = 0.85;
+    g.filmPass.uniforms.grainAmt.value = 0.05;
+    g.filmPass.uniforms.tintR.value = 0.90;
+    g.filmPass.uniforms.tintG.value = 0.93;
+    g.filmPass.uniforms.tintB.value = 1.06;
+    g.filmPass.uniforms.desaturation.value = 0.15;
   }
 
   // === kickableSigns の初期化 ===
@@ -5451,6 +5451,8 @@ function buildSchoolObjects(g) {
       locker.position.set(lx, yOff + 0.9, 24.7);
       locker.castShadow = true; locker.receiveShadow = true;
       g.scene.add(locker); g.cameraMeshes.push(locker);
+      // ロッカーのコライダー（すり抜け防止）
+      g.colliders.push({ type:'box', x:lx, z:24.7, hw:1.25, hd:0.2, h:1.8 });
     }
   }
 
@@ -5518,7 +5520,7 @@ function buildSchoolObjects(g) {
   }
 
   // --- 外部追加照明: 月の方向スポットライト ---
-  const moonSpot = new THREE.SpotLight(0x4466aa, 1.5, 60, Math.PI/6, 0.5, 1);
+  const moonSpot = new THREE.SpotLight(0x4466aa, 0.6, 60, Math.PI/6, 0.5, 1);
   moonSpot.position.set(-30, 25, 10);
   moonSpot.target.position.set(0, 0, 28);
   g.scene.add(moonSpot);
@@ -6965,17 +6967,32 @@ function updateOni(g, oni, dt) {
           SoundManager.playGameSE('found');
         }
       }
-      // Lost target - return to patrol after searching
+      // Lost target or stuck near target - return to patrol/search
       const cDist = Math.sqrt(
         (oni.position.x - oni.chasedPlayer.x)**2 +
         (oni.position.z - oni.chasedPlayer.z)**2
       );
-      if (cDist < 2 && !canSeeChaseTarget && !canSeeAny) {
-        oni.stateTimer += dt;
-        if (oni.stateTimer > 4) {
-          oni.state = 'patrol';
-          oni.stateTimer = 0;
-          oni.chaseTarget = null;
+      if (cDist < 2) {
+        if (!canSeeChaseTarget && !canSeeAny) {
+          // ターゲットを見失った → 素早くpatrolen
+          oni.stateTimer += dt;
+          if (oni.stateTimer > 2) {
+            oni.state = 'search';
+            oni.stateTimer = 0;
+            oni._searchDest = { x: oni.chasedPlayer.x + (Math.random()-0.5)*6, z: oni.chasedPlayer.z + (Math.random()-0.5)*6 };
+            oni.chaseTarget = null;
+          }
+        } else {
+          // 見えているが近すぎてcanTouch条件を満たさない → 回り込み
+          oni.stateTimer += dt;
+          if (oni.stateTimer > 3) {
+            const angle = Math.atan2(oni.chasedPlayer.x - oni.position.x, oni.chasedPlayer.z - oni.position.z);
+            oni.chasedPlayer = {
+              x: oni.chasedPlayer.x + Math.sin(angle + Math.PI/2) * 3,
+              z: oni.chasedPlayer.z + Math.cos(angle + Math.PI/2) * 3
+            };
+            oni.stateTimer = 0;
+          }
         }
       }
       break;
@@ -7268,8 +7285,8 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   const movedDist = Math.sqrt((oni.position.x - prevX)**2 + (oni.position.z - prevZ)**2);
   if (movedDist < speed * dt * 0.1 && speed * dt > 0.05) {
     oni._stuckCount = (oni._stuckCount || 0) + 1;
-    // 1.5秒以上スタック → ウェイポイントをスキップ
-    if (oni._stuckCount > 90) {
+    // 1秒以上スタック → ウェイポイントをスキップ
+    if (oni._stuckCount > 60) {
       oni._stuckCount = 0;
       oni._skipWaypoint = true;
     }
