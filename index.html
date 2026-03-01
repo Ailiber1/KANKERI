@@ -2490,7 +2490,7 @@ const STAGE_CONFIGS = {
     ]
   },
   5: {
-    name: '団地（真夏の公営住宅群）', nameEn: 'Public Housing Complex', size: 90, timeLimit: 240,
+    name: '団地（真夏の公営住宅群）', nameEn: 'Public Housing Complex', size: 100, timeLimit: 240,
     initialOni: 3, maxOni: 5, oniAddAt: [null, null, null, 120, 60],
     startPhase: 0, cycleDuration: 60, // 朝スタート、60秒サイクル
     canPositions: [
@@ -2509,10 +2509,10 @@ const STAGE_CONFIGS = {
       {x:-30,z:25},{x:-20,z:28},{x:-10,z:28},{x:0,z:28},
       // 2棟裏側
       {x:10,z:28},{x:20,z:28},{x:30,z:25},
-      // 1棟左側面（西端、BLDG_W=30→端 x=-40）
-      {x:-42,z:0},{x:-42,z:10},{x:-42,z:-10},
-      // 2棟右側面（東端、端 x=40）
-      {x:42,z:0},{x:42,z:10},{x:42,z:-10},
+      // 1棟左側面（西端の通路、フェンス~階段室間を巡回）
+      {x:-44,z:0},{x:-44,z:10},{x:-44,z:-10},
+      // 2棟右側面（東端の通路）
+      {x:44,z:0},{x:44,z:10},{x:44,z:-10},
       // 棟間通路（表→裏のショートカット）
       {x:-25,z:-15},{x:-25,z:15},
       {x:25,z:-15},{x:25,z:15},
@@ -2520,8 +2520,8 @@ const STAGE_CONFIGS = {
       {x:-41.5,z:0},{x:-8.5,z:0},
       // 階段室巡回（2棟: L=8.5, R=41.5）
       {x:8.5,z:0},{x:41.5,z:0},
-      // 外周
-      {x:-42,z:-42},{x:42,z:-42},{x:42,z:42},{x:-42,z:42}
+      // 外周（size=100、フェンスは±50）
+      {x:-48,z:-48},{x:48,z:-48},{x:48,z:48},{x:-48,z:48}
     ],
     interactables: [
       // 階段室の手すり（1棟L=-41.5, R=-8.5、2棟L=8.5, R=41.5）
@@ -6494,6 +6494,135 @@ function buildDanchiObjects(g) {
     g.filmPass.uniforms.desaturation.value = 0.0;
   }
 
+  // ========================================
+  //  屋上設備（給水塔・TVアンテナ）
+  // ========================================
+  for (const bldg of buildings) {
+    const bx = bldg.cx, bz = bldg.cz;
+    // 給水塔（各棟の屋上中央にコンクリート台 + 銀色タンク）
+    const tankBaseMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.9 });
+    g.materials.push(tankBaseMat);
+    const tankBaseGeo = addGeo(new THREE.BoxGeometry(2, 1.5, 2));
+    const tankBase = new THREE.Mesh(tankBaseGeo, tankBaseMat);
+    tankBase.position.set(bx, BLDG_H + 0.75, bz);
+    tankBase.castShadow = true;
+    g.scene.add(tankBase);
+    // 銀色のタンク本体
+    const tankGeo = addGeo(new THREE.CylinderGeometry(0.8, 0.8, 1.5, 12));
+    const tankMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3, metalness: 0.7 });
+    g.materials.push(tankMat);
+    const tank = new THREE.Mesh(tankGeo, tankMat);
+    tank.position.set(bx, BLDG_H + 2.25, bz);
+    tank.castShadow = true;
+    g.scene.add(tank);
+    // タンクの配管
+    const pipeGeo = addGeo(new THREE.CylinderGeometry(0.05, 0.05, 3, 6));
+    const pipeMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.6 });
+    g.materials.push(pipeMat);
+    const pipe = new THREE.Mesh(pipeGeo, pipeMat);
+    pipe.position.set(bx + 0.6, BLDG_H + 1.5, bz);
+    g.scene.add(pipe);
+
+    // TVアンテナ（屋上に2〜3本、骨組み型）
+    const antMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.5, metalness: 0.5 });
+    g.materials.push(antMat);
+    const antPoleGeo = addGeo(new THREE.CylinderGeometry(0.02, 0.02, 2.5, 4));
+    const antBarGeo = addGeo(new THREE.CylinderGeometry(0.015, 0.015, 1.2, 4));
+    for (let ai = 0; ai < 3; ai++) {
+      const ax = bx - 8 + ai * 8;
+      const pole = new THREE.Mesh(antPoleGeo, antMat);
+      pole.position.set(ax, BLDG_H + 1.25, bz - 1);
+      g.scene.add(pole);
+      // 横棒（魚骨型のエレメント）
+      for (let ae = 0; ae < 4; ae++) {
+        const bar = new THREE.Mesh(antBarGeo, antMat);
+        bar.rotation.z = Math.PI / 2;
+        bar.position.set(ax, BLDG_H + 0.8 + ae * 0.5, bz - 1);
+        g.scene.add(bar);
+      }
+    }
+  }
+
+  // ========================================
+  //  エントランスの庇（各階段室の南面入口上部）
+  // ========================================
+  const canopyMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.7, metalness: 0.2 });
+  g.materials.push(canopyMat);
+  const canopyGeo = addGeo(new THREE.BoxGeometry(3.5, 0.12, 1.5));
+  const canopyBracketGeo = addGeo(new THREE.BoxGeometry(0.08, 0.6, 1.2));
+  for (const bldg of buildings) {
+    const bx = bldg.cx, bz = bldg.cz;
+    const stairXs = [bx - BLDG_W/2 - STAIR_W/2, bx + BLDG_W/2 + STAIR_W/2];
+    for (const sx of stairXs) {
+      // 庇本体（南面入口の上）
+      const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+      canopy.position.set(sx, 2.8, bz - STAIR_D/2 - 0.8);
+      canopy.castShadow = true;
+      g.scene.add(canopy);
+      // 支持ブラケット（左右）
+      for (const side of [-1, 1]) {
+        const bracket = new THREE.Mesh(canopyBracketGeo, canopyMat);
+        bracket.position.set(sx + side * 1.5, 2.5, bz - STAIR_D/2 - 0.5);
+        g.scene.add(bracket);
+      }
+    }
+  }
+
+  // ========================================
+  //  夜の窓明かりシステム
+  // ========================================
+  // 各窓にemissive制御可能なマテリアルを設定
+  // 夜フェーズで一部の窓がランダムに暖色で光る
+  g._windowLightSystem = { windows: [], lastPattern: 0, patternInterval: 15 };
+  const litWindowMat = new THREE.MeshStandardMaterial({
+    color: 0x223344, roughness: 0.1, metalness: 0.8,
+    emissive: 0xffcc66, emissiveIntensity: 0
+  });
+  g.materials.push(litWindowMat);
+  const litWinGeo = addGeo(new THREE.PlaneGeometry(1.2, 1.0));
+  for (const bldg of buildings) {
+    const bx = bldg.cx, bz = bldg.cz;
+    for (let floor = 0; floor < 5; floor++) {
+      const fy = floor * FLOOR_H + 2.0;
+      for (let wx = -12; wx <= 12; wx += 3) {
+        // 南面の光る窓（独立マテリアル）
+        const wmat = litWindowMat.clone();
+        g.materials.push(wmat);
+        const wS = new THREE.Mesh(litWinGeo, wmat);
+        wS.position.set(bx + wx, fy, bz - BLDG_D/2 - 0.21);
+        g.scene.add(wS);
+        g._windowLightSystem.windows.push({ mesh: wS, mat: wmat, lit: false });
+        // 北面
+        const wmat2 = litWindowMat.clone();
+        g.materials.push(wmat2);
+        const wN = new THREE.Mesh(litWinGeo, wmat2);
+        wN.position.set(bx + wx, fy, bz + BLDG_D/2 + 0.21);
+        wN.rotation.y = Math.PI;
+        g.scene.add(wN);
+        g._windowLightSystem.windows.push({ mesh: wN, mat: wmat2, lit: false });
+      }
+    }
+  }
+
+  // ========================================
+  //  濡れた地面の反射システム
+  // ========================================
+  // 夜間に路面のmetalness/roughnessを変化させてウェット感を出す
+  // コンクリ舗装面に薄い反射レイヤーを重ねる
+  const wetOverlayGeo = addGeo(new THREE.PlaneGeometry(100, 100));
+  const wetOverlayMat = new THREE.MeshStandardMaterial({
+    color: 0x111122, roughness: 0.15, metalness: 0.6,
+    transparent: true, opacity: 0,
+    depthWrite: false
+  });
+  g.materials.push(wetOverlayMat);
+  const wetOverlay = new THREE.Mesh(wetOverlayGeo, wetOverlayMat);
+  wetOverlay.rotation.x = -Math.PI / 2;
+  wetOverlay.position.set(0, 0.01, 0);
+  wetOverlay.receiveShadow = true;
+  g.scene.add(wetOverlay);
+  g._wetGround = { mesh: wetOverlay, mat: wetOverlayMat };
+
   // kickableSigns の初期化
   g.kickableSigns = g.kickableSigns || [];
 }
@@ -9630,6 +9759,52 @@ function updateLaundrySheets(g, dt) {
   }
 }
 
+// --- 夜の窓明かり更新 ---
+function updateWindowLights(g, dt) {
+  if (!g._windowLightSystem || g._stageNum !== 5) return;
+  const ws = g._windowLightSystem;
+
+  // 昼夜サイクルのフェーズ判定（0=朝, 1=昼, 2=夕, 3=夜）
+  const dnc = g.dayNightCycle;
+  if (!dnc) return;
+  const isNight = dnc.phase === 3 || dnc.phase === 2; // 夕方〜夜
+
+  ws.lastPattern += dt;
+
+  // パターン変更（15秒ごとにランダムに窓の点灯/消灯を切替）
+  if (ws.lastPattern >= ws.patternInterval) {
+    ws.lastPattern = 0;
+    for (const w of ws.windows) {
+      // 夜は約40%の窓が点灯、昼は全消灯
+      w.lit = isNight && Math.random() < 0.4;
+    }
+  }
+
+  // emissiveIntensity をスムーズに変化
+  for (const w of ws.windows) {
+    const target = w.lit ? 0.8 : 0;
+    const current = w.mat.emissiveIntensity;
+    w.mat.emissiveIntensity += (target - current) * dt * 3;
+  }
+}
+
+// --- 濡れた地面の反射更新 ---
+function updateWetGround(g, dt) {
+  if (!g._wetGround || g._stageNum !== 5) return;
+  const dnc = g.dayNightCycle;
+  if (!dnc) return;
+
+  // 夜フェーズで路面が濡れて反射する演出
+  // phase: 0=朝, 1=昼, 2=夕, 3=夜
+  let targetOpacity = 0;
+  if (dnc.phase === 3) targetOpacity = 0.12; // 夜: しっかり反射
+  else if (dnc.phase === 2) targetOpacity = 0.06; // 夕: 少し反射
+  else targetOpacity = 0; // 朝昼: 反射なし
+
+  const mat = g._wetGround.mat;
+  mat.opacity += (targetOpacity - mat.opacity) * dt * 2;
+}
+
 // --- 蹴れる看板の倒れアニメーション更新 ---
 function updateKickableSigns(g, dt) {
   if (!g.kickableSigns) return;
@@ -10177,6 +10352,8 @@ function gameLoop(timestamp) {
     ['updateFlickeringLights', () => updateFlickeringLights(G, dt)],
     ['updateWitnessWindows', () => updateWitnessWindows(G, dt)],
     ['updateLaundrySheets', () => updateLaundrySheets(G, dt)],
+    ['updateWindowLights', () => updateWindowLights(G, dt)],
+    ['updateWetGround', () => updateWetGround(G, dt)],
     ['updateGamePhases', () => updateGamePhases(G, dt)],
     ['updateHUD', () => updateHUD(G)]
   ];
