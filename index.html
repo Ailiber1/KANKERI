@@ -4655,12 +4655,6 @@ function buildSchoolObjects(g) {
   const railLand = new THREE.Mesh(railLandGeo, railMat);
   railLand.position.set(14, FLOOR_H + 0.6, 30.75);
   g.scene.add(railLand); g.cameraMeshes.push(railLand);
-  // 2F踊り場の南側手すり壁（浮遊防止 — 階段とのz=30境界）
-  const railSouthGeo = new THREE.BoxGeometry(5.5, 1.2, 0.12);
-  g.geometries.push(railSouthGeo);
-  const railSouthE = new THREE.Mesh(railSouthGeo, railMat);
-  railSouthE.position.set(16.75, FLOOR_H + 0.6, 30.06);
-  g.scene.add(railSouthE); g.cameraMeshes.push(railSouthE);
 
   // --- 西階段室（x:-19.5~-14, z:27~31.5 — 東階段室のミラー）---
   for (let i = 0; i < NUM_STEPS; i++) {
@@ -4690,10 +4684,6 @@ function buildSchoolObjects(g) {
   const railLandW = new THREE.Mesh(railLandGeo, railMat);
   railLandW.position.set(-14, FLOOR_H + 0.6, 30.75);
   g.scene.add(railLandW); g.cameraMeshes.push(railLandW);
-  // 西踊り場の南側手すり壁（浮遊防止）
-  const railSouthW = new THREE.Mesh(railSouthGeo, railMat);
-  railSouthW.position.set(-16.75, FLOOR_H + 0.6, 30.06);
-  g.scene.add(railSouthW); g.cameraMeshes.push(railSouthW);
 
   // --- 教室内装（1F × 3教室 + 2F × 3教室）---
   const deskMat = makePBRMat(woodPBR, { roughness: 0.75 });
