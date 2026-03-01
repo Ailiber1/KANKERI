@@ -4561,18 +4561,6 @@ function buildSchoolObjects(g) {
   addBox(13.5, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30（フル高さ）
   // 西階段室 / A 仕切り壁（z:27~30）
   addBox(-13.5, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30（フル高さ）
-  // --- 踊り場の床（z:30→31.5, y=FLOOR_H）---
-  const landingGeo = new THREE.BoxGeometry(5.5, 0.2, 1.5);
-  landingGeo.setAttribute('uv2', landingGeo.attributes.uv);
-  const landingMatE = new THREE.Mesh(landingGeo, stepMat);
-  landingMatE.position.set(16.75, FLOOR_H, 30.75);
-  landingMatE.castShadow = true; landingMatE.receiveShadow = true;
-  g.scene.add(landingMatE); g.geometries.push(landingGeo); g.cameraMeshes.push(landingMatE);
-  const landingMatW = new THREE.Mesh(landingGeo, stepMat);
-  landingMatW.position.set(-16.75, FLOOR_H, 30.75);
-  landingMatW.castShadow = true; landingMatW.receiveShadow = true;
-  g.scene.add(landingMatW); g.cameraMeshes.push(landingMatW);
-
   // --- 2F床 / 1F天井 (y=4, 東階段室 x:14~20 と西階段室 x:-20~-14 を除く) ---
   const f2Geo = new THREE.PlaneGeometry(27, 8);
   f2Geo.setAttribute('uv2', f2Geo.attributes.uv);
@@ -4663,6 +4651,18 @@ function buildSchoolObjects(g) {
   railW1F.position.set(-14, 2.5, 28.5);
   railW1F.rotation.x = Math.atan2(FLOOR_H, stZe - stZs);
   g.scene.add(railW1F); g.cameraMeshes.push(railW1F);
+
+  // --- 踊り場の床（z:30→31.5, y=FLOOR_H）---
+  const landingGeo = new THREE.BoxGeometry(5.5, 0.2, 1.5);
+  landingGeo.setAttribute('uv2', landingGeo.attributes.uv);
+  const landingE = new THREE.Mesh(landingGeo, stepMat);
+  landingE.position.set(16.75, FLOOR_H, 30.75);
+  landingE.castShadow = true; landingE.receiveShadow = true;
+  g.scene.add(landingE); g.geometries.push(landingGeo); g.cameraMeshes.push(landingE);
+  const landingW = new THREE.Mesh(landingGeo, stepMat);
+  landingW.position.set(-16.75, FLOOR_H, 30.75);
+  landingW.castShadow = true; landingW.receiveShadow = true;
+  g.scene.add(landingW); g.cameraMeshes.push(landingW);
 
   // --- 教室内装（1F × 3教室 + 2F × 3教室）---
   const deskMat = makePBRMat(woodPBR, { roughness: 0.75 });
