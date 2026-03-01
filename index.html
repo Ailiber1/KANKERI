@@ -4741,12 +4741,17 @@ function buildSchoolObjects(g) {
     }
   }
 
+  // --- 正面玄関の内側照明（入口暗闇対策）---
+  const entranceLight = new THREE.PointLight(0xccddff, 0.6, 10);
+  entranceLight.position.set(0, 2.8, 24.8);
+  g.scene.add(entranceLight);
+
   // --- 内部照明（廊下の蛍光灯）---
   if (!g.flickeringLights) g.flickeringLights = [];
   for (let fl = 0; fl < 2; fl++) {
     const yOff = fl * FLOOR_H;
     for (let lx = -16; lx <= 16; lx += 8) {
-      const flLight = new THREE.PointLight(0xccddff, fl === 0 ? 0.25 : 0.15, 8);
+      const flLight = new THREE.PointLight(0xccddff, fl === 0 ? 0.4 : 0.2, 10);
       flLight.position.set(lx, yOff + 3.5, 25.75);
       g.scene.add(flLight);
       const flGeo = new THREE.BoxGeometry(1.0, 0.06, 0.12);
@@ -5100,18 +5105,18 @@ function buildSchoolObjects(g) {
 
   // === 校庭の照明 ===
   // 廃校専用の環境光（月明かりの底上げ — シャドウ無効のため少し強めに）
-  const schoolAmbient = new THREE.AmbientLight(0x223355, 0.55);
+  const schoolAmbient = new THREE.AmbientLight(0x334466, 0.85);
   g.scene.add(schoolAmbient);
 
   // メインのDirectionalLight（月光 — シーン全体を均一に照らす）
   // Stage 4: シャドウ無効（校舎壁の影が地面に黒パッチとして出るため）
-  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 0.6);
+  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 1.0);
   moonDirLight.position.set(30, 50, 20);
   moonDirLight.castShadow = false;
   g.scene.add(moonDirLight);
 
   // SpotLight（月光のハイライト — 校庭中央を重点的に照らす）
-  const moonLight = new THREE.SpotLight(0x8888cc, 1.5, 150, Math.PI / 3, 0.4, 0.5);
+  const moonLight = new THREE.SpotLight(0x8888cc, 2.5, 150, Math.PI / 3, 0.4, 0.5);
   moonLight.position.set(30, 50, 20);
   moonLight.target.position.set(0, 0, 0);
   g.scene.add(moonLight);
@@ -5157,12 +5162,12 @@ function buildSchoolObjects(g) {
   }
 
   // Stage 4 夜間シーンの露出 + ポストプロセッシング強化
-  g.renderer.toneMappingExposure = 0.75;
+  g.renderer.toneMappingExposure = 1.05;
   if (g.composer && g.bloomPass && g.filmPass) {
     g.bloomPass.strength = 0.12;  // 控えめなブルーム
     g.bloomPass.radius = 0.3;
     g.bloomPass.threshold = 0.92; // 非常に明るいもののみ
-    g.filmPass.uniforms.vignetteAmt.value = 0.65;
+    g.filmPass.uniforms.vignetteAmt.value = 0.40;
     g.filmPass.uniforms.grainAmt.value = 0.05;
     g.filmPass.uniforms.tintR.value = 0.90;
     g.filmPass.uniforms.tintG.value = 0.93;
