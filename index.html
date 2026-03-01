@@ -4557,10 +4557,14 @@ function buildSchoolObjects(g) {
   // --- 教室仕切り壁（南北方向）---
   addBox(-6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);  // A / B 間
   addBox(6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);   // B / C 間
-  // C / 東階段室仕切り壁（z:27~30 + 踊り場出口 z:30~32 は開口）
+  // C / 東階段室仕切り壁（z:27~30）
   addBox(14, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30
-  // 西階段室 / A 仕切り壁
+  // 東階段室仕切り壁 上部（z:31~32, 踊り場出口 z:30~31 は開口）
+  addBox(14, 31.5, WT, 0.5, 8, schoolDirtyMat);   // z:31~32
+  // 西階段室 / A 仕切り壁（z:27~30）
   addBox(-14, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30
+  // 西階段室仕切り壁 上部（z:31~32, 踊り場出口 z:30~31 は開口）
+  addBox(-14, 31.5, WT, 0.5, 8, schoolDirtyMat);  // z:31~32
   // --- 2F床 / 1F天井 (y=4, 東階段室 x:14~20 と西階段室 x:-20~-14 を除く) ---
   const f2Geo = new THREE.PlaneGeometry(28, 8);
   f2Geo.setAttribute('uv2', f2Geo.attributes.uv);
@@ -4697,6 +4701,18 @@ function buildSchoolObjects(g) {
   landingW.position.set(-16.75, FLOOR_H, 30.75);
   landingW.castShadow = true; landingW.receiveShadow = true;
   g.scene.add(landingW); g.cameraMeshes.push(landingW);
+
+  // --- 階段室 z:31.5~32 の床（踊り場と北壁の間の隙間を埋める）---
+  const swGapGeo = new THREE.BoxGeometry(6, 0.1, 0.5);
+  g.geometries.push(swGapGeo);
+  const swGapFloorE = new THREE.Mesh(swGapGeo, stepMat);
+  swGapFloorE.position.set(17, FLOOR_H, 31.75);
+  swGapFloorE.receiveShadow = true;
+  g.scene.add(swGapFloorE); g.cameraMeshes.push(swGapFloorE);
+  const swGapFloorW = new THREE.Mesh(swGapGeo, stepMat);
+  swGapFloorW.position.set(-17, FLOOR_H, 31.75);
+  swGapFloorW.receiveShadow = true;
+  g.scene.add(swGapFloorW); g.cameraMeshes.push(swGapFloorW);
 
   // --- 教室内装（1F × 3教室 + 2F × 3教室）---
   const deskMat = makePBRMat(woodPBR, { roughness: 0.75 });
@@ -6345,7 +6361,7 @@ function updatePlayer(g, dt) {
   // Stage 4: 校舎内の高さオーバーライド（東西両階段室対応）
   if (g._stageNum === 4) {
     const px = ctrl.position.x, pz = ctrl.position.z;
-    const inBldg = px > -19.5 && px < 19.5 && pz > 24.5 && pz < 31.5;
+    const inBldg = px > -19.5 && px < 19.5 && pz > 24.5 && pz < 32;
     if (inBldg) {
       if (g.playerFloor === undefined) g.playerFloor = 0;
       // 東階段室 (x:14~19.5) or 西階段室 (x:-19.5~-14), z:27~31.5
@@ -7355,7 +7371,7 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   if (g._stageNum === 4) {
     if (oni.floor === undefined) oni.floor = 0;
     const ox = oni.position.x, oz = oni.position.z;
-    if (ox > -19.5 && ox < 19.5 && oz > 24.5 && oz < 31.5) {
+    if (ox > -19.5 && ox < 19.5 && oz > 24.5 && oz < 32) {
       const inEast = ox > 14 && oz > 27;
       const inWest = ox < -14 && oz > 27;
       if (inEast || inWest) {
