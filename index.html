@@ -770,7 +770,7 @@ html, body {
       <option value="2">Stage 2 — 雨上がりの神社</option>
       <option value="3">Stage 3 — ネオン商店街の裏路地</option>
       <option value="4">Stage 4 — 廃校の校庭</option>
-      <option value="5" disabled>Stage 5 — 団地 🔒</option>
+      <option value="5">Stage 5 — 団地（真夏の公営住宅群）</option>
     </select>
 
     <div class="setting-label" data-i18n="CPU_COUNT">● 味方CPU人数</div>
@@ -2488,6 +2488,70 @@ const STAGE_CONFIGS = {
       { type:'desk', x:9, z:30, radius:30, label:'机', sound:'thud' },
       { type:'sign', x:8, z:-12, radius:20, label:'花壇の柵', sound:'metal' }
     ]
+  },
+  5: {
+    name: '団地（真夏の公営住宅群）', nameEn: 'Public Housing Complex', size: 90, timeLimit: 240,
+    initialOni: 3, maxOni: 5, oniAddAt: [null, null, null, 120, 60],
+    startPhase: 0, cycleDuration: 60, // 朝スタート、60秒サイクル
+    canPositions: [
+      { x: 0, z: 0, label: '① 中央公園の砂場付近', labelEn: '① Central Park Sandbox' },
+      { x: -25, z: -25, label: '② 正面の駐輪場と駐車場の間', labelEn: '② Between Bike Shed & Parking' },
+      { x: 20, z: 30, label: '③ 裏側の通路', labelEn: '③ Back Alley Path' }
+    ],
+    waypoints: [
+      // 中央公園巡回
+      {x:0,z:0},{x:-8,z:5},{x:8,z:5},{x:-8,z:-5},{x:8,z:-5},
+      // 1棟正面（南面）— 駐車場・駐輪場エリア
+      {x:-30,z:-18},{x:-20,z:-20},{x:-10,z:-22},{x:0,z:-22},
+      // 2棟正面（南面）
+      {x:10,z:-22},{x:20,z:-20},{x:30,z:-18},
+      // 1棟裏側（北面）— 裏通路
+      {x:-30,z:25},{x:-20,z:28},{x:-10,z:28},{x:0,z:28},
+      // 2棟裏側
+      {x:10,z:28},{x:20,z:28},{x:30,z:25},
+      // 1棟左側面（西端）
+      {x:-38,z:0},{x:-38,z:10},{x:-38,z:-10},
+      // 2棟右側面（東端）
+      {x:38,z:0},{x:38,z:10},{x:38,z:-10},
+      // 棟間通路（表→裏のショートカット）
+      {x:-25,z:-15},{x:-25,z:15},
+      {x:25,z:-15},{x:25,z:15},
+      // 階段室巡回（1棟: 左右階段室）
+      {x:-33,z:-12},{x:-33,z:12},
+      // 階段室巡回（2棟）
+      {x:33,z:-12},{x:33,z:12},
+      // 外周
+      {x:-42,z:-42},{x:42,z:-42},{x:42,z:42},{x:-42,z:42}
+    ],
+    interactables: [
+      // 階段室の手すり
+      { type:'railing', x:-33, z:-12, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:-33, z:12, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:33, z:-12, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:33, z:12, radius:30, label:'階段室の手すり', sound:'metal' },
+      // ゴミ捨て場のフェンス
+      { type:'fence', x:-20, z:-28, radius:25, label:'ゴミ捨て場のフェンス', sound:'metal' },
+      { type:'fence', x:20, z:-28, radius:25, label:'ゴミ捨て場のフェンス', sound:'metal' },
+      // 車のボンネット
+      { type:'car', x:-15, z:-25, radius:20, label:'車のボンネット', sound:'metal' },
+      { type:'car', x:-8, z:-26, radius:20, label:'車のボンネット', sound:'metal' },
+      { type:'car', x:15, z:-25, radius:20, label:'車のボンネット', sound:'metal' },
+      { type:'car', x:25, z:26, radius:20, label:'車のボンネット', sound:'metal' },
+      // 自販機
+      { type:'vending', x:-30, z:-8, radius:25, label:'自販機', sound:'metal' },
+      { type:'vending', x:30, z:-8, radius:25, label:'自販機', sound:'metal' },
+      // 公園遊具
+      { type:'swing_chain', x:-5, z:3, radius:20, label:'ブランコの鎖', sound:'metal' },
+      { type:'slide', x:5, z:-3, radius:18, label:'滑り台', sound:'metal' },
+      { type:'bench', x:10, z:0, radius:12, label:'ベンチ', sound:'thud' },
+      { type:'bench', x:-10, z:0, radius:12, label:'ベンチ', sound:'thud' },
+      // 電柱
+      { type:'pole', x:-15, z:0, radius:15, label:'電柱', sound:'metal' },
+      { type:'pole', x:15, z:15, radius:15, label:'電柱', sound:'metal' },
+      { type:'pole', x:0, z:-35, radius:15, label:'電柱', sound:'metal' },
+      // 集会所
+      { type:'wall', x:15, z:8, radius:20, label:'集会所の壁', sound:'thud' }
+    ]
   }
 };
 
@@ -2839,7 +2903,26 @@ function buildTerrain(g, stageNum) {
   const groundGeo = new THREE.PlaneGeometry(size, size, segments, segments);
   const verts = groundGeo.attributes.position.array;
 
-  if (stageNum === 4) {
+  if (stageNum === 5) {
+    // === STAGE 5: 団地（真夏の公営住宅群）===
+    // コンクリート舗装 + 公園草地の微起伏
+    for (let i = 0; i < verts.length; i += 3) {
+      const x = verts[i], y = verts[i+1];
+      const wz = -y;
+      // 基本の微起伏（コンクリート舗装面）
+      let h = noise.noise2D(x * 0.06, wz * 0.06) * 0.03;
+      h += noise2.noise2D(x * 0.3, wz * 0.3) * 0.01;
+      // 中央公園の草地エリア（|x| < 15, |z| < 8）はやや起伏あり
+      if (Math.abs(x) < 15 && Math.abs(wz) < 8) {
+        h += noise.noise2D(x * 0.08, wz * 0.08) * 0.06;
+        h += noise2.noise2D(x * 0.25, wz * 0.25) * 0.02;
+      }
+      // 砂場の凹み (x:-3~3, z:-2~2)
+      const sdist = Math.sqrt(x*x + wz*wz);
+      if (sdist < 3) h -= 0.15 * Math.max(0, Math.cos(sdist / 3 * Math.PI * 0.5));
+      verts[i+2] = h;
+    }
+  } else if (stageNum === 4) {
     // === STAGE 4: 廃校の校庭 ===
     // 校庭の砂地（ほぼ平坦、微細な凹凸）
     for (let i = 0; i < verts.length; i += 3) {
@@ -2925,7 +3008,21 @@ function buildTerrain(g, stageNum) {
       tex.anisotropy = 4;
       return tex;
     };
-    if (stageNum === 4) {
+    if (stageNum === 5) {
+      // ステージ5: 団地の地面（コンクリート舗装）
+      const rep5 = 22;
+      const d5Diff = setRepeat(loader.load('textures/concrete_diff.jpg'), rep5);
+      const d5Nor  = setRepeat(loader.load('textures/concrete_nor.jpg'), rep5);
+      const d5Rough = setRepeat(loader.load('textures/concrete_rough.jpg'), rep5);
+      const d5Ao   = setRepeat(loader.load('textures/concrete_ao.jpg'), rep5);
+      g.textures.push(d5Diff, d5Nor, d5Rough, d5Ao);
+      groundMat = new THREE.MeshStandardMaterial({
+        map: d5Diff, normalMap: d5Nor,
+        normalScale: new THREE.Vector2(1.0, 1.0),
+        roughnessMap: d5Rough, roughness: 0.85,
+        aoMap: d5Ao, aoMapIntensity: 0.8, metalness: 0.0
+      });
+    } else if (stageNum === 4) {
       // ステージ4: 校庭の砂地（dirt PBRテクスチャ）
       const rep4 = 18;
       const d4Diff = setRepeat(loader.load('textures/dirt_diff.jpg'), rep4);
@@ -3146,10 +3243,19 @@ function buildTerrain(g, stageNum) {
 
   // Boundary walls (all stages)
   const half = size / 2;
-  const wallH = stageNum === 4 ? 3 : (stageNum === 3 ? 12 : (stageNum === 2 ? 2.5 : 2));
+  const wallH = stageNum === 5 ? 3 : (stageNum === 4 ? 3 : (stageNum === 3 ? 12 : (stageNum === 2 ? 2.5 : 2)));
   const fenceGeo = new THREE.BoxGeometry(size + 2, wallH, 0.1);
   let fenceMat;
-  if (stageNum === 4) {
+  if (stageNum === 5) {
+    // ステージ5: 団地の金網フェンス
+    fenceGeo.setAttribute('uv2', fenceGeo.attributes.uv);
+    fenceMat = new THREE.MeshStandardMaterial({
+      color: 0x888899, roughness: 0.6, metalness: 0.4,
+      transparent: true, opacity: 0.5, wireframe: true,
+      emissive: 0x111118, emissiveIntensity: 0.1
+    });
+    g.materials.push(fenceMat);
+  } else if (stageNum === 4) {
     // ステージ4: コンクリート壁（学校の外塀）
     const wLoader4 = new THREE.TextureLoader();
     const setWallRep4 = (tex) => {
@@ -5611,6 +5717,743 @@ function buildSchoolObjects(g) {
   g.scene.add(moonSpot.target);
 }
 
+// --- STAGE 5: 団地（真夏の公営住宅群）オブジェクト ---
+function buildDanchiObjects(g) {
+  const gH = (x, z) => getGroundHeight(g, x, z);
+  const texLoader = new THREE.TextureLoader();
+
+  // === PBRテクスチャのロード ===
+  const loadPBR = (name, repS, repT) => {
+    const setRep = (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(repS, repT);
+      tex.anisotropy = 4;
+      return tex;
+    };
+    const diff  = setRep(texLoader.load('textures/' + name + '_diff.jpg'));
+    const nor   = setRep(texLoader.load('textures/' + name + '_nor.jpg'));
+    const rough = setRep(texLoader.load('textures/' + name + '_rough.jpg'));
+    const ao    = setRep(texLoader.load('textures/' + name + '_ao.jpg'));
+    g.textures.push(diff, nor, rough, ao);
+    return { diff, nor, rough, ao };
+  };
+
+  const plasterPBR  = loadPBR('plaster', 6, 3);
+  const concretePBR = loadPBR('concrete', 4, 2);
+  const metalPBR    = loadPBR('metal', 2, 2);
+  const woodPBR     = loadPBR('wood', 2, 2);
+  const grassPBR    = loadPBR('grass', 4, 2);
+
+  const makePBRMat = (pbr, opts) => {
+    const mat = new THREE.MeshStandardMaterial({
+      map: pbr.diff,
+      normalMap: pbr.nor, normalScale: new THREE.Vector2(0.8, 0.8),
+      roughnessMap: pbr.rough, roughness: opts.roughness || 0.9,
+      aoMap: pbr.ao, aoMapIntensity: opts.ao || 0.6,
+      metalness: opts.metalness || 0.0,
+      color: opts.color || 0xffffff
+    });
+    if (opts.emissive) { mat.emissive = new THREE.Color(opts.emissive); mat.emissiveIntensity = opts.emissiveI || 0.1; }
+    g.materials.push(mat);
+    return mat;
+  };
+
+  const plasterMat = makePBRMat(plasterPBR, { roughness: 0.92, color: 0xe8e0d8 });
+  const concreteMat = makePBRMat(concretePBR, { roughness: 0.9, color: 0xcccccc });
+  const metalMat = makePBRMat(metalPBR, { roughness: 0.5, metalness: 0.7, color: 0x888888 });
+  const woodMat = makePBRMat(woodPBR, { roughness: 0.85, color: 0x8B7355 });
+  const grassMat = makePBRMat(grassPBR, { roughness: 0.9, color: 0x4a7a3a });
+
+  const addGeo = (geo) => { g.geometries.push(geo); return geo; };
+
+  // ========================================
+  //  団地棟 2棟（5階建て、平行配置）
+  // ========================================
+  // 棟1: x=-25, z:-15~15 (南面:z=-15, 北面:z=15)
+  // 棟2: x=25,  z:-15~15
+  // 各棟: 幅35m(x方向±17.5) × 奥行8m(z方向) × 高さ15m
+  const BLDG_W = 35, BLDG_D = 8, BLDG_H = 15;
+  const FLOOR_H = 3.0; // 各階の高さ
+  const buildings = [
+    { cx: -25, cz: 0, label: '1' },
+    { cx: 25,  cz: 0, label: '2' }
+  ];
+
+  for (const bldg of buildings) {
+    const bx = bldg.cx, bz = bldg.cz;
+
+    // --- 棟本体（外壁）---
+    // 南面（正面）
+    const southWallGeo = addGeo(new THREE.BoxGeometry(BLDG_W, BLDG_H, 0.4));
+    southWallGeo.setAttribute('uv2', southWallGeo.attributes.uv);
+    const southWall = new THREE.Mesh(southWallGeo, plasterMat);
+    southWall.position.set(bx, BLDG_H/2, bz - BLDG_D/2);
+    southWall.castShadow = true; southWall.receiveShadow = true;
+    g.scene.add(southWall);
+    g.cameraMeshes.push(southWall);
+    g.colliders.push({ type:'box', x:bx, z:bz-BLDG_D/2, hw:BLDG_W/2+0.3, hd:0.5, h:BLDG_H });
+
+    // 北面（裏側）
+    const northWall = new THREE.Mesh(southWallGeo, plasterMat);
+    northWall.position.set(bx, BLDG_H/2, bz + BLDG_D/2);
+    northWall.castShadow = true; northWall.receiveShadow = true;
+    g.scene.add(northWall);
+    g.cameraMeshes.push(northWall);
+    g.colliders.push({ type:'box', x:bx, z:bz+BLDG_D/2, hw:BLDG_W/2+0.3, hd:0.5, h:BLDG_H });
+
+    // 東面（妻面）
+    const eastWallGeo = addGeo(new THREE.BoxGeometry(BLDG_D, BLDG_H, 0.4));
+    eastWallGeo.setAttribute('uv2', eastWallGeo.attributes.uv);
+    const eastWall = new THREE.Mesh(eastWallGeo, plasterMat);
+    eastWall.position.set(bx + BLDG_W/2, BLDG_H/2, bz);
+    eastWall.rotation.y = Math.PI/2;
+    eastWall.castShadow = true; eastWall.receiveShadow = true;
+    g.scene.add(eastWall);
+    g.cameraMeshes.push(eastWall);
+    g.colliders.push({ type:'box', x:bx+BLDG_W/2, z:bz, hw:0.5, hd:BLDG_D/2+0.3, h:BLDG_H });
+
+    // 西面（妻面）
+    const westWall = new THREE.Mesh(eastWallGeo, plasterMat);
+    westWall.position.set(bx - BLDG_W/2, BLDG_H/2, bz);
+    westWall.rotation.y = Math.PI/2;
+    westWall.castShadow = true; westWall.receiveShadow = true;
+    g.scene.add(westWall);
+    g.cameraMeshes.push(westWall);
+    g.colliders.push({ type:'box', x:bx-BLDG_W/2, z:bz, hw:0.5, hd:BLDG_D/2+0.3, h:BLDG_H });
+
+    // --- 棟番号表示（妻面）---
+    const numCanvas = document.createElement('canvas');
+    numCanvas.width = 128; numCanvas.height = 256;
+    const numCtx = numCanvas.getContext('2d');
+    numCtx.fillStyle = '#e0d8d0';
+    numCtx.fillRect(0, 0, 128, 256);
+    numCtx.font = 'bold 180px Arial';
+    numCtx.fillStyle = '#555555';
+    numCtx.textAlign = 'center';
+    numCtx.fillText(bldg.label, 64, 200);
+    const numTex = new THREE.CanvasTexture(numCanvas);
+    g.textures.push(numTex);
+    const numMat = new THREE.MeshBasicMaterial({ map: numTex, transparent: true });
+    g.materials.push(numMat);
+    const numGeo = addGeo(new THREE.PlaneGeometry(3, 6));
+    // 東妻面に番号
+    const numMesh = new THREE.Mesh(numGeo, numMat);
+    numMesh.position.set(bx + BLDG_W/2 + 0.25, 8, bz);
+    numMesh.rotation.y = Math.PI/2;
+    g.scene.add(numMesh);
+    // 西妻面にも
+    const numMesh2 = new THREE.Mesh(numGeo, numMat);
+    numMesh2.position.set(bx - BLDG_W/2 - 0.25, 8, bz);
+    numMesh2.rotation.y = -Math.PI/2;
+    g.scene.add(numMesh2);
+
+    // --- 各階の窓（南北面 × 5階）---
+    const windowMat = new THREE.MeshStandardMaterial({
+      color: 0x223344, roughness: 0.1, metalness: 0.8,
+      emissive: 0x000000, emissiveIntensity: 0
+    });
+    g.materials.push(windowMat);
+    const winGeo = addGeo(new THREE.PlaneGeometry(1.2, 1.0));
+    for (let floor = 0; floor < 5; floor++) {
+      const fy = floor * FLOOR_H + 2.0;
+      for (let wx = -14; wx <= 14; wx += 3.5) {
+        // 南面の窓
+        const wS = new THREE.Mesh(winGeo, windowMat);
+        wS.position.set(bx + wx, fy, bz - BLDG_D/2 - 0.22);
+        g.scene.add(wS);
+        // 北面の窓
+        const wN = new THREE.Mesh(winGeo, windowMat);
+        wN.position.set(bx + wx, fy, bz + BLDG_D/2 + 0.22);
+        wN.rotation.y = Math.PI;
+        g.scene.add(wN);
+      }
+    }
+
+    // --- ベランダ手すり（南面、各階）---
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.7 });
+    g.materials.push(railMat);
+    const railGeo = addGeo(new THREE.BoxGeometry(BLDG_W - 2, 0.08, 0.05));
+    for (let floor = 1; floor < 5; floor++) {
+      const ry = floor * FLOOR_H + 1.0;
+      const rail = new THREE.Mesh(railGeo, railMat);
+      rail.position.set(bx, ry, bz - BLDG_D/2 - 0.8);
+      g.scene.add(rail);
+    }
+
+    // --- 階段室（各棟左端・右端）---
+    // 階段室: 棟の左端(-BLDG_W/2)と右端(+BLDG_W/2)に突出
+    const stairDefs = [
+      { sx: bx - BLDG_W/2 - 1.5, label: 'L' },
+      { sx: bx + BLDG_W/2 + 1.5, label: 'R' }
+    ];
+    for (const sd of stairDefs) {
+      // 階段室の外壁（3m×3m×15m の箱）
+      const stairWallGeo = addGeo(new THREE.BoxGeometry(3, BLDG_H, 3));
+      stairWallGeo.setAttribute('uv2', stairWallGeo.attributes.uv);
+      const stairBox = new THREE.Mesh(stairWallGeo, plasterMat);
+      stairBox.position.set(sd.sx, BLDG_H/2, bz);
+      stairBox.castShadow = true; stairBox.receiveShadow = true;
+      g.scene.add(stairBox);
+      g.cameraMeshes.push(stairBox);
+      // 階段室コライダー: 南面を開放してプレイヤー・鬼が進入可能
+      g.colliders.push({ type:'box', x:sd.sx, z:bz+1.5, hw:1.5, hd:0.3, h:BLDG_H }); // 北壁
+      g.colliders.push({ type:'box', x:sd.sx+1.5, z:bz+0.15, hw:0.3, hd:1.35, h:BLDG_H }); // 東壁
+      g.colliders.push({ type:'box', x:sd.sx-1.5, z:bz+0.15, hw:0.3, hd:1.35, h:BLDG_H }); // 西壁
+
+      // 階段（プレイヤーは2階踊り場=+3mまで登れる）
+      // 入口: 階段室の南面 (z = bz - 1.5)
+      const NUM_STEPS = 10;
+      const stRise = FLOOR_H / NUM_STEPS;
+      const stDepth = 0.3;
+      const stepGeo = addGeo(new THREE.BoxGeometry(1.5, stRise, stDepth));
+      const stepMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.8 });
+      g.materials.push(stepMat);
+      for (let s = 0; s < NUM_STEPS; s++) {
+        const step = new THREE.Mesh(stepGeo, stepMat);
+        step.position.set(sd.sx, s * stRise + stRise/2, bz - 1.2 + s * stDepth);
+        g.scene.add(step);
+      }
+
+      // 踊り場の床
+      const landGeo = addGeo(new THREE.BoxGeometry(2.5, 0.15, 2));
+      const landing = new THREE.Mesh(landGeo, concreteMat);
+      landing.position.set(sd.sx, FLOOR_H, bz + 0.5);
+      g.scene.add(landing);
+    }
+  }
+
+  // ========================================
+  //  中央公園（2棟の間、30m × 15m）
+  // ========================================
+  // 草地エリアの重ね（|x|<15, |z|<8）
+  const parkGrassGeo = addGeo(new THREE.PlaneGeometry(30, 16, 60, 32));
+  parkGrassGeo.setAttribute('uv2', parkGrassGeo.attributes.uv);
+  const parkGrass = new THREE.Mesh(parkGrassGeo, grassMat);
+  parkGrass.rotation.x = -Math.PI/2;
+  parkGrass.position.set(0, 0.02, 0);
+  parkGrass.receiveShadow = true;
+  g.scene.add(parkGrass);
+
+  // 砂場
+  const sandMat = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.95, metalness: 0 });
+  g.materials.push(sandMat);
+  const sandGeo = addGeo(new THREE.CircleGeometry(3, 24));
+  const sand = new THREE.Mesh(sandGeo, sandMat);
+  sand.rotation.x = -Math.PI/2;
+  sand.position.set(0, 0.03, 0);
+  g.scene.add(sand);
+  // 砂場の縁
+  const sandRimGeo = addGeo(new THREE.TorusGeometry(3, 0.15, 8, 32));
+  const sandRimMat = new THREE.MeshStandardMaterial({ color: 0x888877, roughness: 0.85 });
+  g.materials.push(sandRimMat);
+  const sandRim = new THREE.Mesh(sandRimGeo, sandRimMat);
+  sandRim.rotation.x = -Math.PI/2;
+  sandRim.position.set(0, 0.1, 0);
+  g.scene.add(sandRim);
+
+  // 滑り台
+  const slideGroup = new THREE.Group();
+  slideGroup.position.set(5, gH(5, -3), -3);
+  const slideMat = new THREE.MeshStandardMaterial({ color: 0xee4444, roughness: 0.4, metalness: 0.3 });
+  g.materials.push(slideMat);
+  // 滑り台の板
+  const slideGeo = addGeo(new THREE.BoxGeometry(0.8, 0.05, 3));
+  const slideMesh = new THREE.Mesh(slideGeo, slideMat);
+  slideMesh.position.set(0, 1.2, 0);
+  slideMesh.rotation.x = -0.35;
+  slideGroup.add(slideMesh);
+  // 滑り台の支柱
+  const slidePoleGeo = addGeo(new THREE.CylinderGeometry(0.05, 0.05, 2.2, 8));
+  const slidePoleMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.5 });
+  g.materials.push(slidePoleMat);
+  for (const px of [-0.35, 0.35]) {
+    const pole = new THREE.Mesh(slidePoleGeo, slidePoleMat);
+    pole.position.set(px, 1.1, -1.2);
+    slideGroup.add(pole);
+  }
+  g.scene.add(slideGroup);
+  g.cameraMeshes.push(slideGroup);
+  g.colliders.push({ type:'box', x:5, z:-3, hw:0.8, hd:1.8, h:2.5 });
+
+  // ブランコ
+  const swingGroup = new THREE.Group();
+  swingGroup.position.set(-5, gH(-5, 3), 3);
+  const swingFrameGeo = addGeo(new THREE.CylinderGeometry(0.04, 0.04, 2.5, 8));
+  const swingFrameMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.5, metalness: 0.6 });
+  g.materials.push(swingFrameMat);
+  // フレームA字（左右のA型支柱）
+  for (const sx of [-1.5, 1.5]) {
+    for (const off of [-0.3, 0.3]) {
+      const pole = new THREE.Mesh(swingFrameGeo, swingFrameMat);
+      pole.position.set(sx, 1.25, off);
+      pole.rotation.z = off > 0 ? 0.15 : -0.15;
+      swingGroup.add(pole);
+    }
+  }
+  // 横梁
+  const swingBarGeo = addGeo(new THREE.CylinderGeometry(0.04, 0.04, 3.2, 8));
+  const swingBar = new THREE.Mesh(swingBarGeo, swingFrameMat);
+  swingBar.rotation.z = Math.PI/2;
+  swingBar.position.set(0, 2.4, 0);
+  swingGroup.add(swingBar);
+  // ブランコ座面
+  const seatGeo = addGeo(new THREE.BoxGeometry(0.4, 0.03, 0.25));
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+  g.materials.push(seatMat);
+  g.swingSeats = g.swingSeats || [];
+  for (const sx of [-0.6, 0.6]) {
+    const seat = new THREE.Mesh(seatGeo, seatMat);
+    seat.position.set(sx, 0.6, 0);
+    swingGroup.add(seat);
+    g.swingSeats.push({ seat, baseY: 0.6, sx });
+  }
+  g.scene.add(swingGroup);
+  g.cameraMeshes.push(swingGroup);
+  g.colliders.push({ type:'box', x:-5, z:3, hw:1.8, hd:0.6, h:2.5 });
+
+  // ベンチ（2台）
+  const benchGeo = addGeo(new THREE.BoxGeometry(2.0, 0.08, 0.5));
+  const benchLegGeo = addGeo(new THREE.BoxGeometry(0.08, 0.4, 0.4));
+  const benchMat = new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.8 });
+  g.materials.push(benchMat);
+  const benchIronMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.5, metalness: 0.5 });
+  g.materials.push(benchIronMat);
+  for (const bp of [{ x:10, z:0 }, { x:-10, z:0 }]) {
+    const benchSeat = new THREE.Mesh(benchGeo, benchMat);
+    benchSeat.position.set(bp.x, gH(bp.x, bp.z) + 0.45, bp.z);
+    g.scene.add(benchSeat);
+    for (const lx of [-0.8, 0.8]) {
+      const leg = new THREE.Mesh(benchLegGeo, benchIronMat);
+      leg.position.set(bp.x + lx, gH(bp.x, bp.z) + 0.2, bp.z);
+      g.scene.add(leg);
+    }
+    g.colliders.push({ type:'box', x:bp.x, z:bp.z, hw:1.2, hd:0.4, h:0.6 });
+  }
+
+  // 花壇（色とりどりの花）
+  const flowerBedGeo = addGeo(new THREE.BoxGeometry(6, 0.3, 2));
+  const flowerBedMat = new THREE.MeshStandardMaterial({ color: 0x885533, roughness: 0.9 });
+  g.materials.push(flowerBedMat);
+  const flowerBed = new THREE.Mesh(flowerBedGeo, flowerBedMat);
+  flowerBed.position.set(0, 0.15, 6);
+  g.scene.add(flowerBed);
+  // 花（InstancedMesh）
+  const flowerColors = [0xff3333, 0xffcc00, 0xff6600, 0xff66aa, 0xffff33];
+  const flowerGeo = addGeo(new THREE.SphereGeometry(0.12, 6, 4));
+  for (let i = 0; i < 40; i++) {
+    const fc = flowerColors[i % flowerColors.length];
+    const fMat = new THREE.MeshStandardMaterial({ color: fc, roughness: 0.7, emissive: fc, emissiveIntensity: 0.15 });
+    g.materials.push(fMat);
+    const flower = new THREE.Mesh(flowerGeo, fMat);
+    flower.position.set(
+      -2.5 + Math.random() * 5,
+      0.35 + Math.random() * 0.2,
+      5.2 + Math.random() * 1.6
+    );
+    g.scene.add(flower);
+  }
+
+  // ========================================
+  //  駐車場・駐輪場・ゴミ捨て場（正面エリア）
+  // ========================================
+  // 車（各棟正面に3〜4台）
+  const carBodyGeo = addGeo(new THREE.BoxGeometry(2.0, 1.2, 4.0));
+  const carRoofGeo = addGeo(new THREE.BoxGeometry(1.6, 0.5, 2.5));
+  const carColors = [0xcccccc, 0x334466, 0x663333, 0xdddddd, 0x446633, 0x444444, 0x888888];
+  const carDefs = [
+    // 1棟正面
+    { x:-30, z:-22, ry:0 }, { x:-26, z:-22, ry:0 }, { x:-22, z:-22, ry:0.05 },
+    // 2棟正面
+    { x:22, z:-22, ry:0 }, { x:26, z:-22, ry:-0.03 }, { x:30, z:-22, ry:0 },
+    // 裏側（各2台）
+    { x:-28, z:22, ry:Math.PI }, { x:-24, z:22, ry:Math.PI },
+    { x:26, z:22, ry:Math.PI }, { x:30, z:22, ry:Math.PI }
+  ];
+  for (const cd of carDefs) {
+    const cc = carColors[Math.floor(Math.random() * carColors.length)];
+    const carMat = new THREE.MeshStandardMaterial({ color: cc, roughness: 0.3, metalness: 0.6 });
+    g.materials.push(carMat);
+    const carBody = new THREE.Mesh(carBodyGeo, carMat);
+    const cy = gH(cd.x, cd.z) + 0.6;
+    carBody.position.set(cd.x, cy, cd.z);
+    carBody.rotation.y = cd.ry;
+    carBody.castShadow = true;
+    g.scene.add(carBody);
+    g.cameraMeshes.push(carBody);
+    // 車の屋根
+    const roofMat = new THREE.MeshStandardMaterial({ color: cc, roughness: 0.2, metalness: 0.7 });
+    g.materials.push(roofMat);
+    const carRoof = new THREE.Mesh(carRoofGeo, roofMat);
+    carRoof.position.set(cd.x, cy + 0.85, cd.z);
+    carRoof.rotation.y = cd.ry;
+    g.scene.add(carRoof);
+    g.colliders.push({ type:'box', x:cd.x, z:cd.z, hw:1.3, hd:2.3, h:1.8 });
+    // タイヤ
+    const tireGeo = addGeo(new THREE.CylinderGeometry(0.3, 0.3, 0.15, 12));
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.95 });
+    g.materials.push(tireMat);
+    for (const tz of [-1.3, 1.3]) {
+      for (const tx of [-0.9, 0.9]) {
+        const tire = new THREE.Mesh(tireGeo, tireMat);
+        tire.rotation.z = Math.PI/2;
+        tire.position.set(cd.x + tx, gH(cd.x, cd.z) + 0.3, cd.z + tz);
+        g.scene.add(tire);
+      }
+    }
+  }
+
+  // 駐輪場（屋根付き）
+  const bikeRoofGeo = addGeo(new THREE.BoxGeometry(5, 0.1, 3));
+  const bikeRoofMat = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.5, metalness: 0.4, transparent: true, opacity: 0.7 });
+  g.materials.push(bikeRoofMat);
+  const bikeDefs = [{ x:-18, z:-25 }, { x:18, z:-25 }];
+  for (const bd of bikeDefs) {
+    // 屋根
+    const roof = new THREE.Mesh(bikeRoofGeo, bikeRoofMat);
+    roof.position.set(bd.x, 2.2, bd.z);
+    g.scene.add(roof);
+    // 支柱
+    const bikePoleGeo = addGeo(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 6));
+    for (const px of [-2.2, 2.2]) {
+      const pole = new THREE.Mesh(bikePoleGeo, metalMat);
+      pole.position.set(bd.x + px, 1.1, bd.z - 1.2);
+      g.scene.add(pole);
+    }
+    g.colliders.push({ type:'box', x:bd.x, z:bd.z, hw:2.8, hd:1.8, h:2.3 });
+    g.cameraMeshes.push(roof);
+  }
+
+  // ゴミ捨て場（フェンス囲い、2箇所）
+  const garbageFenceMat = new THREE.MeshStandardMaterial({
+    color: 0x888888, roughness: 0.6, metalness: 0.5,
+    wireframe: true, transparent: true, opacity: 0.6
+  });
+  g.materials.push(garbageFenceMat);
+  const garbageDefs = [{ x:-20, z:-28 }, { x:20, z:-28 }];
+  for (const gd of garbageDefs) {
+    // フェンス3面（U字型）
+    const gfGeo1 = addGeo(new THREE.BoxGeometry(3, 1.5, 0.1));
+    const gf1 = new THREE.Mesh(gfGeo1, garbageFenceMat);
+    gf1.position.set(gd.x, 0.75, gd.z - 1.2);
+    g.scene.add(gf1);
+    const gf2 = new THREE.Mesh(gfGeo1, garbageFenceMat);
+    gf2.position.set(gd.x, 0.75, gd.z + 1.2);
+    g.scene.add(gf2);
+    const gfGeo2 = addGeo(new THREE.BoxGeometry(0.1, 1.5, 2.4));
+    const gf3 = new THREE.Mesh(gfGeo2, garbageFenceMat);
+    gf3.position.set(gd.x + 1.5, 0.75, gd.z);
+    g.scene.add(gf3);
+    g.colliders.push({ type:'box', x:gd.x, z:gd.z, hw:1.8, hd:1.5, h:1.5 });
+  }
+
+  // ========================================
+  //  集会所（公園横の平屋建て小屋）
+  // ========================================
+  const commHallGeo = addGeo(new THREE.BoxGeometry(6, 3, 4));
+  commHallGeo.setAttribute('uv2', commHallGeo.attributes.uv);
+  const commHall = new THREE.Mesh(commHallGeo, plasterMat);
+  commHall.position.set(15, 1.5, 8);
+  commHall.castShadow = true; commHall.receiveShadow = true;
+  g.scene.add(commHall);
+  g.cameraMeshes.push(commHall);
+  g.colliders.push({ type:'box', x:15, z:8, hw:3.5, hd:2.5, h:3 });
+  // 集会所の屋根
+  const roofGeo = addGeo(new THREE.BoxGeometry(7, 0.15, 5));
+  const roofMeshMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.7, metalness: 0.3 });
+  g.materials.push(roofMeshMat);
+  const roofMesh = new THREE.Mesh(roofGeo, roofMeshMat);
+  roofMesh.position.set(15, 3.1, 8);
+  g.scene.add(roofMesh);
+
+  // ========================================
+  //  草木（至る所に配置）
+  // ========================================
+  // 大きな木（5〜6本）
+  const treeTrunkGeo = addGeo(new THREE.CylinderGeometry(0.2, 0.35, 5, 8));
+  const treeLeafGeo = addGeo(new THREE.SphereGeometry(2.5, 10, 8));
+  const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x5C4033, roughness: 0.9 });
+  const treeLeafMat = new THREE.MeshStandardMaterial({ color: 0x2d6b1a, roughness: 0.85 });
+  g.materials.push(treeTrunkMat, treeLeafMat);
+  const treeDefs = [
+    { x:-12, z:5 }, { x:12, z:-5 }, { x:-30, z:-10 },
+    { x:30, z:10 }, { x:-5, z:-10 }, { x:20, z:-12 }
+  ];
+  for (const td of treeDefs) {
+    const ty = gH(td.x, td.z);
+    const trunk = new THREE.Mesh(treeTrunkGeo, treeTrunkMat);
+    trunk.position.set(td.x, ty + 2.5, td.z);
+    trunk.castShadow = true;
+    g.scene.add(trunk);
+    g.cameraMeshes.push(trunk);
+    const leaf = new THREE.Mesh(treeLeafGeo, treeLeafMat);
+    leaf.position.set(td.x, ty + 5.5, td.z);
+    leaf.castShadow = true;
+    g.scene.add(leaf);
+    g.colliders.push({ type:'cylinder', x:td.x, z:td.z, r:0.5, h:6 });
+  }
+
+  // 丸く刈り込んだ低木（ツツジ風、10〜15株）
+  const bushGeo = addGeo(new THREE.SphereGeometry(0.6, 8, 6));
+  const bushMat = new THREE.MeshStandardMaterial({ color: 0x3a7a2a, roughness: 0.9 });
+  g.materials.push(bushMat);
+  const bushDefs = [
+    {x:-8,z:8},{x:8,z:8},{x:-12,z:-8},{x:12,z:-8},
+    {x:-15,z:2},{x:15,z:2},{x:-20,z:-5},{x:20,z:5},
+    {x:0,z:10},{x:-3,z:-12},{x:3,z:12},{x:-18,z:14}
+  ];
+  for (const bd of bushDefs) {
+    const bush = new THREE.Mesh(bushGeo, bushMat);
+    bush.position.set(bd.x, gH(bd.x, bd.z) + 0.5, bd.z);
+    bush.castShadow = true;
+    g.scene.add(bush);
+    g.cameraMeshes.push(bush);
+    g.colliders.push({ type:'cylinder', x:bd.x, z:bd.z, r:0.7, h:1.2 });
+  }
+
+  // 生垣（棟周囲・通路沿いに帯状）
+  const hedgeGeo = addGeo(new THREE.BoxGeometry(8, 1.0, 0.8));
+  const hedgeMat = new THREE.MeshStandardMaterial({ color: 0x2a6a1a, roughness: 0.9 });
+  g.materials.push(hedgeMat);
+  const hedgeDefs = [
+    { x:-25, z:-10, ry:0 }, { x:-25, z:10, ry:0 },
+    { x:25, z:-10, ry:0 }, { x:25, z:10, ry:0 },
+    { x:0, z:10, ry:Math.PI/2 }
+  ];
+  for (const hd of hedgeDefs) {
+    const hedge = new THREE.Mesh(hedgeGeo, hedgeMat);
+    hedge.position.set(hd.x, 0.5, hd.z);
+    hedge.rotation.y = hd.ry || 0;
+    hedge.castShadow = true;
+    g.scene.add(hedge);
+    g.cameraMeshes.push(hedge);
+    if (hd.ry) {
+      g.colliders.push({ type:'box', x:hd.x, z:hd.z, hw:0.5, hd:4.5, h:1.0 });
+    } else {
+      g.colliders.push({ type:'box', x:hd.x, z:hd.z, hw:4.5, hd:0.5, h:1.0 });
+    }
+  }
+
+  // ========================================
+  //  電柱・電線
+  // ========================================
+  const poleDefs = [{ x:-15, z:0 }, { x:15, z:15 }, { x:0, z:-35 }];
+  const poleGeo = addGeo(new THREE.CylinderGeometry(0.1, 0.12, 8, 8));
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.5, metalness: 0.3 });
+  g.materials.push(poleMat);
+  for (const pd of poleDefs) {
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(pd.x, gH(pd.x, pd.z) + 4, pd.z);
+    pole.castShadow = true;
+    g.scene.add(pole);
+    g.cameraMeshes.push(pole);
+    g.colliders.push({ type:'cylinder', x:pd.x, z:pd.z, r:0.2, h:8 });
+    // 電柱の腕木
+    const armGeo = addGeo(new THREE.BoxGeometry(2, 0.1, 0.1));
+    const arm = new THREE.Mesh(armGeo, poleMat);
+    arm.position.set(pd.x, gH(pd.x, pd.z) + 7.5, pd.z);
+    g.scene.add(arm);
+  }
+
+  // ========================================
+  //  自販機（2台、各棟の1階横）
+  // ========================================
+  const vendGeo = addGeo(new THREE.BoxGeometry(0.8, 1.8, 0.6));
+  const vendDefs = [{ x:-30, z:-8 }, { x:30, z:-8 }];
+  for (const vd of vendDefs) {
+    const vendMat = new THREE.MeshStandardMaterial({
+      color: 0x2244aa, roughness: 0.3, metalness: 0.4,
+      emissive: 0x2244aa, emissiveIntensity: 0.5
+    });
+    g.materials.push(vendMat);
+    const vend = new THREE.Mesh(vendGeo, vendMat);
+    vend.position.set(vd.x, gH(vd.x, vd.z) + 0.9, vd.z);
+    vend.castShadow = true;
+    g.scene.add(vend);
+    g.cameraMeshes.push(vend);
+    g.colliders.push({ type:'box', x:vd.x, z:vd.z, hw:0.5, hd:0.4, h:1.8 });
+    // 自販機の光
+    const vendLight = new THREE.PointLight(0x4488ff, 0.8, 8);
+    vendLight.position.set(vd.x, gH(vd.x, vd.z) + 1.5, vd.z - 0.4);
+    g.scene.add(vendLight);
+  }
+
+  // ========================================
+  //  ジャングルジム（正面広場）
+  // ========================================
+  const jgPos = { x:0, z:-20 };
+  const jgMat = new THREE.MeshStandardMaterial({ color: 0xcc7722, roughness: 0.4, metalness: 0.5 });
+  g.materials.push(jgMat);
+  const jgBarGeo = addGeo(new THREE.CylinderGeometry(0.03, 0.03, 2.5, 6));
+  for (let jy = 0; jy < 3; jy++) {
+    for (let jx = -1; jx <= 1; jx++) {
+      for (let jz = -1; jz <= 1; jz++) {
+        // 縦の柱
+        const bar = new THREE.Mesh(jgBarGeo, jgMat);
+        bar.position.set(jgPos.x + jx * 1, gH(jgPos.x, jgPos.z) + 1.25, jgPos.z + jz * 1);
+        g.scene.add(bar);
+      }
+    }
+    // 横の梁
+    for (let jz2 = -1; jz2 <= 1; jz2++) {
+      const hBar = new THREE.Mesh(jgBarGeo, jgMat);
+      hBar.rotation.z = Math.PI/2;
+      hBar.position.set(jgPos.x, gH(jgPos.x, jgPos.z) + 0.8 + jy * 0.8, jgPos.z + jz2 * 1);
+      g.scene.add(hBar);
+    }
+  }
+  g.colliders.push({ type:'box', x:jgPos.x, z:jgPos.z, hw:1.5, hd:1.5, h:2.5 });
+
+  // ========================================
+  //  照明（水銀灯、街灯）
+  // ========================================
+  g.streetLights = g.streetLights || [];
+  const lampDefs = [
+    { x:-15, z:-18 }, { x:15, z:-18 },
+    { x:-15, z:18 }, { x:15, z:18 },
+    { x:-35, z:0 }, { x:35, z:0 },
+    { x:0, z:-30 }, { x:0, z:30 }
+  ];
+  const lampPostGeo = addGeo(new THREE.CylinderGeometry(0.08, 0.1, 6, 8));
+  const lampPostMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.5, metalness: 0.7 });
+  g.materials.push(lampPostMat);
+  for (const lp of lampDefs) {
+    const post = new THREE.Mesh(lampPostGeo, lampPostMat);
+    post.position.set(lp.x, gH(lp.x, lp.z) + 3, lp.z);
+    post.castShadow = true;
+    g.scene.add(post);
+    g.cameraMeshes.push(post);
+    g.colliders.push({ type:'cylinder', x:lp.x, z:lp.z, r:0.15, h:6 });
+    // 街灯頭部
+    const lhGeo = addGeo(new THREE.BoxGeometry(0.5, 0.12, 0.25));
+    const lhMat = new THREE.MeshStandardMaterial({
+      color: 0x666666, emissive: 0xddeeff, emissiveIntensity: 0.6,
+      roughness: 0.3, metalness: 0.5
+    });
+    g.materials.push(lhMat);
+    const lHead = new THREE.Mesh(lhGeo, lhMat);
+    lHead.position.set(lp.x, gH(lp.x, lp.z) + 6, lp.z);
+    g.scene.add(lHead);
+    // 水銀灯の光（青白色）
+    const lampLight = new THREE.PointLight(0xbbccff, 1.5, 25);
+    lampLight.position.set(lp.x, gH(lp.x, lp.z) + 5.8, lp.z);
+    g.scene.add(lampLight);
+    g.streetLights.push({ spot: lampLight, fixture: lHead, fixMat: lhMat });
+  }
+
+  // ========================================
+  //  物干し場のシーツ（2階ベランダ、風で揺れるアニメーション）
+  // ========================================
+  g._laundrySheets = [];
+  const sheetMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, roughness: 0.9, side: THREE.DoubleSide,
+    transparent: true, opacity: 0.85
+  });
+  g.materials.push(sheetMat);
+  for (const bldg of buildings) {
+    const bx = bldg.cx;
+    // 南面ベランダの2階〜4階にシーツ
+    for (let floor = 1; floor < 4; floor++) {
+      for (let si = 0; si < 3; si++) {
+        const sx = bx - 10 + si * 10 + (Math.random() - 0.5) * 4;
+        const sy = floor * FLOOR_H + 1.5;
+        const sz = -BLDG_D/2 - 1.0;
+        const sheetGeo = addGeo(new THREE.PlaneGeometry(1.0 + Math.random() * 0.5, 1.2 + Math.random() * 0.3, 4, 4));
+        const sheet = new THREE.Mesh(sheetGeo, sheetMat);
+        sheet.position.set(sx, sy, sz);
+        g.scene.add(sheet);
+        g._laundrySheets.push({
+          mesh: sheet, geo: sheetGeo, baseVerts: sheetGeo.attributes.position.array.slice(),
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+    }
+  }
+
+  // ========================================
+  //  住人の窓イベントシステム（Stage 5固有ギミック）
+  // ========================================
+  g._witnessSystem = {
+    timer: 0,
+    interval: 40, // 40秒ごと
+    warningTimer: 0,
+    active: false,
+    spotLight: null,
+    windowMesh: null,
+    targetFloor: 0,
+    targetBldgIdx: 0,
+    targetWindowX: 0,
+    revealDuration: 2.0,
+    revealTimer: 0
+  };
+  // 目撃用SpotLight
+  const witnessSpot = new THREE.SpotLight(0xffee88, 2.0, 30, Math.PI/5, 0.5, 1);
+  witnessSpot.visible = false;
+  g.scene.add(witnessSpot);
+  const witnessTarget = new THREE.Object3D();
+  g.scene.add(witnessTarget);
+  witnessSpot.target = witnessTarget;
+  g._witnessSystem.spotLight = witnessSpot;
+  g._witnessSystem.targetObj = witnessTarget;
+
+  // ========================================
+  //  裏側の舗装通路とフェンス
+  // ========================================
+  // 裏通路のアスファルト帯
+  const backPathGeo = addGeo(new THREE.PlaneGeometry(80, 5));
+  const backPathLoader = new THREE.TextureLoader();
+  const bpDiff = backPathLoader.load('textures/asphalt_diff.jpg');
+  bpDiff.wrapS = bpDiff.wrapT = THREE.RepeatWrapping;
+  bpDiff.repeat.set(16, 1);
+  g.textures.push(bpDiff);
+  const backPathMat = new THREE.MeshStandardMaterial({ map: bpDiff, roughness: 0.85 });
+  g.materials.push(backPathMat);
+  const backPath = new THREE.Mesh(backPathGeo, backPathMat);
+  backPath.rotation.x = -Math.PI/2;
+  backPath.position.set(0, 0.02, 25);
+  backPath.receiveShadow = true;
+  g.scene.add(backPath);
+
+  // 正面の舗装路
+  const frontPath = new THREE.Mesh(backPathGeo, backPathMat);
+  frontPath.rotation.x = -Math.PI/2;
+  frontPath.position.set(0, 0.02, -20);
+  frontPath.receiveShadow = true;
+  g.scene.add(frontPath);
+
+  // 裏側の金網フェンス
+  const backFenceGeo = addGeo(new THREE.BoxGeometry(80, 2, 0.1));
+  const backFenceMat = new THREE.MeshStandardMaterial({
+    color: 0x888888, wireframe: true, transparent: true, opacity: 0.4
+  });
+  g.materials.push(backFenceMat);
+  const backFence = new THREE.Mesh(backFenceGeo, backFenceMat);
+  backFence.position.set(0, 1, 35);
+  g.scene.add(backFence);
+  g.colliders.push({ type:'box', x:0, z:35, hw:42, hd:0.3, h:2 });
+
+  // ========================================
+  //  ポストプロセッシング & ライティング設定
+  // ========================================
+  // Stage 5は朝スタート — 昼夜サイクルが4回転（240秒/60秒サイクル）
+  // sunLightはcreateDayNightCycleで管理されるので追加設定不要
+
+  g.renderer.toneMappingExposure = 1.0;
+  if (g.composer && g.bloomPass && g.filmPass) {
+    g.bloomPass.strength = 0.15;
+    g.bloomPass.radius = 0.4;
+    g.bloomPass.threshold = 0.85;
+    g.filmPass.uniforms.vignetteAmt.value = 0.3;
+    g.filmPass.uniforms.grainAmt.value = 0.02;
+    g.filmPass.uniforms.tintR.value = 1.0;
+    g.filmPass.uniforms.tintG.value = 1.0;
+    g.filmPass.uniforms.tintB.value = 1.0;
+    g.filmPass.uniforms.desaturation.value = 0.0;
+  }
+
+  // kickableSigns の初期化
+  g.kickableSigns = g.kickableSigns || [];
+}
+
 // --- CAN ---
 function createCan(g) {
   const canGroup = new THREE.Group();
@@ -6432,6 +7275,26 @@ function updatePlayer(g, dt) {
     }
   }
 
+  // Stage 5: 団地の階段室の高さオーバーライド（2F踊り場=+3mまで）
+  // 建物1: bx=-25, bz=0、建物2: bx=25, bz=0
+  // 階段室: 各棟の左端(bx-19)と右端(bx+19)に突出、z中心=bz(0)
+  if (g._stageNum === 5) {
+    const FLOOR_H5 = 3;
+    const stairZones5 = [
+      { sx: -25 - 17.5 - 1.5, bz: 0 }, { sx: -25 + 17.5 + 1.5, bz: 0 },
+      { sx:  25 - 17.5 - 1.5, bz: 0 }, { sx:  25 + 17.5 + 1.5, bz: 0 }
+    ];
+    for (const sz of stairZones5) {
+      if (Math.abs(ctrl.position.x - sz.sx) < 1.5 && Math.abs(ctrl.position.z - sz.bz) < 1.5) {
+        const stairStart = sz.bz - 1.2;
+        const progress = Math.max(0, Math.min(1, (ctrl.position.z - stairStart) / 2.7));
+        const stepH = Math.ceil(progress * 10) * (FLOOR_H5 / 10);
+        ctrl.position.y = Math.max(ctrl.position.y, stepH);
+        break;
+      }
+    }
+  }
+
   // Face movement direction
   if (ctrl.moveSpeed > 0.5) {
     ctrl.rotation = Math.atan2(moveX, moveZ);
@@ -6569,6 +7432,19 @@ function getGroundHeight(g, x, z) {
   // Sample from ground geometry (must match buildTerrain displacement)
   const noise = g._noise || (g._noise = new SimplexNoise2D(42));
   const noise2 = g._noise2 || (g._noise2 = new SimplexNoise2D(137));
+
+  if (g._stageNum === 5) {
+    // Stage 5: 団地 — コンクリ舗装 + 公園草地
+    let h = noise.noise2D(x * 0.06, z * 0.06) * 0.03;
+    h += noise2.noise2D(x * 0.3, z * 0.3) * 0.01;
+    if (Math.abs(x) < 15 && Math.abs(z) < 8) {
+      h += noise.noise2D(x * 0.08, z * 0.08) * 0.06;
+      h += noise2.noise2D(x * 0.25, z * 0.25) * 0.02;
+    }
+    const sdist = Math.sqrt(x*x + z*z);
+    if (sdist < 3) h -= 0.15 * Math.max(0, Math.cos(sdist / 3 * Math.PI * 0.5));
+    return h;
+  }
 
   if (g._stageNum === 4) {
     // Stage 4: 廃校の校庭 — ほぼ平坦な砂地
@@ -7439,6 +8315,24 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
     }
   }
 
+  // Stage 5: 団地の階段室の高さオーバーライド（鬼も2F踊り場まで巡回可能）
+  // 建物1: bx=-25, bz=0、建物2: bx=25, bz=0
+  if (g._stageNum === 5) {
+    const FLOOR_H5 = 3;
+    const stairZones5 = [
+      { sx: -25 - 17.5 - 1.5, bz: 0 }, { sx: -25 + 17.5 + 1.5, bz: 0 },
+      { sx:  25 - 17.5 - 1.5, bz: 0 }, { sx:  25 + 17.5 + 1.5, bz: 0 }
+    ];
+    for (const sz of stairZones5) {
+      if (Math.abs(oni.position.x - sz.sx) < 1.5 && Math.abs(oni.position.z - sz.bz) < 1.5) {
+        const stairStart = sz.bz - 1.2;
+        const progress = Math.max(0, Math.min(1, (oni.position.z - stairStart) / 2.7));
+        oni.position.y = Math.max(oni.position.y, Math.ceil(progress * 10) * (FLOOR_H5 / 10));
+        break;
+      }
+    }
+  }
+
   // Face direction (実際の移動方向を向く)
   const actualDx = oni.position.x - prevX;
   const actualDz = oni.position.z - prevZ;
@@ -7455,7 +8349,24 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
 
 function getFootSoundRange(g) {
   // ステージごとの足音基本距離
-  const baseRange = g._stageNum === 3 ? 12 : (g._stageNum === 2 ? 18 : 8);
+  // Stage 5: コンクリ=12m, 芝生=8m（階段室のエコー=25mは別途チェック）
+  let baseRange = 8;
+  if (g._stageNum === 3) baseRange = 12;
+  else if (g._stageNum === 2) baseRange = 18;
+  else if (g._stageNum === 5) {
+    // 階段室内ならエコーで足音が響く (25m)
+    // 建物1: bx=-25, bz=0、建物2: bx=25, bz=0
+    const px = g.player.position.x, pz = g.player.position.z;
+    const stairZones = [
+      { sx: -25 - 17.5 - 1.5, bz: 0 }, { sx: -25 + 17.5 + 1.5, bz: 0 },
+      { sx:  25 - 17.5 - 1.5, bz: 0 }, { sx:  25 + 17.5 + 1.5, bz: 0 }
+    ];
+    let inStair = false;
+    for (const sz of stairZones) {
+      if (Math.abs(px - sz.sx) < 1.5 && Math.abs(pz - sz.bz) < 1.5) { inStair = true; break; }
+    }
+    baseRange = inStair ? 25 : 12; // 階段室=25m, コンクリ路面=12m
+  }
   const mult = g.player.isDashing ? 1.8 : (g.player.isCrouching ? 0.3 : 1.0);
   return baseRange * mult;
 }
@@ -8594,6 +9505,87 @@ function updateFlickeringLights(g, dt) {
   }
 }
 
+// --- Stage 5: 住人の窓からの目撃イベント更新 ---
+function updateWitnessWindows(g, dt) {
+  if (!g._witnessSystem || g._stageNum !== 5) return;
+  const ws = g._witnessSystem;
+
+  // 目撃中の処理
+  if (ws.active) {
+    ws.revealTimer -= dt;
+    if (ws.revealTimer <= 0) {
+      // 目撃終了: スポットライトOFF
+      ws.active = false;
+      ws.spotLight.visible = false;
+    }
+    return;
+  }
+
+  // 定期タイマー
+  ws.timer += dt;
+  if (ws.timer < ws.interval) return;
+  ws.timer = 0;
+
+  // ゲームフェーズがSEEK中のみ発動
+  if (g.gamePhase !== 'SEEK') return;
+
+  // ランダムな棟と窓位置を選択
+  // 建物1: bx=-25, bz=0、建物2: bx=25, bz=0（BLDG_D=8, 南面z=-4, 北面z=+4）
+  const bldgIdx = Math.random() < 0.5 ? 0 : 1;
+  const bx = bldgIdx === 0 ? -25 : 25;
+  const bz = 0; // 両棟ともz中心=0
+  const floor = 1 + Math.floor(Math.random() * 4); // 2F〜5F
+  const fy = floor * 3 + 2.0;
+  const wx = bx + (-14 + Math.floor(Math.random() * 9) * 3.5); // 棟のx中心を基準に窓位置
+
+  // 窓位置からプレイヤーを視認できるか判定
+  const px = g.player.position.x, pz = g.player.position.z;
+  const distToPlayer = Math.sqrt((px - wx) * (px - wx) + (pz - bz) * (pz - bz));
+
+  // 25m以内かつしゃがんでいない場合のみ目撃成立
+  if (distToPlayer < 25 && !g.player.isCrouching && !g.player.captured) {
+    ws.active = true;
+    ws.revealTimer = ws.revealDuration;
+
+    // スポットライトで窓から照射（南面z=-4.2 or 北面z=+4.2）
+    const windowZ = pz < bz ? bz - 4.2 : bz + 4.2; // プレイヤーに近い面から照射
+    ws.spotLight.position.set(wx, fy, windowZ);
+    ws.targetObj.position.set(px, 0, pz);
+    ws.spotLight.visible = true;
+
+    // 全鬼にプレイヤー位置を通知（footSound状態に遷移）
+    for (const oni of g.onis) {
+      if (oni.state === 'patrol' || oni.state === 'search') {
+        oni.target = g.player.position.clone();
+        oni.state = 'footSound';
+        oni._footSoundTimer = 5;
+      }
+    }
+
+    // 通知表示
+    showNotification('住人に目撃された！');
+    SoundManager.playGameSE('found');
+  }
+}
+
+// --- Stage 5: 洗濯物の風アニメーション更新 ---
+function updateLaundrySheets(g, dt) {
+  if (!g._laundrySheets || g._stageNum !== 5) return;
+  const time = performance.now() * 0.001;
+  for (const ls of g._laundrySheets) {
+    const pos = ls.geo.attributes.position;
+    const base = ls.baseVerts;
+    for (let i = 0; i < pos.count; i++) {
+      const bx = base[i * 3], by = base[i * 3 + 1], bz = base[i * 3 + 2];
+      // 風による揺れ（z方向にサイン波）
+      const wave = Math.sin(time * 2.5 + ls.phase + by * 3) * 0.08;
+      const wave2 = Math.sin(time * 1.8 + ls.phase * 1.3 + bx * 5) * 0.04;
+      pos.array[i * 3 + 2] = bz + wave + wave2;
+    }
+    pos.needsUpdate = true;
+  }
+}
+
 // --- 蹴れる看板の倒れアニメーション更新 ---
 function updateKickableSigns(g, dt) {
   if (!g.kickableSigns) return;
@@ -9139,6 +10131,8 @@ function gameLoop(timestamp) {
     ['updateRollingPebbles', () => updateRollingPebbles(G, dt)],
     ['updateKickableSigns', () => updateKickableSigns(G, dt)],
     ['updateFlickeringLights', () => updateFlickeringLights(G, dt)],
+    ['updateWitnessWindows', () => updateWitnessWindows(G, dt)],
+    ['updateLaundrySheets', () => updateLaundrySheets(G, dt)],
     ['updateGamePhases', () => updateGamePhases(G, dt)],
     ['updateHUD', () => updateHUD(G)]
   ];
@@ -9213,7 +10207,9 @@ function startGame(stageNum, mode) {
 
   // Build stage — dispatch by stage number
   buildTerrain(G, stageNum);
-  if (stageNum === 4) {
+  if (stageNum === 5) {
+    buildDanchiObjects(G);
+  } else if (stageNum === 4) {
     buildSchoolObjects(G);
   } else if (stageNum === 3) {
     buildAlleyObjects(G);
