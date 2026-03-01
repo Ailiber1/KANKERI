@@ -4557,12 +4557,12 @@ function buildSchoolObjects(g) {
   // --- 教室仕切り壁（南北方向）---
   addBox(-6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);  // A / B 間
   addBox(6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);   // B / C 間
-  // C / 東階段室仕切り壁（z:27~30）
-  addBox(13.5, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30（フル高さ）
-  // 西階段室 / A 仕切り壁（z:27~30）
-  addBox(-13.5, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30（フル高さ）
+  // C / 東階段室仕切り壁（z:27~30 + 踊り場出口 z:30~32 は開口）
+  addBox(14, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30
+  // 西階段室 / A 仕切り壁
+  addBox(-14, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30
   // --- 2F床 / 1F天井 (y=4, 東階段室 x:14~20 と西階段室 x:-20~-14 を除く) ---
-  const f2Geo = new THREE.PlaneGeometry(27, 8);
+  const f2Geo = new THREE.PlaneGeometry(28, 8);
   f2Geo.setAttribute('uv2', f2Geo.attributes.uv);
   const f2Mat = makePBRMat(concretePBR, { roughness: 0.85 });
   const f2Mesh = new THREE.Mesh(f2Geo, f2Mat);
@@ -4571,7 +4571,7 @@ function buildSchoolObjects(g) {
   f2Mesh.receiveShadow = true;
   g.scene.add(f2Mesh); g.geometries.push(f2Geo);
   // 1F天井面（下から見える）
-  const c1Geo = new THREE.PlaneGeometry(27, 8);
+  const c1Geo = new THREE.PlaneGeometry(28, 8);
   const c1Mat = new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.95 });
   g.materials.push(c1Mat);
   const c1Mesh = new THREE.Mesh(c1Geo, c1Mat);
@@ -4600,8 +4600,8 @@ function buildSchoolObjects(g) {
   f1TMesh.position.set(0, 0.02, 27.5);
   f1TMesh.receiveShadow = true;
   g.scene.add(f1TMesh); g.geometries.push(f1TGeo);
-  // 2F床タイル（両階段室を除く → 幅27, center x=0）
-  const f2TGeo = new THREE.PlaneGeometry(27, 7);
+  // 2F床タイル（両階段室を除く → 幅28, center x=0）
+  const f2TGeo = new THREE.PlaneGeometry(28, 7);
   f2TGeo.setAttribute('uv2', f2TGeo.attributes.uv);
   const f2TMesh = new THREE.Mesh(f2TGeo, floorTileMat);
   f2TMesh.rotation.x = -Math.PI / 2;
@@ -4742,7 +4742,7 @@ function buildSchoolObjects(g) {
   }
 
   // --- 正面玄関の内側照明（入口暗闇対策）---
-  const entranceLight = new THREE.PointLight(0xccddff, 0.6, 10);
+  const entranceLight = new THREE.PointLight(0xccddff, 0.3, 8);
   entranceLight.position.set(0, 2.8, 24.8);
   g.scene.add(entranceLight);
 
@@ -4751,7 +4751,7 @@ function buildSchoolObjects(g) {
   for (let fl = 0; fl < 2; fl++) {
     const yOff = fl * FLOOR_H;
     for (let lx = -16; lx <= 16; lx += 8) {
-      const flLight = new THREE.PointLight(0xccddff, fl === 0 ? 0.4 : 0.2, 10);
+      const flLight = new THREE.PointLight(0xccddff, fl === 0 ? 0.2 : 0.1, 8);
       flLight.position.set(lx, yOff + 3.5, 25.75);
       g.scene.add(flLight);
       const flGeo = new THREE.BoxGeometry(1.0, 0.06, 0.12);
@@ -5105,18 +5105,18 @@ function buildSchoolObjects(g) {
 
   // === 校庭の照明 ===
   // 廃校専用の環境光（月明かりの底上げ — シャドウ無効のため少し強めに）
-  const schoolAmbient = new THREE.AmbientLight(0x334466, 0.85);
+  const schoolAmbient = new THREE.AmbientLight(0x1a2233, 0.5);
   g.scene.add(schoolAmbient);
 
   // メインのDirectionalLight（月光 — シーン全体を均一に照らす）
   // Stage 4: シャドウ無効（校舎壁の影が地面に黒パッチとして出るため）
-  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 1.0);
+  const moonDirLight = new THREE.DirectionalLight(0x6677aa, 0.5);
   moonDirLight.position.set(30, 50, 20);
   moonDirLight.castShadow = false;
   g.scene.add(moonDirLight);
 
   // SpotLight（月光のハイライト — 校庭中央を重点的に照らす）
-  const moonLight = new THREE.SpotLight(0x8888cc, 2.5, 150, Math.PI / 3, 0.4, 0.5);
+  const moonLight = new THREE.SpotLight(0x6677aa, 1.2, 150, Math.PI / 3, 0.4, 0.5);
   moonLight.position.set(30, 50, 20);
   moonLight.target.position.set(0, 0, 0);
   g.scene.add(moonLight);
@@ -5162,12 +5162,12 @@ function buildSchoolObjects(g) {
   }
 
   // Stage 4 夜間シーンの露出 + ポストプロセッシング強化
-  g.renderer.toneMappingExposure = 1.05;
+  g.renderer.toneMappingExposure = 0.8;
   if (g.composer && g.bloomPass && g.filmPass) {
     g.bloomPass.strength = 0.12;  // 控えめなブルーム
     g.bloomPass.radius = 0.3;
     g.bloomPass.threshold = 0.92; // 非常に明るいもののみ
-    g.filmPass.uniforms.vignetteAmt.value = 0.40;
+    g.filmPass.uniforms.vignetteAmt.value = 0.55;
     g.filmPass.uniforms.grainAmt.value = 0.05;
     g.filmPass.uniforms.tintR.value = 0.90;
     g.filmPass.uniforms.tintG.value = 0.93;
