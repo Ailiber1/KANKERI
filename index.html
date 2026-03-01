@@ -5946,7 +5946,16 @@ function buildDanchiObjects(g) {
         g.scene.add(step);
       }
 
-      // --- 各階の踊り場（2F〜5F）と玄関ドア ---
+      // --- 各階の床スラブ・パラペット壁・踊り場・玄関ドア（2F〜5F）---
+      // 床スラブ: 階段室の全幅を覆うコンクリート床板
+      const slabGeo = addGeo(new THREE.BoxGeometry(STAIR_W - 0.1, 0.2, STAIR_D * 0.5));
+      // パラペット壁: 南面に各階の区切り壁（外から階層構造が見える）
+      const parapetWallGeo = addGeo(new THREE.BoxGeometry(STAIR_W - 0.1, FLOOR_H - 0.2, 0.12));
+      const parapetWallMat = new THREE.MeshStandardMaterial({
+        color: 0xd0c8c0, roughness: 0.9, metalness: 0.0
+      });
+      g.materials.push(parapetWallMat);
+      // 踊り場（階段到達点の小床）
       const landGeo = addGeo(new THREE.BoxGeometry(STAIR_W - 0.2, 0.15, 1.2));
       const doorGeo = addGeo(new THREE.PlaneGeometry(0.8, 1.8));
       const doorMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.7, metalness: 0.3 });
@@ -5958,10 +5967,25 @@ function buildDanchiObjects(g) {
       for (let fl = 1; fl <= TOTAL_FLIGHTS; fl++) {
         const landY = fl * FLOOR_H;
         const landZ = sSouthZ + (fl * STEPS_PER_FLIGHT) * STEP_RUN;
-        // 踊り場
+
+        // 床スラブ（各階の床板、北寄りに配置し階段の通り道は残す）
+        const slab = new THREE.Mesh(slabGeo, concreteMat);
+        slab.position.set(sd.sx, landY - 0.1, stairCZ + STAIR_D * 0.25);
+        slab.receiveShadow = true;
+        g.scene.add(slab);
+
+        // 南面パラペット壁（各階の区切り壁、1F入口の上から始まる）
+        // この壁が外から見える各階の構造線になる
+        const pWall = new THREE.Mesh(parapetWallGeo, parapetWallMat);
+        pWall.position.set(sd.sx, landY + (FLOOR_H - 0.2)/2, sSouthZ + 0.06);
+        pWall.castShadow = true; pWall.receiveShadow = true;
+        g.scene.add(pWall);
+
+        // 踊り場（階段到達地点）
         const landing = new THREE.Mesh(landGeo, concreteMat);
         landing.position.set(sd.sx, landY, landZ);
         g.scene.add(landing);
+
         // 左右の玄関ドア
         for (const side of [-1, 1]) {
           const frame = new THREE.Mesh(doorFrameGeo, doorFrameMat);
