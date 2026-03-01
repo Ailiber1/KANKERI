@@ -2665,14 +2665,16 @@ const STAGE_CONFIGS = {
       { x: 15, z: -20, label: '③ 参道の石灯籠付近', labelEn: '③ Near Stone Lanterns' }
     ],
     waypoints: [
-      // 庭園巡回
-      {x:0,z:0},{x:-8,z:0},{x:8,z:0},{x:0,z:-8},{x:0,z:8},
-      // 本堂周辺
-      {x:-5,z:10},{x:5,z:10},{x:0,z:14},{x:-8,z:14},{x:8,z:14},
-      // 庫裏
-      {x:15,z:12},{x:18,z:10},{x:15,z:8},
-      // 離れ
-      {x:-18,z:12},{x:-20,z:10},{x:-18,z:8},
+      // 庭園巡回（建物南側の広場）
+      {x:0,z:0},{x:-8,z:0},{x:8,z:0},{x:0,z:-8},{x:0,z:3},
+      // 建物南側（建物外壁沿い、進入不可）
+      {x:-10,z:3},{x:10,z:3},{x:22,z:4},{x:-24,z:4},
+      // 建物北側
+      {x:-10,z:17},{x:0,z:17},{x:10,z:17},{x:22,z:17},
+      // 建物東側（庫裏の外）
+      {x:22,z:10},{x:22,z:14},
+      // 建物西側（離れの外）
+      {x:-24,z:10},{x:-24,z:14},
       // 参道
       {x:0,z:-15},{x:0,z:-20},{x:0,z:-25},{x:0,z:-30},
       // 竹林
@@ -2689,8 +2691,6 @@ const STAGE_CONFIGS = {
     interactables: [
       // 梵鐘（特殊: 全鬼反応の陽動、cooldown30秒）
       { type:'bell', x:-22, z:-8, radius:40, label:'梵鐘', labelEn:'Temple Bell', sound:'bell', cooldown:30 },
-      // 障子戸（離れ、開閉ギミック）
-      { type:'shoji', x:-18, z:10, radius:8, label:'障子戸', labelEn:'Shoji Door', sound:'slide' },
       // 石灯籠
       { type:'lantern', x:-2, z:-18, radius:15, label:'石灯籠', labelEn:'Stone Lantern', sound:'stone' },
       { type:'lantern', x:2, z:-18, radius:15, label:'石灯籠', labelEn:'Stone Lantern', sound:'stone' },
@@ -2700,21 +2700,19 @@ const STAGE_CONFIGS = {
       { type:'rock', x:-5, z:2, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
       { type:'rock', x:6, z:-3, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
       { type:'rock', x:3, z:5, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
-      // 本堂の柱
-      { type:'pillar', x:-3, z:10, radius:18, label:'本堂の柱', labelEn:'Main Hall Pillar', sound:'thud' },
-      { type:'pillar', x:3, z:10, radius:18, label:'本堂の柱', labelEn:'Main Hall Pillar', sound:'thud' },
-      // 庫裏の壁
-      { type:'wall', x:15, z:10, radius:15, label:'庫裏の壁', labelEn:'Kitchen Wall', sound:'thud' },
+      // 建物外壁（固体化のため外側から叩く）
+      { type:'wall', x:0, z:3, radius:20, label:'本堂の壁', labelEn:'Main Hall Wall', sound:'thud' },
+      { type:'wall', x:22, z:10, radius:15, label:'庫裏の壁', labelEn:'Kitchen Wall', sound:'thud' },
+      { type:'wall', x:-24, z:10, radius:12, label:'離れの壁', labelEn:'Annex Wall', sound:'thud' },
       // 山門
       { type:'gate', x:0, z:-32, radius:20, label:'山門の柱', labelEn:'Temple Gate Pillar', sound:'thud' },
       // 地蔵尊
       { type:'statue', x:22, z:24, radius:10, label:'地蔵尊', labelEn:'Jizo Statue', sound:'stone' },
       { type:'statue', x:26, z:20, radius:10, label:'地蔵尊', labelEn:'Jizo Statue', sound:'stone' },
       { type:'statue', x:24, z:16, radius:10, label:'地蔵尊', labelEn:'Jizo Statue', sound:'stone' },
-      // 壺（庫裏内）
-      { type:'pot', x:17, z:12, radius:12, label:'壺', labelEn:'Ceramic Pot', sound:'stone' },
-      // ベンチ（縁側）
-      { type:'bench', x:-18, z:14, radius:12, label:'縁側', labelEn:'Veranda', sound:'thud' }
+      // 松の木
+      { type:'tree', x:-5, z:-17, radius:15, label:'松の木', labelEn:'Pine Tree', sound:'thud' },
+      { type:'tree', x:5, z:-17, radius:15, label:'松の木', labelEn:'Pine Tree', sound:'thud' }
     ]
   }
 };
@@ -7001,31 +6999,16 @@ function buildTempleObjects(g) {
   }
 
   // ========================================
-  //  本堂（15×10×6m、中心: (0, 0, 10)）
+  //  本堂（15×10×6m、中心: (0, 0, 10)）— 固体ブロック
   // ========================================
   const honX = 0, honZ = 10;
   // 基壇（石積み）
   addBox(stoneMat, 16, 0.5, 11, honX, 0.25, honZ);
-  // 床（板の間）
-  addBox(woodMat, 15, 0.15, 10, honX, 0.575, honZ);
-  // 壁 — 北壁
-  addBox(wallMat, 15, 5, 0.3, honX, 3.1, honZ + 5);
-  addBoxCollider(honX, honZ + 5, 7.7, 0.3, 6);
-  // 壁 — 南壁（入口2箇所を開口: x=-4~-2 と x=2~4）
-  addBox(wallMat, 4.5, 5, 0.3, honX - 5.25, 3.1, honZ - 5);
-  addBoxCollider(honX - 5.25, honZ - 5, 2.5, 0.3, 6);
-  addBox(wallMat, 2, 5, 0.3, honX, 3.1, honZ - 5);
-  addBoxCollider(honX, honZ - 5, 1.2, 0.3, 6);
-  addBox(wallMat, 4.5, 5, 0.3, honX + 5.25, 3.1, honZ - 5);
-  addBoxCollider(honX + 5.25, honZ - 5, 2.5, 0.3, 6);
-  // 壁 — 東壁
-  addBox(wallMat, 0.3, 5, 10, honX + 7.5, 3.1, honZ);
-  addBoxCollider(honX + 7.5, honZ, 0.3, 5.2, 6);
-  // 壁 — 西壁（裏口開口 z=12~14）
-  addBox(wallMat, 0.3, 5, 3, honX - 7.5, 3.1, honZ - 3.5);
-  addBoxCollider(honX - 7.5, honZ - 3.5, 0.3, 1.7, 6);
-  addBox(wallMat, 0.3, 5, 5, honX - 7.5, 3.1, honZ + 2.5);
-  addBoxCollider(honX - 7.5, honZ + 2.5, 0.3, 2.7, 6);
+  // 壁 — 全面（入口なし）
+  addBox(wallMat, 15, 5, 0.3, honX, 3.1, honZ + 5);  // 北壁
+  addBox(wallMat, 15, 5, 0.3, honX, 3.1, honZ - 5);  // 南壁（全面閉鎖）
+  addBox(wallMat, 0.3, 5, 10, honX + 7.5, 3.1, honZ); // 東壁
+  addBox(wallMat, 0.3, 5, 10, honX - 7.5, 3.1, honZ); // 西壁（全面閉鎖）
   // 屋根
   const honRoofGeo = addGeo(new THREE.ConeGeometry(11, 3, 4));
   const honRoof = new THREE.Mesh(honRoofGeo, roofMat);
@@ -7033,42 +7016,20 @@ function buildTempleObjects(g) {
   honRoof.rotation.y = Math.PI / 4;
   honRoof.castShadow = true;
   g.scene.add(honRoof);
-  // 内部柱4本
-  const pillarPositions = [[-3, honZ - 3], [3, honZ - 3], [-3, honZ + 3], [3, honZ + 3]];
-  for (const [px, pz] of pillarPositions) {
-    const pillarGeo = addGeo(new THREE.CylinderGeometry(0.2, 0.2, 5, 8));
-    const pillar = new THREE.Mesh(pillarGeo, darkWoodMat);
-    pillar.position.set(px, 3.1, pz);
-    pillar.castShadow = true;
-    g.scene.add(pillar);
-    addCylCollider(px, pz, 0.35, 6);
-  }
+  // ★ 固体コライダー1個（建物全体をブロック）
+  addBoxCollider(honX, honZ, 8.0, 5.5, 6);
 
   // ========================================
-  //  庫裏（10×8×4m、中心: (15, 0, 10)）
+  //  庫裏（10×8×4m、中心: (15, 0, 10)）— 固体ブロック
   // ========================================
   const kuriX = 15, kuriZ = 10;
   // 基壇
   addBox(stoneMat, 11, 0.4, 9, kuriX, 0.2, kuriZ);
-  // 床（土間+板の間）
-  addBox(earthMat, 5, 0.1, 8, kuriX - 2.5, 0.45, kuriZ);
-  addBox(woodMat, 5, 0.1, 8, kuriX + 2.5, 0.45, kuriZ);
-  // 壁 — 北
-  addBox(wallMat, 10, 3.5, 0.3, kuriX, 2.2, kuriZ + 4);
-  addBoxCollider(kuriX, kuriZ + 4, 5.2, 0.3, 4);
-  // 壁 — 南（引き戸開口 x=13~15）
-  addBox(wallMat, 3, 3.5, 0.3, kuriX - 3.5, 2.2, kuriZ - 4);
-  addBoxCollider(kuriX - 3.5, kuriZ - 4, 1.7, 0.3, 4);
-  addBox(wallMat, 3, 3.5, 0.3, kuriX + 3.5, 2.2, kuriZ - 4);
-  addBoxCollider(kuriX + 3.5, kuriZ - 4, 1.7, 0.3, 4);
-  // 壁 — 東
-  addBox(wallMat, 0.3, 3.5, 8, kuriX + 5, 2.2, kuriZ);
-  addBoxCollider(kuriX + 5, kuriZ, 0.3, 4.2, 4);
-  // 壁 — 西（勝手口開口 z=10~12）
-  addBox(wallMat, 0.3, 3.5, 3, kuriX - 5, 2.2, kuriZ - 2.5);
-  addBoxCollider(kuriX - 5, kuriZ - 2.5, 0.3, 1.7, 4);
-  addBox(wallMat, 0.3, 3.5, 3, kuriX - 5, 2.2, kuriZ + 2.5);
-  addBoxCollider(kuriX - 5, kuriZ + 2.5, 0.3, 1.7, 4);
+  // 壁 — 全面（入口なし）
+  addBox(wallMat, 10, 3.5, 0.3, kuriX, 2.2, kuriZ + 4);  // 北壁
+  addBox(wallMat, 10, 3.5, 0.3, kuriX, 2.2, kuriZ - 4);  // 南壁（全面閉鎖）
+  addBox(wallMat, 0.3, 3.5, 8, kuriX + 5, 2.2, kuriZ);   // 東壁
+  addBox(wallMat, 0.3, 3.5, 8, kuriX - 5, 2.2, kuriZ);   // 西壁（全面閉鎖）
   // 屋根
   const kuriRoofGeo = addGeo(new THREE.ConeGeometry(8, 2.5, 4));
   const kuriRoof = new THREE.Mesh(kuriRoofGeo, roofMat);
@@ -7076,46 +7037,27 @@ function buildTempleObjects(g) {
   kuriRoof.rotation.y = Math.PI / 4;
   kuriRoof.castShadow = true;
   g.scene.add(kuriRoof);
-  // 土間の棚
-  addBox(woodMat, 1.5, 1.5, 0.4, kuriX - 3, 1.2, kuriZ + 3.5);
-  // 壺
-  const potGeo = addGeo(new THREE.CylinderGeometry(0.25, 0.35, 0.8, 8));
-  const pot = new THREE.Mesh(potGeo, stoneMat);
-  pot.position.set(kuriX + 2, 0.85, kuriZ + 3);
-  pot.castShadow = true;
-  g.scene.add(pot);
+  // ★ 固体コライダー1個
+  addBoxCollider(kuriX, kuriZ, 5.5, 4.5, 4);
 
   // ========================================
-  //  離れ（8×6×4m、中心: (-18, 0, 10)）
+  //  離れ（8×6×4m、中心: (-18, 0, 10)）— 固体ブロック
   // ========================================
   const hanX = -18, hanZ = 10;
   // 基壇
   addBox(stoneMat, 9, 0.4, 7, hanX, 0.2, hanZ);
-  // 床（畳）
-  addBox(tatamiMat, 8, 0.1, 6, hanX, 0.45, hanZ);
-  // 壁 — 北
-  addBox(wallMat, 8, 3.5, 0.3, hanX, 2.2, hanZ + 3);
-  addBoxCollider(hanX, hanZ + 3, 4.2, 0.3, 4);
-  // 壁 — 南（障子戸開口 x=-20~-16）
-  addBox(wallMat, 2, 3.5, 0.3, hanX + 3, 2.2, hanZ - 3);
-  addBoxCollider(hanX + 3, hanZ - 3, 1.2, 0.3, 4);
-  addBox(wallMat, 2, 3.5, 0.3, hanX - 3, 2.2, hanZ - 3);
-  addBoxCollider(hanX - 3, hanZ - 3, 1.2, 0.3, 4);
-  // 障子戸（開閉可能）
-  const shojiGeo = addGeo(new THREE.BoxGeometry(2.5, 3, 0.08));
+  // 壁 — 全面（障子戸は閉鎖、視覚のみ）
+  addBox(wallMat, 8, 3.5, 0.3, hanX, 2.2, hanZ + 3);   // 北壁
+  addBox(wallMat, 8, 3.5, 0.3, hanX, 2.2, hanZ - 3);   // 南壁（全面閉鎖）
+  addBox(wallMat, 0.3, 3.5, 6, hanX + 4, 2.2, hanZ);   // 東壁（全面閉鎖）
+  addBox(wallMat, 0.3, 3.5, 6, hanX - 4, 2.2, hanZ);   // 西壁
+  // 障子戸（視覚のみ、開閉なし）
+  const shojiGeo = addGeo(new THREE.BoxGeometry(3, 3, 0.08));
   const shojiMesh = new THREE.Mesh(shojiGeo, shojiMat);
   shojiMesh.position.set(hanX, 2.0, hanZ - 3);
   shojiMesh.castShadow = true;
   g.scene.add(shojiMesh);
-  g._shojiDoor = { mesh: shojiMesh, open: false, baseX: hanX, baseZ: hanZ - 3 };
-  // 壁 — 東（縁側開口）
-  addBox(wallMat, 0.3, 3.5, 2, hanX + 4, 2.2, hanZ + 2);
-  addBoxCollider(hanX + 4, hanZ + 2, 0.3, 1.2, 4);
-  addBox(wallMat, 0.3, 3.5, 2, hanX + 4, 2.2, hanZ - 2);
-  addBoxCollider(hanX + 4, hanZ - 2, 0.3, 1.2, 4);
-  // 壁 — 西
-  addBox(wallMat, 0.3, 3.5, 6, hanX - 4, 2.2, hanZ);
-  addBoxCollider(hanX - 4, hanZ, 0.3, 3.2, 4);
+  g._shojiDoor = null; // 開閉無効化
   // 屋根
   const hanRoofGeo = addGeo(new THREE.ConeGeometry(6.5, 2, 4));
   const hanRoof = new THREE.Mesh(hanRoofGeo, roofMat);
@@ -7123,30 +7065,35 @@ function buildTempleObjects(g) {
   hanRoof.rotation.y = Math.PI / 4;
   hanRoof.castShadow = true;
   g.scene.add(hanRoof);
-  // 縁側
+  // 縁側（視覚のみ）
   addBox(woodMat, 1.5, 0.15, 4, hanX + 4.5, 0.45, hanZ);
+  // ★ 固体コライダー1個
+  addBoxCollider(hanX, hanZ, 4.5, 3.5, 4);
 
   // ========================================
-  //  渡り廊下（本堂↔庫裏、本堂↔離れ、幅1.5m）
+  //  渡り廊下（本堂↔庫裏、本堂↔離れ）— 固体ブロック
   // ========================================
   // 本堂東壁 → 庫裏西壁 (x: 7.5 ~ 10)
   addBox(woodMat, 2.5, 0.15, 1.5, 8.75, 0.5, honZ);
+  addBox(wallMat, 2.5, 3, 0.2, 8.75, 1.5, honZ + 0.75); // 手すり壁化
+  addBox(wallMat, 2.5, 3, 0.2, 8.75, 1.5, honZ - 0.75);
   const watari1RoofGeo = addGeo(new THREE.BoxGeometry(2.5, 0.1, 2, 1));
   const watari1Roof = new THREE.Mesh(watari1RoofGeo, roofMat);
   watari1Roof.position.set(8.75, 3.5, honZ);
   g.scene.add(watari1Roof);
-  // 手すり（コライダーなし、視覚のみ）
-  addBox(woodMat, 2.5, 0.8, 0.05, 8.75, 1.0, honZ + 0.75);
-  addBox(woodMat, 2.5, 0.8, 0.05, 8.75, 1.0, honZ - 0.75);
+  // ★ 渡り廊下1 コライダー
+  addBoxCollider(8.75, honZ, 1.5, 1.0, 4);
 
   // 本堂西壁 → 離れ東壁 (x: -7.5 ~ -14)
   addBox(woodMat, 6.5, 0.15, 1.5, -10.75, 0.5, honZ);
+  addBox(wallMat, 6.5, 3, 0.2, -10.75, 1.5, honZ + 0.75);
+  addBox(wallMat, 6.5, 3, 0.2, -10.75, 1.5, honZ - 0.75);
   const watari2RoofGeo = addGeo(new THREE.BoxGeometry(6.5, 0.1, 2, 1));
   const watari2Roof = new THREE.Mesh(watari2RoofGeo, roofMat);
   watari2Roof.position.set(-10.75, 3.5, honZ);
   g.scene.add(watari2Roof);
-  addBox(woodMat, 6.5, 0.8, 0.05, -10.75, 1.0, honZ + 0.75);
-  addBox(woodMat, 6.5, 0.8, 0.05, -10.75, 1.0, honZ - 0.75);
+  // ★ 渡り廊下2 コライダー
+  addBoxCollider(-10.75, honZ, 3.5, 1.0, 4);
 
   // ========================================
   //  枯山水庭園（30×25m、中央 (0, 0, 0)）
@@ -9326,20 +9273,12 @@ function getFootSoundRange(g) {
   // Stage 5: コンクリ=12m, 芝生=8m（階段室のエコー=25mは別途チェック）
   let baseRange = 8;
   if (g._stageNum === 6) {
-    // Stage 6: 古刹の大屋敷 — エリア別足音検知距離
+    // Stage 6: 古刹の大屋敷 — エリア別足音検知距離（建物は固体ブロック、屋外のみ）
     const px = g.player.position.x, pz = g.player.position.z;
     // 砂利: 庭園中央エリア (|x|<15, |z|<12)
     if (Math.abs(px) < 15 && Math.abs(pz) < 12) baseRange = 18;
-    // 板の間: 本堂内部 (|x|<7.5, z:5~15) または渡り廊下
-    else if ((Math.abs(px) < 7.5 && pz > 5 && pz < 15) ||
-             (px > 7.5 && px < 10 && Math.abs(pz - 10) < 1) ||
-             (px < -7.5 && px > -14 && Math.abs(pz - 10) < 1)) baseRange = 15;
-    // 畳: 離れ内部 (x:-22~-14, z:7~13)
-    else if (px > -22 && px < -14 && pz > 7 && pz < 13) baseRange = 6;
     // 竹林: (x:17~27, z:15~25)
     else if (px > 17 && px < 27 && pz > 15 && pz < 25) baseRange = 16;
-    // 土間: 庫裏内部 (x:10~20, z:6~14)
-    else if (px > 10 && px < 20 && pz > 6 && pz < 14) baseRange = 10;
     // 飛び石: 庭園内の飛び石上
     else if (Math.abs(pz) < 3 && px > -12 && px < 12) baseRange = 12;
     // 苔: 外周・築山付近
