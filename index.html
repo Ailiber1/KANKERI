@@ -2516,19 +2516,19 @@ const STAGE_CONFIGS = {
       // 棟間通路（表→裏のショートカット）
       {x:-25,z:-15},{x:-25,z:15},
       {x:25,z:-15},{x:25,z:15},
-      // 階段室巡回（1棟: L=-41.5, R=-8.5）
-      {x:-41.5,z:0},{x:-8.5,z:0},
-      // 階段室巡回（2棟: L=8.5, R=41.5）
-      {x:8.5,z:0},{x:41.5,z:0},
+      // 階段室巡回（1棟: L=-34, R=-16、南面突出z=-9入口）
+      {x:-34,z:-9},{x:-16,z:-9},
+      // 階段室巡回（2棟: L=16, R=34）
+      {x:16,z:-9},{x:34,z:-9},
       // 外周（size=100、フェンスは±50）
       {x:-48,z:-48},{x:48,z:-48},{x:48,z:48},{x:-48,z:48}
     ],
     interactables: [
-      // 階段室の手すり（1棟L=-41.5, R=-8.5、2棟L=8.5, R=41.5）
-      { type:'railing', x:-41.5, z:0, radius:30, label:'階段室の手すり', sound:'metal' },
-      { type:'railing', x:-8.5, z:0, radius:30, label:'階段室の手すり', sound:'metal' },
-      { type:'railing', x:8.5, z:0, radius:30, label:'階段室の手すり', sound:'metal' },
-      { type:'railing', x:41.5, z:0, radius:30, label:'階段室の手すり', sound:'metal' },
+      // 階段室の手すり（1棟L=-34, R=-16、2棟L=16, R=34）
+      { type:'railing', x:-34, z:-6.5, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:-16, z:-6.5, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:16, z:-6.5, radius:30, label:'階段室の手すり', sound:'metal' },
+      { type:'railing', x:34, z:-6.5, radius:30, label:'階段室の手すり', sound:'metal' },
       // ゴミ捨て場のフェンス
       { type:'fence', x:-20, z:-28, radius:25, label:'ゴミ捨て場のフェンス', sound:'metal' },
       { type:'fence', x:20, z:-28, radius:25, label:'ゴミ捨て場のフェンス', sound:'metal' },
@@ -5882,9 +5882,9 @@ function buildDanchiObjects(g) {
       g.scene.add(rail);
     }
 
-    // --- 階段室（各棟の左端・右端に1つずつ、計2箇所/棟）---
-    // 階段室: 棟の左右端に突出する外付け階段塔（5階まで通じる）
-    // 3m(x) × 5m(z) × 15m(h) の塔、南面から進入可能
+    // --- 階段室（各棟に2箇所、建物の約1/3位置に配置、南面突出・入口開放）---
+    // 階段位置: 建物端ではなく内側（bx±9 ≒ 建物幅の30%位置）
+    // 南面（正面）から突出し、入口は南面を完全開放（中が見える）
     // STAIR_W, STAIR_D は関数スコープで定義済み
     const TOTAL_FLIGHTS = 4; // 1F→5F = 4区間
     const STEPS_PER_FLIGHT = 10;
@@ -5892,43 +5892,64 @@ function buildDanchiObjects(g) {
     const STEP_RISE = (FLOOR_H * TOTAL_FLIGHTS) / TOTAL_STEPS; // 0.3m
     const STEP_RUN = STAIR_D / TOTAL_STEPS; // 0.125m
 
+    const stairCZ = bz - BLDG_D/2 - STAIR_D/2; // 階段室z中心（南面から突出）
     const stairDefs = [
-      { sx: bx - BLDG_W/2 - STAIR_W/2, label: 'L' },
-      { sx: bx + BLDG_W/2 + STAIR_W/2, label: 'R' }
+      { sx: bx - 9, label: 'L' },
+      { sx: bx + 9, label: 'R' }
     ];
     for (const sd of stairDefs) {
-      // 階段室の外壁（3m × 15m × 5m の塔）
-      const stairWallGeo = addGeo(new THREE.BoxGeometry(STAIR_W, BLDG_H, STAIR_D));
-      stairWallGeo.setAttribute('uv2', stairWallGeo.attributes.uv);
-      const stairBox = new THREE.Mesh(stairWallGeo, plasterMat);
-      stairBox.position.set(sd.sx, BLDG_H/2, bz);
-      stairBox.castShadow = true; stairBox.receiveShadow = true;
-      g.scene.add(stairBox);
-      g.cameraMeshes.push(stairBox);
-
-      // コライダー: 南面を開放（進入口）、北・東・西は壁
       const shw = STAIR_W/2, shd = STAIR_D/2;
-      g.colliders.push({ type:'box', x:sd.sx, z:bz+shd, hw:shw, hd:0.3, h:BLDG_H }); // 北壁
-      g.colliders.push({ type:'box', x:sd.sx+shw, z:bz+0.3, hw:0.3, hd:shd-0.3, h:BLDG_H }); // 東壁
-      g.colliders.push({ type:'box', x:sd.sx-shw, z:bz+0.3, hw:0.3, hd:shd-0.3, h:BLDG_H }); // 西壁
+      const sSouthZ = stairCZ - shd; // 階段南端（入口）
+      const sNorthZ = stairCZ + shd; // 階段北端（建物接続面）
 
-      // 階段ステップ（40段、1F→5F）
+      // --- 階段室の壁（南面は完全開放、東西＋天井のみ） ---
+      // 東壁
+      const sideWallGeo = addGeo(new THREE.PlaneGeometry(STAIR_D, BLDG_H));
+      sideWallGeo.setAttribute('uv2', sideWallGeo.attributes.uv);
+      const eastWall = new THREE.Mesh(sideWallGeo, plasterMat);
+      eastWall.position.set(sd.sx + shw, BLDG_H/2, stairCZ);
+      eastWall.rotation.y = Math.PI/2;
+      eastWall.castShadow = true; eastWall.receiveShadow = true;
+      g.scene.add(eastWall); g.cameraMeshes.push(eastWall);
+      // 西壁
+      const westWall = new THREE.Mesh(sideWallGeo, plasterMat);
+      westWall.position.set(sd.sx - shw, BLDG_H/2, stairCZ);
+      westWall.rotation.y = -Math.PI/2;
+      westWall.castShadow = true; westWall.receiveShadow = true;
+      g.scene.add(westWall); g.cameraMeshes.push(westWall);
+      // 天井
+      const stairRoofGeo = addGeo(new THREE.PlaneGeometry(STAIR_W, STAIR_D));
+      const stairRoof = new THREE.Mesh(stairRoofGeo, concreteMat);
+      stairRoof.rotation.x = Math.PI/2;
+      stairRoof.position.set(sd.sx, BLDG_H, stairCZ);
+      g.scene.add(stairRoof);
+      // 背面壁（北面=建物接合部、上半分のみ ← 1F入口は開放）
+      const backWallGeo = addGeo(new THREE.PlaneGeometry(STAIR_W, BLDG_H));
+      backWallGeo.setAttribute('uv2', backWallGeo.attributes.uv);
+      const backWall = new THREE.Mesh(backWallGeo, plasterMat);
+      backWall.position.set(sd.sx, BLDG_H/2, sNorthZ);
+      backWall.receiveShadow = true;
+      g.scene.add(backWall);
+
+      // --- コライダー: 東・西・北は壁、南面は完全開放（入口） ---
+      g.colliders.push({ type:'box', x:sd.sx, z:sNorthZ, hw:shw, hd:0.3, h:BLDG_H }); // 北壁
+      g.colliders.push({ type:'box', x:sd.sx+shw, z:stairCZ, hw:0.3, hd:shd, h:BLDG_H }); // 東壁
+      g.colliders.push({ type:'box', x:sd.sx-shw, z:stairCZ, hw:0.3, hd:shd, h:BLDG_H }); // 西壁
+
+      // --- 階段ステップ（40段、1F→5F） ---
       const stepGeo = addGeo(new THREE.BoxGeometry(STAIR_W * 0.7, STEP_RISE, STEP_RUN + 0.02));
       const stepMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.8 });
       g.materials.push(stepMat);
-      const stairSouthZ = bz - shd; // 階段南端
       for (let s = 0; s < TOTAL_STEPS; s++) {
         const step = new THREE.Mesh(stepGeo, stepMat);
-        step.position.set(sd.sx, s * STEP_RISE + STEP_RISE/2, stairSouthZ + s * STEP_RUN + STEP_RUN/2);
+        step.position.set(sd.sx, s * STEP_RISE + STEP_RISE/2, sSouthZ + s * STEP_RUN + STEP_RUN/2);
         g.scene.add(step);
       }
 
-      // 各階の踊り場（2F〜5F = 4フロア分）と玄関ドア
+      // --- 各階の踊り場（2F〜5F）と玄関ドア ---
       const landGeo = addGeo(new THREE.BoxGeometry(STAIR_W - 0.2, 0.15, 1.2));
       const doorGeo = addGeo(new THREE.PlaneGeometry(0.8, 1.8));
-      const doorMat = new THREE.MeshStandardMaterial({
-        color: 0x5a4030, roughness: 0.7, metalness: 0.3
-      });
+      const doorMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.7, metalness: 0.3 });
       g.materials.push(doorMat);
       const doorFrameMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.5 });
       g.materials.push(doorFrameMat);
@@ -5936,21 +5957,17 @@ function buildDanchiObjects(g) {
 
       for (let fl = 1; fl <= TOTAL_FLIGHTS; fl++) {
         const landY = fl * FLOOR_H;
-        const landZ = stairSouthZ + (fl * STEPS_PER_FLIGHT) * STEP_RUN;
-
-        // 踊り場の床
+        const landZ = sSouthZ + (fl * STEPS_PER_FLIGHT) * STEP_RUN;
+        // 踊り場
         const landing = new THREE.Mesh(landGeo, concreteMat);
         landing.position.set(sd.sx, landY, landZ);
         g.scene.add(landing);
-
-        // 左右の玄関ドア（踊り場の東西壁面に配置、装飾のみ）
+        // 左右の玄関ドア
         for (const side of [-1, 1]) {
-          // ドアフレーム
           const frame = new THREE.Mesh(doorFrameGeo, doorFrameMat);
           frame.position.set(sd.sx + side * (STAIR_W/2 - 0.05), landY + 1.0, landZ);
           frame.rotation.y = side > 0 ? Math.PI/2 : -Math.PI/2;
           g.scene.add(frame);
-          // ドア面
           const door = new THREE.Mesh(doorGeo, doorMat);
           door.position.set(sd.sx + side * (STAIR_W/2 - 0.02), landY + 1.0, landZ);
           door.rotation.y = side > 0 ? Math.PI/2 : -Math.PI/2;
@@ -5958,10 +5975,10 @@ function buildDanchiObjects(g) {
         }
       }
 
-      // 階段室内の照明（各階に薄暗い電球）
+      // --- 階段室内の照明 ---
       for (let fl = 0; fl < 5; fl++) {
         const bulb = new THREE.PointLight(0xffe8cc, 0.3, 5);
-        bulb.position.set(sd.sx, fl * FLOOR_H + 2.5, bz);
+        bulb.position.set(sd.sx, fl * FLOOR_H + 2.5, stairCZ);
         g.scene.add(bulb);
       }
     }
@@ -6553,17 +6570,18 @@ function buildDanchiObjects(g) {
   const canopyBracketGeo = addGeo(new THREE.BoxGeometry(0.08, 0.6, 1.2));
   for (const bldg of buildings) {
     const bx = bldg.cx, bz = bldg.cz;
-    const stairXs = [bx - BLDG_W/2 - STAIR_W/2, bx + BLDG_W/2 + STAIR_W/2];
+    const sSouthZ = bz - BLDG_D/2 - STAIR_D; // 階段室南端（入口）
+    const stairXs = [bx - 9, bx + 9]; // 階段室x位置（建物内側）
     for (const sx of stairXs) {
-      // 庇本体（南面入口の上）
+      // 庇本体（階段入口の上）
       const canopy = new THREE.Mesh(canopyGeo, canopyMat);
-      canopy.position.set(sx, 2.8, bz - STAIR_D/2 - 0.8);
+      canopy.position.set(sx, 2.8, sSouthZ - 0.5);
       canopy.castShadow = true;
       g.scene.add(canopy);
       // 支持ブラケット（左右）
       for (const side of [-1, 1]) {
         const bracket = new THREE.Mesh(canopyBracketGeo, canopyMat);
-        bracket.position.set(sx + side * 1.5, 2.5, bz - STAIR_D/2 - 0.5);
+        bracket.position.set(sx + side * 1.5, 2.5, sSouthZ - 0.3);
         g.scene.add(bracket);
       }
     }
@@ -7450,18 +7468,17 @@ function updatePlayer(g, dt) {
   }
 
   // Stage 5: 団地の階段室の高さオーバーライド（5F=+12mまで）
-  // 建物1: bx=-25, bz=0、建物2: bx=25, bz=0
-  // 階段室: BLDG_W=30 → 各棟の左端(bx-16.5)と右端(bx+16.5)に突出
-  // STAIR_W=3, STAIR_D=5、南面(bz-2.5)から北面(bz+2.5)
+  // 階段室: 建物内側（bx±9）に配置、南面から突出（z = -6.5中心、-9〜-4）
   // 40段(10段×4区間)、STEP_RISE=0.3m
   if (g._stageNum === 5) {
+    const stairCZ5 = -6.5; // 階段室z中心（bz=0, BLDG_D=8, STAIR_D=5）
     const stairZones5 = [
-      { sx: -25 - 16.5, bz: 0 }, { sx: -25 + 16.5, bz: 0 },
-      { sx:  25 - 16.5, bz: 0 }, { sx:  25 + 16.5, bz: 0 }
+      { sx: -25 - 9, sz: stairCZ5 }, { sx: -25 + 9, sz: stairCZ5 },
+      { sx:  25 - 9, sz: stairCZ5 }, { sx:  25 + 9, sz: stairCZ5 }
     ];
     for (const sz of stairZones5) {
-      if (Math.abs(ctrl.position.x - sz.sx) < 1.5 && Math.abs(ctrl.position.z - sz.bz) < 2.5) {
-        const stairSouthZ = sz.bz - 2.5;
+      if (Math.abs(ctrl.position.x - sz.sx) < 1.5 && Math.abs(ctrl.position.z - sz.sz) < 2.5) {
+        const stairSouthZ = sz.sz - 2.5;
         const progress = Math.max(0, Math.min(1, (ctrl.position.z - stairSouthZ) / 5));
         const stepH = Math.ceil(progress * 40) * 0.3;
         ctrl.position.y = Math.max(ctrl.position.y, stepH);
@@ -8491,15 +8508,16 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   }
 
   // Stage 5: 団地の階段室の高さオーバーライド（鬼も5Fまで巡回可能）
-  // BLDG_W=30 → 階段室 bx±16.5, STAIR_D=5, 40段×0.3m
+  // 階段室: bx±9、z中心=-6.5（南面突出）
   if (g._stageNum === 5) {
+    const stairCZ5 = -6.5;
     const stairZones5 = [
-      { sx: -25 - 16.5, bz: 0 }, { sx: -25 + 16.5, bz: 0 },
-      { sx:  25 - 16.5, bz: 0 }, { sx:  25 + 16.5, bz: 0 }
+      { sx: -25 - 9, sz: stairCZ5 }, { sx: -25 + 9, sz: stairCZ5 },
+      { sx:  25 - 9, sz: stairCZ5 }, { sx:  25 + 9, sz: stairCZ5 }
     ];
     for (const sz of stairZones5) {
-      if (Math.abs(oni.position.x - sz.sx) < 1.5 && Math.abs(oni.position.z - sz.bz) < 2.5) {
-        const stairSouthZ = sz.bz - 2.5;
+      if (Math.abs(oni.position.x - sz.sx) < 1.5 && Math.abs(oni.position.z - sz.sz) < 2.5) {
+        const stairSouthZ = sz.sz - 2.5;
         const progress = Math.max(0, Math.min(1, (oni.position.z - stairSouthZ) / 5));
         oni.position.y = Math.max(oni.position.y, Math.ceil(progress * 40) * 0.3);
         break;
@@ -8529,15 +8547,16 @@ function getFootSoundRange(g) {
   else if (g._stageNum === 2) baseRange = 18;
   else if (g._stageNum === 5) {
     // 階段室内ならエコーで足音が響く (25m)
-    // BLDG_W=30 → 階段室 bx±16.5, STAIR_W=3, STAIR_D=5
+    // 階段室: bx±9、z中心=-6.5（南面突出）
     const px = g.player.position.x, pz = g.player.position.z;
+    const stairCZ5 = -6.5;
     const stairZones = [
-      { sx: -25 - 16.5, bz: 0 }, { sx: -25 + 16.5, bz: 0 },
-      { sx:  25 - 16.5, bz: 0 }, { sx:  25 + 16.5, bz: 0 }
+      { sx: -25 - 9, sz: stairCZ5 }, { sx: -25 + 9, sz: stairCZ5 },
+      { sx:  25 - 9, sz: stairCZ5 }, { sx:  25 + 9, sz: stairCZ5 }
     ];
     let inStair = false;
     for (const sz of stairZones) {
-      if (Math.abs(px - sz.sx) < 1.5 && Math.abs(pz - sz.bz) < 2.5) { inStair = true; break; }
+      if (Math.abs(px - sz.sx) < 1.5 && Math.abs(pz - sz.sz) < 2.5) { inStair = true; break; }
     }
     baseRange = inStair ? 25 : 12; // 階段室=25m, コンクリ路面=12m
   }
