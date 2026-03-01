@@ -4710,6 +4710,20 @@ function buildSchoolObjects(g) {
   swGapFloorW.receiveShadow = true;
   g.scene.add(swGapFloorW); g.cameraMeshes.push(swGapFloorW);
 
+  // --- 2F階段室南壁（z:27, x:14~20 / x:-20~-14）— 2Fのみ。1F階段出入りは影響なし ---
+  const sw2FWallGeo = new THREE.BoxGeometry(5.5, FLOOR_H, WT * 2);
+  g.geometries.push(sw2FWallGeo);
+  const sw2FWallE = new THREE.Mesh(sw2FWallGeo, schoolDirtyMat);
+  sw2FWallE.position.set(16.75, FLOOR_H + FLOOR_H / 2, 27);
+  sw2FWallE.castShadow = true; sw2FWallE.receiveShadow = true;
+  g.scene.add(sw2FWallE); g.cameraMeshes.push(sw2FWallE);
+  g.colliders.push({ type:'box', x:16.75, z:27, hw:2.75, hd:WT, h:FLOOR_H, floor:1 });
+  const sw2FWallW = new THREE.Mesh(sw2FWallGeo, schoolDirtyMat);
+  sw2FWallW.position.set(-16.75, FLOOR_H + FLOOR_H / 2, 27);
+  sw2FWallW.castShadow = true; sw2FWallW.receiveShadow = true;
+  g.scene.add(sw2FWallW); g.cameraMeshes.push(sw2FWallW);
+  g.colliders.push({ type:'box', x:-16.75, z:27, hw:2.75, hd:WT, h:FLOOR_H, floor:1 });
+
   // --- 教室内装（1F × 3教室 + 2F × 3教室）---
   const deskMat = makePBRMat(woodPBR, { roughness: 0.75 });
   const chairMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.6, metalness: 0.7 });
