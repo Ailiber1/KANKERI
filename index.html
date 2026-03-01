@@ -6367,10 +6367,9 @@ function updatePlayer(g, dt) {
         if (pz >= 30) {
           // 踊り場ゾーン (z:30~31.5)
           if (g.playerFloor === 0) {
-            // 1Fからランプを登りきった→2Fへ遷移
             g.playerFloor = 1;
           }
-          ctrl.position.y = g.playerFloor * 4.0;
+          ctrl.position.y = g.playerFloor === 0 ? 0.15 : 4.0;
         } else {
           // 階段ゾーン (z:27~30): 10段の離散的な高さ
           const progress = Math.max(0, Math.min(1, (pz - 27) / 3));
@@ -6382,8 +6381,8 @@ function updatePlayer(g, dt) {
           }
         }
       } else {
-        // 教室・廊下エリア
-        ctrl.position.y = g.playerFloor * 4.0;
+        // 教室・廊下エリア（1F床タイルはy:0.15）
+        ctrl.position.y = g.playerFloor === 0 ? 0.15 : 4.0;
       }
       // 2Fから正面入口への落下防止
       if (g.playerFloor === 1 && Math.abs(px) < 2.5 && pz < 25) {
@@ -7374,7 +7373,7 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
         if (oz >= 30) {
           // 踊り場: ランプから登りきったら2Fへ
           if (oni.floor === 0) oni.floor = 1;
-          oni.position.y = oni.floor * 4.0;
+          oni.position.y = oni.floor === 0 ? 0.15 : 4.0;
         } else {
           // 階段 z:27~30: 10段の離散的な高さ
           const p = Math.max(0, Math.min(1, (oz - 27) / 3));
@@ -7383,7 +7382,7 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
           else if (p <= 0.05) oni.floor = 0;
         }
       } else {
-        oni.position.y = (oni.floor || 0) * 4.0;
+        oni.position.y = (oni.floor || 0) === 0 ? 0.15 : 4.0;
       }
     }
   }
