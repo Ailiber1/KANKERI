@@ -3075,7 +3075,7 @@ function buildTerrain(g, stageNum) {
       puddle.position.set(p.x, getGroundHeight(g, p.x, p.z) + 0.04, p.z);
       g.scene.add(puddle);
     });
-  } else {
+  } else if (stageNum === 1) {
     // Stage 1: Asphalt paths
     const pathGeo = new THREE.PlaneGeometry(2.5, size * 0.7, 1, 1);
     const aspTex = createProceduralTexture('asphalt_diff', 512);
@@ -4464,9 +4464,7 @@ function buildSchoolObjects(g) {
 
   // Stage 4: フォグ密度を軽減（深夜でも遠くが見えるように）
   g.scene.fog.density = 0.006;
-  // Stage 4: シャドウマップ全体を無効化
-  // 深夜シーンではシャドウが不要。校舎壁の影が地面に黒い帯として出るバグを根本解消
-  g.renderer.shadowMap.enabled = false;
+  // Stage 4: sunLightのシャドウ無効化（深夜なので不要）
   g.sunLight.castShadow = false;
   g.sunLight.intensity = 0.05;
 
@@ -5163,10 +5161,6 @@ function buildSchoolObjects(g) {
     g.scene.add(lampLight);
     g.streetLights.push({ spot: lampLight, fixture: lampHead, fixMat: lampHeadMat });
   }
-
-  // DEBUG: 黒帯の正体を特定するため背景を赤に、フォグ無効
-  g.scene.background = new THREE.Color(0xff0000);
-  g.scene.fog = null;
 
   // Stage 4 夜間シーンの露出 + ポストプロセッシング強化
   g.renderer.toneMappingExposure = 0.75;
