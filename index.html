@@ -5107,23 +5107,15 @@ function buildSchoolObjects(g) {
   g.scene.add(moon);
 
   // === 校庭の照明 ===
-  // 廃校専用の環境光（月明かりの底上げ）
-  const schoolAmbient = new THREE.AmbientLight(0x223355, 0.4);
+  // 廃校専用の環境光（月明かりの底上げ — シャドウ無効のため少し強めに）
+  const schoolAmbient = new THREE.AmbientLight(0x223355, 0.55);
   g.scene.add(schoolAmbient);
 
   // メインのDirectionalLight（月光 — シーン全体を均一に照らす）
-  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 0.5);
+  // Stage 4: シャドウ無効（校舎壁の影が地面に黒パッチとして出るため）
+  const moonDirLight = new THREE.DirectionalLight(0x8899cc, 0.6);
   moonDirLight.position.set(30, 50, 20);
-  moonDirLight.castShadow = true;
-  moonDirLight.shadow.mapSize.width = 1024;
-  moonDirLight.shadow.mapSize.height = 1024;
-  moonDirLight.shadow.camera.left = -40;
-  moonDirLight.shadow.camera.right = 40;
-  moonDirLight.shadow.camera.top = 40;
-  moonDirLight.shadow.camera.bottom = -40;
-  moonDirLight.shadow.camera.near = 1;
-  moonDirLight.shadow.camera.far = 120;
-  moonDirLight.shadow.bias = -0.001;
+  moonDirLight.castShadow = false;
   g.scene.add(moonDirLight);
 
   // SpotLight（月光のハイライト — 校庭中央を重点的に照らす）
@@ -5173,12 +5165,12 @@ function buildSchoolObjects(g) {
   }
 
   // Stage 4 夜間シーンの露出 + ポストプロセッシング強化
-  g.renderer.toneMappingExposure = 0.65;
+  g.renderer.toneMappingExposure = 0.75;
   if (g.composer && g.bloomPass && g.filmPass) {
     g.bloomPass.strength = 0.12;  // 控えめなブルーム
     g.bloomPass.radius = 0.3;
     g.bloomPass.threshold = 0.92; // 非常に明るいもののみ
-    g.filmPass.uniforms.vignetteAmt.value = 0.85;
+    g.filmPass.uniforms.vignetteAmt.value = 0.65;
     g.filmPass.uniforms.grainAmt.value = 0.05;
     g.filmPass.uniforms.tintR.value = 0.90;
     g.filmPass.uniforms.tintG.value = 0.93;
