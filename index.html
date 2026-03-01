@@ -4464,11 +4464,11 @@ function buildSchoolObjects(g) {
 
   // Stage 4: フォグ密度を軽減（深夜でも遠くが見えるように）
   g.scene.fog.density = 0.006;
-  // Stage 4: sunLight（昼用ライト）のシャドウを無効化
-  // → シャドウカメラ(±25)が校舎(z:24~32)を十分にカバーできず黒い影アーティファクトが発生するため
-  // → 代わりにmoonDirLight(±40)が適切な影を提供
+  // Stage 4: シャドウマップ全体を無効化
+  // 深夜シーンではシャドウが不要。校舎壁の影が地面に黒い帯として出るバグを根本解消
+  g.renderer.shadowMap.enabled = false;
   g.sunLight.castShadow = false;
-  g.sunLight.intensity = 0.05; // 深夜なのでほぼゼロに
+  g.sunLight.intensity = 0.05;
 
   // === PBRテクスチャのロード ===
   const loadPBR = (name, repS, repT) => {
