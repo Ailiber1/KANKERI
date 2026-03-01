@@ -2443,9 +2443,17 @@ const STAGE_CONFIGS = {
       // 校庭中央
       {x:0,z:5},{x:8,z:-5},{x:-8,z:-8},
       // 校舎内巡回（1F廊下）
-      {x:-15,z:25.5},{x:-5,z:25.5},{x:5,z:25.5},{x:12,z:25.5},
-      // 教室内偵察
-      {x:-13,z:29},{x:0,z:29},{x:10,z:29}
+      {x:-12,z:25.5},{x:-5,z:25.5},{x:5,z:25.5},{x:12,z:25.5},
+      // 1F教室内偵察
+      {x:-10,z:29},{x:0,z:29},{x:10,z:29},
+      // 東階段室経由で2Fへ上がる
+      {x:16.75,z:27},{x:16.75,z:30.75},
+      // 2F廊下巡回
+      {x:10,z:25.5},{x:0,z:25.5},{x:-10,z:25.5},
+      // 2F教室内偵察
+      {x:-10,z:29},{x:0,z:29},{x:10,z:29},
+      // 西階段室経由で1Fへ降りる
+      {x:-16.75,z:30.75},{x:-16.75,z:27}
     ],
     interactables: [
       { type:'door', x:-5, z:23, radius:20, label:'教室のドア', sound:'thud' },
@@ -2774,7 +2782,7 @@ function createGameScene(stageConfig) {
     // ブルーム（光のにじみ）
     const bloomPass = new THREE.UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.25, 0.4, 0.88
+      0.0, 0.4, 0.95
     );
     composer.addPass(bloomPass);
     // カスタムシェーダ（ビネット + フィルムグレイン + 色補正）
@@ -2782,8 +2790,8 @@ function createGameScene(stageConfig) {
       uniforms: {
         tDiffuse: { value: null },
         time: { value: 0 },
-        vignetteAmt: { value: 0.6 },
-        grainAmt: { value: 0.04 },
+        vignetteAmt: { value: 0.0 },
+        grainAmt: { value: 0.0 },
         tintR: { value: 1.0 }, tintG: { value: 1.0 }, tintB: { value: 1.0 },
         desaturation: { value: 0.0 }
       },
@@ -4542,7 +4550,7 @@ function buildSchoolObjects(g) {
 
   // --- 廊下・教室仕切り壁 z=27（ドア開口部付き）---
   // ドア: ClassA x:-8±0.75, ClassB x:0±0.75, ClassC x:10±0.75, 階段室 x:14+
-  addBox(-14.1, 27, 5.4, WT, 8, schoolDirtyMat);   // x:-19.5 ~ -8.7
+  addBox(-11.35, 27, 2.65, WT, 8, schoolDirtyMat);  // x:-14 ~ -8.7（西階段室を除く）
   addBox(-4, 27, 3.25, WT, 8, schoolDirtyMat);      // x:-7.25 ~ -0.75
   addBox(5, 27, 4.25, WT, 8, schoolDirtyMat);       // x:0.75 ~ 9.25
   addBox(12.4, 27, 1.6, WT, 8, schoolDirtyMat);     // x:10.8 ~ 14
@@ -4550,25 +4558,27 @@ function buildSchoolObjects(g) {
   // --- 教室仕切り壁（南北方向）---
   addBox(-6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);  // A / B 間
   addBox(6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);   // B / C 間
-  // C / 階段室 — z:30~31.5にドア開口部（2Fへの通路）
+  // C / 東階段室 — z:30~31.5にドア開口部（2Fへの通路）
   addBox(13.5, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30（南側壁）
+  // 西階段室 / A — z:30~31.5にドア開口部
+  addBox(-13.5, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30（南側壁）
 
-  // --- 2F床 / 1F天井 (y=4, 階段室 x:14~20 を除く) ---
-  const f2Geo = new THREE.PlaneGeometry(33.5, 8);
+  // --- 2F床 / 1F天井 (y=4, 東階段室 x:14~20 と西階段室 x:-20~-14 を除く) ---
+  const f2Geo = new THREE.PlaneGeometry(27, 8);
   f2Geo.setAttribute('uv2', f2Geo.attributes.uv);
   const f2Mat = makePBRMat(concretePBR, { roughness: 0.85 });
   const f2Mesh = new THREE.Mesh(f2Geo, f2Mat);
   f2Mesh.rotation.x = -Math.PI / 2;
-  f2Mesh.position.set(-3.25, FLOOR_H, 28);
+  f2Mesh.position.set(0, FLOOR_H, 28);
   f2Mesh.receiveShadow = true;
   g.scene.add(f2Mesh); g.geometries.push(f2Geo);
   // 1F天井面（下から見える）
-  const c1Geo = new THREE.PlaneGeometry(33.5, 8);
+  const c1Geo = new THREE.PlaneGeometry(27, 8);
   const c1Mat = new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.95 });
   g.materials.push(c1Mat);
   const c1Mesh = new THREE.Mesh(c1Geo, c1Mat);
   c1Mesh.rotation.x = Math.PI / 2;
-  c1Mesh.position.set(-3.25, FLOOR_H - 0.01, 28);
+  c1Mesh.position.set(0, FLOOR_H - 0.01, 28);
   g.scene.add(c1Mesh); g.geometries.push(c1Geo);
   // 2F天井 (y=7.8)
   const c2Geo = new THREE.PlaneGeometry(40, 8);
@@ -4592,12 +4602,12 @@ function buildSchoolObjects(g) {
   f1TMesh.position.set(0, 0.02, 27.5);
   f1TMesh.receiveShadow = true;
   g.scene.add(f1TMesh); g.geometries.push(f1TGeo);
-  // 2F床タイル（階段室 x:14~20 を除く → 幅33.5, center x=-3.25）
-  const f2TGeo = new THREE.PlaneGeometry(33.5, 7);
+  // 2F床タイル（両階段室を除く → 幅27, center x=0）
+  const f2TGeo = new THREE.PlaneGeometry(27, 7);
   f2TGeo.setAttribute('uv2', f2TGeo.attributes.uv);
   const f2TMesh = new THREE.Mesh(f2TGeo, floorTileMat);
   f2TMesh.rotation.x = -Math.PI / 2;
-  f2TMesh.position.set(-3.25, FLOOR_H + 0.02, 27.5);
+  f2TMesh.position.set(0, FLOOR_H + 0.02, 27.5);
   f2TMesh.receiveShadow = true;
   g.scene.add(f2TMesh); g.geometries.push(f2TGeo);
 
@@ -4625,12 +4635,6 @@ function buildSchoolObjects(g) {
   landMesh.position.set(16.75, FLOOR_H, 30.75);
   landMesh.receiveShadow = true;
   g.scene.add(landMesh); g.geometries.push(landGeo);
-  // 踊り場の天井面（下から見える）
-  const landCGeo = new THREE.PlaneGeometry(5.5, 1.5);
-  const landCMesh = new THREE.Mesh(landCGeo, c1Mat);
-  landCMesh.rotation.x = Math.PI / 2;
-  landCMesh.position.set(16.75, FLOOR_H - 0.01, 30.75);
-  g.scene.add(landCMesh); g.geometries.push(landCGeo);
   // 階段手すり（階段の西側 x=14）
   const railMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.4, metalness: 0.8 });
   g.materials.push(railMat);
@@ -4647,6 +4651,35 @@ function buildSchoolObjects(g) {
   railLand.position.set(14, FLOOR_H + 0.5, 30.75);
   g.scene.add(railLand); g.cameraMeshes.push(railLand);
 
+  // --- 西階段室（x:-19.5~-14, z:27~31.5 — 東階段室のミラー）---
+  for (let i = 0; i < NUM_STEPS; i++) {
+    const sZ = stZs + (i + 0.5) * stDep;
+    const sY = (i + 0.5) * stRise;
+    const sGeoW = new THREE.BoxGeometry(5.5, stRise, stDep);
+    sGeoW.setAttribute('uv2', sGeoW.attributes.uv);
+    const sMeshW = new THREE.Mesh(sGeoW, stepMat);
+    sMeshW.position.set(-16.75, sY, sZ);
+    sMeshW.castShadow = true; sMeshW.receiveShadow = true;
+    g.scene.add(sMeshW); g.geometries.push(sGeoW); g.cameraMeshes.push(sMeshW);
+  }
+  // 西踊り場の2F床
+  const landGeoW = new THREE.PlaneGeometry(5.5, 1.5);
+  landGeoW.setAttribute('uv2', landGeoW.attributes.uv);
+  const landMeshW = new THREE.Mesh(landGeoW, f2Mat);
+  landMeshW.rotation.x = -Math.PI / 2;
+  landMeshW.position.set(-16.75, FLOOR_H, 30.75);
+  landMeshW.receiveShadow = true;
+  g.scene.add(landMeshW); g.geometries.push(landGeoW);
+  // 西階段手すり（東側 x=-14）
+  const railW1F = new THREE.Mesh(railGeo, railMat);
+  railW1F.position.set(-14, 2.5, 28.5);
+  railW1F.rotation.x = Math.atan2(FLOOR_H, stZe - stZs);
+  g.scene.add(railW1F); g.cameraMeshes.push(railW1F);
+  // 西踊り場の手すり
+  const railLandW = new THREE.Mesh(railLandGeo, railMat);
+  railLandW.position.set(-14, FLOOR_H + 0.5, 30.75);
+  g.scene.add(railLandW); g.cameraMeshes.push(railLandW);
+
   // --- 教室内装（1F × 3教室 + 2F × 3教室）---
   const deskMat = makePBRMat(woodPBR, { roughness: 0.75 });
   const chairMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.6, metalness: 0.7 });
@@ -4654,7 +4687,7 @@ function buildSchoolObjects(g) {
   const bbMat = new THREE.MeshStandardMaterial({ color: 0x1a3a1a, roughness: 0.8 });
   g.materials.push(bbMat);
   const classrooms = [
-    { xMin: -19, xMax: -7.5, zMin: 27.5, zMax: 31 },
+    { xMin: -13, xMax: -7.5, zMin: 27.5, zMax: 31 },
     { xMin: -5.5, xMax: 5.5, zMin: 27.5, zMax: 31 },
     { xMin: 7.5, xMax: 13, zMin: 27.5, zMax: 31 }
   ];
@@ -4668,14 +4701,15 @@ function buildSchoolObjects(g) {
       const bbGeo = new THREE.PlaneGeometry(bbW, 1.2);
       g.geometries.push(bbGeo);
       const bb = new THREE.Mesh(bbGeo, bbMat);
-      bb.position.set(rcx, yOff + 1.8, room.zMin + 0.05);
+      bb.position.set(rcx, yOff + 1.8, room.zMax - 0.05);
+      bb.rotation.y = Math.PI;
       g.scene.add(bb);
-      // 教卓
+      // 教卓（黒板の手前に配置）
       const tdGeo = new THREE.BoxGeometry(1.2, 0.75, 0.6);
       tdGeo.setAttribute('uv2', tdGeo.attributes.uv);
       g.geometries.push(tdGeo);
       const td = new THREE.Mesh(tdGeo, deskMat);
-      td.position.set(rcx, yOff + 0.375, room.zMin + 0.8);
+      td.position.set(rcx, yOff + 0.375, room.zMax - 0.8);
       td.castShadow = true; td.receiveShadow = true;
       g.scene.add(td); g.cameraMeshes.push(td);
       // 生徒の机と椅子
@@ -4752,14 +4786,22 @@ function buildSchoolObjects(g) {
   }
 
   // --- 階段室・踊り場の照明 ---
-  // 1F階段室
+  // 東 1F階段室
   const stairLight1 = new THREE.PointLight(0xddccaa, 0.2, 6);
   stairLight1.position.set(16.75, 3.0, 28.5);
   g.scene.add(stairLight1);
-  // 2F踊り場
+  // 東 2F踊り場
   const stairLight2 = new THREE.PointLight(0xeeddaa, 0.3, 6);
   stairLight2.position.set(16.75, FLOOR_H + 3.0, 30.75);
   g.scene.add(stairLight2);
+  // 西 1F階段室
+  const stairLight3 = new THREE.PointLight(0xddccaa, 0.2, 6);
+  stairLight3.position.set(-16.75, 3.0, 28.5);
+  g.scene.add(stairLight3);
+  // 西 2F踊り場
+  const stairLight4 = new THREE.PointLight(0xeeddaa, 0.3, 6);
+  stairLight4.position.set(-16.75, FLOOR_H + 3.0, 30.75);
+  g.scene.add(stairLight4);
   // 踊り場に非常灯風の小さな赤いライト
   const exitLightGeo = new THREE.BoxGeometry(0.3, 0.15, 0.05);
   g.geometries.push(exitLightGeo);
@@ -4771,6 +4813,11 @@ function buildSchoolObjects(g) {
   exitLightMesh.position.set(13.6, FLOOR_H + 3.2, 30.75);
   exitLightMesh.rotation.y = Math.PI / 2;
   g.scene.add(exitLightMesh);
+  // 西踊り場の非常灯
+  const exitLightMeshW = new THREE.Mesh(exitLightGeo, exitLightMat);
+  exitLightMeshW.position.set(-13.6, FLOOR_H + 3.2, 30.75);
+  exitLightMeshW.rotation.y = -Math.PI / 2;
+  g.scene.add(exitLightMeshW);
 
   // --- 廃校ディテール ---
   // 瓦礫（廊下に散乱）
@@ -6292,31 +6339,31 @@ function updatePlayer(g, dt) {
   // Get ground height at player position
   ctrl.position.y = getGroundHeight(g, ctrl.position.x, ctrl.position.z);
 
-  // Stage 4: 校舎内の高さオーバーライド
+  // Stage 4: 校舎内の高さオーバーライド（東西両階段室対応）
   if (g._stageNum === 4) {
     const px = ctrl.position.x, pz = ctrl.position.z;
     const inBldg = px > -19.5 && px < 19.5 && pz > 24.5 && pz < 31.5;
     if (inBldg) {
       if (g.playerFloor === undefined) g.playerFloor = 0;
-      // 階段室 (x:14~19.5, z:27~31.5)
-      if (px > 14 && pz > 27) {
+      // 東階段室 (x:14~19.5) or 西階段室 (x:-19.5~-14), z:27~31.5
+      const inEastStair = px > 14 && pz > 27;
+      const inWestStair = px < -14 && pz > 27;
+      if (inEastStair || inWestStair) {
         if (pz >= 30) {
-          // 踊り場ゾーン (z:30~31.5): 2Fプレイヤーはy=4、1Fプレイヤーはy=0（踊り場の下）
-          if (g.playerFloor === 1) {
-            ctrl.position.y = 4.0;
-          } else {
-            // 1Fからランプを登ってきた場合（z=30到達でy≒4）→2F遷移
-            // それ以外は踊り場下の空間（y=0）
-            ctrl.position.y = 0;
+          // 踊り場ゾーン (z:30~31.5)
+          if (g.playerFloor === 0) {
+            // 1Fからランプを登りきった→2Fへ遷移
+            g.playerFloor = 1;
           }
+          ctrl.position.y = g.playerFloor * 4.0;
         } else {
           // ランプゾーン (z:27~30): y=0→4
           const progress = Math.max(0, Math.min(1, (pz - 27) / 3));
           ctrl.position.y = progress * 4.0;
           if (progress >= 0.95) {
-            g.playerFloor = 1; // 頂上到達→2Fへ遷移
+            g.playerFloor = 1;
           } else if (progress <= 0.05) {
-            g.playerFloor = 0; // 底到達→1Fへ遷移
+            g.playerFloor = 0;
           }
         }
       } else {
@@ -6674,7 +6721,8 @@ function createOni(g, spawnX, spawnZ) {
     role: 'patrol', // 'patrol' or 'searcher' or 'canGuard'
     searchTarget: null, // collider to search behind
     searchTimer: 0, // time since last search attempt
-    searchedCovers: [] // recently searched covers (avoid re-searching)
+    searchedCovers: [], // recently searched covers (avoid re-searching)
+    floor: 0 // 0=1F, 1=2F（Stage 4用）
   };
 }
 
@@ -6750,7 +6798,9 @@ function updateOni(g, oni, dt) {
   const pDist = pDir.length();
   // Peeking reduces detection distance to 8m (spec §11.7)
   const peekBlocked = g.player.isPeeking !== 'none' && pDist > 8;
-  const canSeePlayer = !peekBlocked && checkTargetVisibility(playerPos, g.player.isCrouching, g.player.captured, g.playerFig);
+  // Stage 4: 異なるフロアにいる場合は見えない
+  const floorBlocked = g._stageNum === 4 && (oni.floor || 0) !== (g.playerFloor || 0);
+  const canSeePlayer = !peekBlocked && !floorBlocked && checkTargetVisibility(playerPos, g.player.isCrouching, g.player.captured, g.playerFig);
 
   // Check visibility for all CPU allies & find closest visible target
   let closestVisibleTarget = null; // null = no target, 'player' = human, or ally object
@@ -7298,20 +7348,27 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   // Ground height
   oni.position.y = getGroundHeight(g, oni.position.x, oni.position.z);
 
-  // Stage 4: 校舎内の高さオーバーライド（鬼は1Fのみ）
+  // Stage 4: 校舎内の高さオーバーライド（鬼も2F巡回可能・両階段室対応）
   if (g._stageNum === 4) {
+    if (oni.floor === undefined) oni.floor = 0;
     const ox = oni.position.x, oz = oni.position.z;
     if (ox > -19.5 && ox < 19.5 && oz > 24.5 && oz < 31.5) {
-      if (ox > 14 && oz > 27) {
+      const inEast = ox > 14 && oz > 27;
+      const inWest = ox < -14 && oz > 27;
+      if (inEast || inWest) {
         if (oz >= 30) {
-          oni.position.y = 0; // 踊り場下（鬼は1Fのみ）
+          // 踊り場: ランプから登りきったら2Fへ
+          if (oni.floor === 0) oni.floor = 1;
+          oni.position.y = oni.floor * 4.0;
         } else {
-          // 階段室ランプ z:27~30
+          // ランプ z:27~30
           const p = Math.max(0, Math.min(1, (oz - 27) / 3));
           oni.position.y = p * 4.0;
+          if (p >= 0.95) oni.floor = 1;
+          else if (p <= 0.05) oni.floor = 0;
         }
       } else {
-        oni.position.y = 0; // 鬼は1Fのみ
+        oni.position.y = (oni.floor || 0) * 4.0;
       }
     }
   }
