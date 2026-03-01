@@ -4559,9 +4559,9 @@ function buildSchoolObjects(g) {
   addBox(-6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);  // A / B 間
   addBox(6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);   // B / C 間
   // C / 東階段室 — z:30~31.5にドア開口部（2Fへの通路）
-  addBox(13.5, 28.5, WT, 1.5, 4, schoolDirtyMat);  // z:27~30（1F高さのみ・2Fでは開放）
+  addBox(13.5, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30（フル高さ）
   // 西階段室 / A — z:30~31.5にドア開口部
-  addBox(-13.5, 28.5, WT, 1.5, 4, schoolDirtyMat); // z:27~30（1F高さのみ・2Fでは開放）
+  addBox(-13.5, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30（フル高さ）
 
   // --- 2F床 / 1F天井 (y=4, 東階段室 x:14~20 と西階段室 x:-20~-14 を除く) ---
   const f2Geo = new THREE.PlaneGeometry(27, 8);
@@ -4638,18 +4638,24 @@ function buildSchoolObjects(g) {
   // 階段手すり（階段の西側 x=14）
   const railMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.4, metalness: 0.8 });
   g.materials.push(railMat);
-  const railGeo = new THREE.BoxGeometry(0.05, 1, 3);
+  const railGeo = new THREE.BoxGeometry(0.15, 1.2, 3);
   g.geometries.push(railGeo);
   const rail1F = new THREE.Mesh(railGeo, railMat);
   rail1F.position.set(14, 2.5, 28.5);
   rail1F.rotation.x = Math.atan2(FLOOR_H, stZe - stZs);
   g.scene.add(rail1F); g.cameraMeshes.push(rail1F);
   // 踊り場の手すり（z=30~31.5の西側）
-  const railLandGeo = new THREE.BoxGeometry(0.05, 1, 1.5);
+  const railLandGeo = new THREE.BoxGeometry(0.15, 1.2, 1.5);
   g.geometries.push(railLandGeo);
   const railLand = new THREE.Mesh(railLandGeo, railMat);
-  railLand.position.set(14, FLOOR_H + 0.5, 30.75);
+  railLand.position.set(14, FLOOR_H + 0.6, 30.75);
   g.scene.add(railLand); g.cameraMeshes.push(railLand);
+  // 2F踊り場の南側手すり壁（浮遊防止 — 階段とのz=30境界）
+  const railSouthGeo = new THREE.BoxGeometry(5.5, 1.2, 0.12);
+  g.geometries.push(railSouthGeo);
+  const railSouthE = new THREE.Mesh(railSouthGeo, railMat);
+  railSouthE.position.set(16.75, FLOOR_H + 0.6, 30.06);
+  g.scene.add(railSouthE); g.cameraMeshes.push(railSouthE);
 
   // --- 西階段室（x:-19.5~-14, z:27~31.5 — 東階段室のミラー）---
   for (let i = 0; i < NUM_STEPS; i++) {
@@ -4677,8 +4683,12 @@ function buildSchoolObjects(g) {
   g.scene.add(railW1F); g.cameraMeshes.push(railW1F);
   // 西踊り場の手すり
   const railLandW = new THREE.Mesh(railLandGeo, railMat);
-  railLandW.position.set(-14, FLOOR_H + 0.5, 30.75);
+  railLandW.position.set(-14, FLOOR_H + 0.6, 30.75);
   g.scene.add(railLandW); g.cameraMeshes.push(railLandW);
+  // 西踊り場の南側手すり壁（浮遊防止）
+  const railSouthW = new THREE.Mesh(railSouthGeo, railMat);
+  railSouthW.position.set(-16.75, FLOOR_H + 0.6, 30.06);
+  g.scene.add(railSouthW); g.cameraMeshes.push(railSouthW);
 
   // --- 教室内装（1F × 3教室 + 2F × 3教室）---
   const deskMat = makePBRMat(woodPBR, { roughness: 0.75 });
@@ -4804,6 +4814,21 @@ function buildSchoolObjects(g) {
   const stairLight4 = new THREE.PointLight(0xeeddaa, 0.3, 6);
   stairLight4.position.set(-16.75, FLOOR_H + 3.0, 30.75);
   g.scene.add(stairLight4);
+  // --- 階段室⇔教室ドア入口照明（暗い開口部=「黒い扉」を解消）---
+  // 東ドア入口（x=13.5, z=30.5 — ドア開口部を照らす）
+  const doorLightE1 = new THREE.PointLight(0xeeddbb, 0.5, 6);
+  doorLightE1.position.set(13.5, 2.0, 30.5);
+  g.scene.add(doorLightE1);
+  const doorLightE2 = new THREE.PointLight(0xeeddbb, 0.5, 6);
+  doorLightE2.position.set(13.5, 6.0, 30.5);
+  g.scene.add(doorLightE2);
+  // 西ドア入口
+  const doorLightW1 = new THREE.PointLight(0xeeddbb, 0.5, 6);
+  doorLightW1.position.set(-13.5, 2.0, 30.5);
+  g.scene.add(doorLightW1);
+  const doorLightW2 = new THREE.PointLight(0xeeddbb, 0.5, 6);
+  doorLightW2.position.set(-13.5, 6.0, 30.5);
+  g.scene.add(doorLightW2);
   // 踊り場に非常灯風の小さな赤いライト
   const exitLightGeo = new THREE.BoxGeometry(0.3, 0.15, 0.05);
   g.geometries.push(exitLightGeo);
