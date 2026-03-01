@@ -2443,17 +2443,17 @@ const STAGE_CONFIGS = {
       // 校庭中央
       {x:0,z:5},{x:8,z:-5},{x:-8,z:-8},
       // 校舎内巡回（1F廊下）
-      {x:-12,z:25.5},{x:-5,z:25.5},{x:5,z:25.5},{x:12,z:25.5},
+      {x:-10,z:25.5},{x:0,z:25.5},{x:10,z:25.5},
       // 1F教室内偵察
       {x:-10,z:29},{x:0,z:29},{x:10,z:29},
-      // 東階段室経由で2Fへ上がる
-      {x:16.75,z:27},{x:16.75,z:30.75},
-      // 2F廊下巡回
+      // 東階段室へ（教室C→ドア開口部z:30.5経由→踊り場）
+      {x:10,z:30.5},{x:16.75,z:30.5},
+      // 2F廊下巡回（踊り場→教室エリア→廊下）
       {x:10,z:25.5},{x:0,z:25.5},{x:-10,z:25.5},
       // 2F教室内偵察
       {x:-10,z:29},{x:0,z:29},{x:10,z:29},
-      // 西階段室経由で1Fへ降りる
-      {x:-16.75,z:30.75},{x:-16.75,z:27}
+      // 西階段室経由で1Fへ降りる（ドア開口部z:30.5経由→階段降下→廊下）
+      {x:-10,z:30.5},{x:-16.75,z:30.5},{x:-16.75,z:25},{x:0,z:25.5}
     ],
     interactables: [
       { type:'door', x:-5, z:23, radius:20, label:'教室のドア', sound:'thud' },
@@ -4559,9 +4559,9 @@ function buildSchoolObjects(g) {
   addBox(-6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);  // A / B 間
   addBox(6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);   // B / C 間
   // C / 東階段室 — z:30~31.5にドア開口部（2Fへの通路）
-  addBox(13.5, 28.5, WT, 1.5, 8, schoolDirtyMat);  // z:27~30（南側壁）
+  addBox(13.5, 28.5, WT, 1.5, 4, schoolDirtyMat);  // z:27~30（1F高さのみ・2Fでは開放）
   // 西階段室 / A — z:30~31.5にドア開口部
-  addBox(-13.5, 28.5, WT, 1.5, 8, schoolDirtyMat); // z:27~30（南側壁）
+  addBox(-13.5, 28.5, WT, 1.5, 4, schoolDirtyMat); // z:27~30（1F高さのみ・2Fでは開放）
 
   // --- 2F床 / 1F天井 (y=4, 東階段室 x:14~20 と西階段室 x:-20~-14 を除く) ---
   const f2Geo = new THREE.PlaneGeometry(27, 8);
@@ -4712,6 +4712,8 @@ function buildSchoolObjects(g) {
       td.position.set(rcx, yOff + 0.375, room.zMax - 0.8);
       td.castShadow = true; td.receiveShadow = true;
       g.scene.add(td); g.cameraMeshes.push(td);
+      // 教卓コライダー（プレイヤーがすり抜けないように）
+      if (fl === 0) g.colliders.push({ type:'box', x: rcx, z: room.zMax - 0.8, hw: 0.6, hd: 0.3, h: 0.75 });
       // 生徒の机と椅子
       const numCols = Math.max(2, Math.floor((rw - 2) / 1.4));
       const startX = room.xMin + 1.2;
@@ -7293,7 +7295,7 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   oni.position.z = Math.max(-half, Math.min(half, oni.position.z));
 
   // コライダー押し出し（複数パス + マージン拡大）
-  const ONI_MARGIN = 0.5;
+  const ONI_MARGIN = 0.35;
   for (let pass = 0; pass < 3; pass++) {
     let anyPush = false;
     for (const col of g.colliders) {
@@ -7335,8 +7337,8 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   const movedDist = Math.sqrt((oni.position.x - prevX)**2 + (oni.position.z - prevZ)**2);
   if (movedDist < speed * dt * 0.1 && speed * dt > 0.05) {
     oni._stuckCount = (oni._stuckCount || 0) + 1;
-    // 1秒以上スタック → ウェイポイントをスキップ
-    if (oni._stuckCount > 60) {
+    // 0.7秒以上スタック → ウェイポイントをスキップ
+    if (oni._stuckCount > 42) {
       oni._stuckCount = 0;
       oni._skipWaypoint = true;
     }
