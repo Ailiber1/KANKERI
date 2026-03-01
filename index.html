@@ -5775,6 +5775,7 @@ function buildDanchiObjects(g) {
   // ※幅30mに縮小し、側面に通路を確保（建物を一周できる）
   const BLDG_W = 30, BLDG_D = 8, BLDG_H = 15;
   const FLOOR_H = 3.0; // 各階の高さ
+  const STAIR_W = 3, STAIR_D = 5; // 階段室: 幅3m × 奥行5m
   const buildings = [
     { cx: -25, cz: 0, label: '1' },
     { cx: 25,  cz: 0, label: '2' }
@@ -5884,7 +5885,7 @@ function buildDanchiObjects(g) {
     // --- 階段室（各棟の左端・右端に1つずつ、計2箇所/棟）---
     // 階段室: 棟の左右端に突出する外付け階段塔（5階まで通じる）
     // 3m(x) × 5m(z) × 15m(h) の塔、南面から進入可能
-    const STAIR_W = 3, STAIR_D = 5;
+    // STAIR_W, STAIR_D は関数スコープで定義済み
     const TOTAL_FLIGHTS = 4; // 1F→5F = 4区間
     const STEPS_PER_FLIGHT = 10;
     const TOTAL_STEPS = TOTAL_FLIGHTS * STEPS_PER_FLIGHT; // 40段
@@ -9764,10 +9765,10 @@ function updateWindowLights(g, dt) {
   if (!g._windowLightSystem || g._stageNum !== 5) return;
   const ws = g._windowLightSystem;
 
-  // 昼夜サイクルのフェーズ判定（0=朝, 1=昼, 2=夕, 3=夜）
-  const dnc = g.dayNightCycle;
-  if (!dnc) return;
-  const isNight = dnc.phase === 3 || dnc.phase === 2; // 夕方〜夜
+  // 昼夜サイクルのフェーズ判定
+  const dn = g.dayNight;
+  if (!dn) return;
+  const isNight = dn.phase === 'night' || dn.phase === 'evening';
 
   ws.lastPattern += dt;
 
@@ -9791,15 +9792,14 @@ function updateWindowLights(g, dt) {
 // --- 濡れた地面の反射更新 ---
 function updateWetGround(g, dt) {
   if (!g._wetGround || g._stageNum !== 5) return;
-  const dnc = g.dayNightCycle;
-  if (!dnc) return;
+  const dn = g.dayNight;
+  if (!dn) return;
 
   // 夜フェーズで路面が濡れて反射する演出
-  // phase: 0=朝, 1=昼, 2=夕, 3=夜
   let targetOpacity = 0;
-  if (dnc.phase === 3) targetOpacity = 0.12; // 夜: しっかり反射
-  else if (dnc.phase === 2) targetOpacity = 0.06; // 夕: 少し反射
-  else targetOpacity = 0; // 朝昼: 反射なし
+  if (dn.phase === 'night') targetOpacity = 0.12;
+  else if (dn.phase === 'evening') targetOpacity = 0.06;
+  else targetOpacity = 0;
 
   const mat = g._wetGround.mat;
   mat.opacity += (targetOpacity - mat.opacity) * dt * 2;
