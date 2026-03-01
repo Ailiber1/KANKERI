@@ -6378,10 +6378,16 @@ function updatePlayer(g, dt) {
         if (px > 14 && px < 20 && ctrl.position.z > 26.5) ctrl.position.z = 26.5;
         if (px < -14 && px > -20 && ctrl.position.z > 26.5) ctrl.position.z = 26.5;
       }
-      // 侵入防止後のZ座標で階段判定
+      // 侵入防止後のZ座標で階段判定（>=で z:27.0 も階段として扱う）
       const curZ = ctrl.position.z;
-      const inEastStair = px > 14 && curZ > 27;
-      const inWestStair = px < -14 && curZ > 27;
+      const inEastStair = px > 14 && curZ >= 27;
+      const inWestStair = px < -14 && curZ >= 27;
+      // 階段を降りきって通路に出た瞬間 → 1Fに強制遷移（瞬間移動バグ防止）
+      if (g._onStairs && !(inEastStair || inWestStair)) {
+        if ((px > 14 && px < 20) || (px < -14 && px > -20)) {
+          g.playerFloor = 0;
+        }
+      }
       if (inEastStair || inWestStair) {
         if (curZ >= 30) {
           // 踊り場ゾーン (z:30~31.5)
@@ -7388,8 +7394,13 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
     if (oni.floor === undefined) oni.floor = 0;
     const ox = oni.position.x, oz = oni.position.z;
     if (ox > -19.5 && ox < 19.5 && oz > 24.5 && oz < 32) {
-      const inEast = ox > 14 && oz > 27;
-      const inWest = ox < -14 && oz > 27;
+      const inEast = ox > 14 && oz >= 27;
+      const inWest = ox < -14 && oz >= 27;
+      // 階段降りきり時の1F強制遷移
+      if (oni._onStairs && !(inEast || inWest)) {
+        if ((ox > 14 && ox < 20) || (ox < -14 && ox > -20)) oni.floor = 0;
+      }
+      oni._onStairs = inEast || inWest;
       if (inEast || inWest) {
         if (oz >= 30) {
           // 踊り場: ランプから登りきったら2Fへ
