@@ -1108,6 +1108,107 @@ function loadSavedUser() {
 }
 
 // ============================================================
+// SECTION: RANKING (Firebase)
+// ============================================================
+
+function saveScoreAttackRanking(survivalTime) {
+  if (!gameState.deviceId) return;
+  if (gameState.isGuest) return; // ゲスト除外
+  var ref = db.ref('rankings/scoreAttack/' + gameState.deviceId);
+  ref.transaction(function(current) {
+    if (!current) {
+      return {
+        username: gameState.username,
+        score: survivalTime,
+        timestamp: Date.now()
+      };
+    }
+    current.username = gameState.username; // 名前変更に追従
+    if (survivalTime > (current.score || 0)) {
+      current.score = survivalTime;
+    }
+    current.timestamp = Date.now();
+    return current;
+  });
+}
+
+function loadRankings() {
+  var RANKING_MAX = 10;
+  var lang = gameState.language === 'ja';
+  var listEl = document.getElementById('ranking-list');
+  if (!listEl) return;
+
+  listEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px">' +
+    (lang ? '読み込み中...' : 'Loading...') + '</div>';
+
+  db.ref('rankings/scoreAttack')
+    .orderByChild('score')
+    .limitToLast(RANKING_MAX)
+    .once('value')
+    .then(function(snap) {
+      var entries = [];
+      snap.forEach(function(child) {
+        var d = child.val();
+        if (d && d.username) entries.push(d);
+      });
+      entries.sort(function(a, b) {
+        return (b.score || 0) - (a.score || 0);
+      });
+      entries.splice(RANKING_MAX);
+      renderRankingList(entries, listEl, lang);
+    })
+    .catch(function() {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px">' +
+        (lang ? 'データの取得に失敗しました' : 'Failed to load data') + '</div>';
+    });
+}
+
+function renderRankingList(entries, listEl, lang) {
+  if (!entries || entries.length === 0) {
+    listEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px">' +
+      (lang ? 'まだ記録がありません' : 'No records yet') + '</div>';
+    return;
+  }
+
+  var html = '<div style="margin-bottom:8px;font-size:14px;color:var(--neon-cyan)">SCORE ATTACK — ' +
+    (lang ? '古刹の大屋敷' : 'Ancient Temple Estate') + '</div>';
+  html += '<div style="display:flex;justify-content:space-between;padding:4px 8px;font-size:11px;color:var(--text-dim);border-bottom:1px solid rgba(255,51,102,0.2)">';
+  html += '<span style="width:30px">#</span><span style="flex:1">' + (lang ? '名前' : 'Name') + '</span>';
+  html += '<span style="width:80px;text-align:right">' + (lang ? '生存時間' : 'Time') + '</span></div>';
+
+  var currentRank = 1;
+  for (var i = 0; i < entries.length; i++) {
+    if (i > 0 && entries[i].score < entries[i - 1].score) {
+      currentRank = i + 1;
+    }
+    var rankClass = '';
+    var rankIcon = '';
+    if (currentRank === 1) { rankClass = ' style="color:#d4af37"'; rankIcon = '🥇'; }
+    else if (currentRank === 2) { rankClass = ' style="color:#c0c0c0"'; rankIcon = '🥈'; }
+    else if (currentRank === 3) { rankClass = ' style="color:#cd7f32"'; rankIcon = '🥉'; }
+
+    var score = entries[i].score || 0;
+    var mm = Math.floor(score / 60);
+    var ss = Math.floor(score % 60);
+    var timeStr = mm + ':' + (ss < 10 ? '0' : '') + ss;
+
+    var isMe = entries[i].username === gameState.username;
+    var bgStyle = isMe ? 'background:rgba(255,51,102,0.1);' : '';
+
+    html += '<div style="display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid rgba(255,51,102,0.08);font-size:13px;' + bgStyle + '"' + rankClass + '>';
+    html += '<span style="width:30px">' + (rankIcon || currentRank) + '</span>';
+    html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHTML(entries[i].username) + '</span>';
+    html += '<span style="width:80px;text-align:right;font-family:Share Tech Mono,monospace">' + timeStr + '</span>';
+    html += '</div>';
+  }
+
+  html += '<div style="text-align:center;color:var(--text-dim);font-size:10px;padding:8px 0;margin-top:4px">' +
+    (lang ? '※登録ユーザーのみ対象' : '※Registered users only') + '</div>';
+
+  listEl.innerHTML = html;
+}
+
+// ============================================================
 // SECTION: SOUND (BGM/SE framework)
 // ============================================================
 let currentBGM = null;
@@ -2254,6 +2355,7 @@ function initButtonHandlers() {
   // Ranking button
   document.getElementById('btn-ranking').addEventListener('click', () => {
     openModal('ranking-modal');
+    loadRankings();
   });
 
   // Language buttons
@@ -2277,7 +2379,7 @@ function initButtonHandlers() {
   document.getElementById('btn-score-start').addEventListener('click', () => {
     closeModal('score-modal');
     resumeAudioContext();
-    showNotification('Score Attack — Coming Soon...');
+    startGame(6, 'score');
   });
 
   // Close modals on overlay click
@@ -2551,6 +2653,68 @@ const STAGE_CONFIGS = {
       { type:'pole', x:0, z:-35, radius:15, label:'電柱', sound:'metal' },
       // 集会所
       { type:'wall', x:15, z:8, radius:20, label:'集会所の壁', sound:'thud' }
+    ]
+  },
+  6: {
+    name: '古刹の大屋敷', nameEn: 'Ancient Temple Estate', size: 70, timeLimit: 0,
+    initialOni: 1, maxOni: 5, oniAddAt: [null, 60, 120, 180, 240],
+    startPhase: 0, cycleDuration: 60,
+    canPositions: [
+      { x: 0, z: -5, label: '① 枯山水の庭園中央', labelEn: '① Zen Garden Center' },
+      { x: -12, z: 8, label: '② 本堂の裏手', labelEn: '② Behind Main Hall' },
+      { x: 15, z: -20, label: '③ 参道の石灯籠付近', labelEn: '③ Near Stone Lanterns' }
+    ],
+    waypoints: [
+      // 庭園巡回
+      {x:0,z:0},{x:-8,z:0},{x:8,z:0},{x:0,z:-8},{x:0,z:8},
+      // 本堂周辺
+      {x:-5,z:10},{x:5,z:10},{x:0,z:14},{x:-8,z:14},{x:8,z:14},
+      // 庫裏
+      {x:15,z:12},{x:18,z:10},{x:15,z:8},
+      // 離れ
+      {x:-18,z:12},{x:-20,z:10},{x:-18,z:8},
+      // 参道
+      {x:0,z:-15},{x:0,z:-20},{x:0,z:-25},{x:0,z:-30},
+      // 竹林
+      {x:20,z:20},{x:25,z:22},{x:22,z:18},
+      // 鐘楼
+      {x:-22,z:-8},{x:-24,z:-10},
+      // 池周辺
+      {x:-15,z:-18},{x:-18,z:-20},{x:-12,z:-22},
+      // 築山
+      {x:-22,z:22},{x:-25,z:20},
+      // 外周
+      {x:-33,z:-33},{x:33,z:-33},{x:33,z:33},{x:-33,z:33}
+    ],
+    interactables: [
+      // 梵鐘（特殊: 全鬼反応の陽動、cooldown30秒）
+      { type:'bell', x:-22, z:-8, radius:40, label:'梵鐘', labelEn:'Temple Bell', sound:'bell', cooldown:30 },
+      // 障子戸（離れ、開閉ギミック）
+      { type:'shoji', x:-18, z:10, radius:8, label:'障子戸', labelEn:'Shoji Door', sound:'slide' },
+      // 石灯籠
+      { type:'lantern', x:-2, z:-18, radius:15, label:'石灯籠', labelEn:'Stone Lantern', sound:'stone' },
+      { type:'lantern', x:2, z:-18, radius:15, label:'石灯籠', labelEn:'Stone Lantern', sound:'stone' },
+      { type:'lantern', x:-2, z:-24, radius:15, label:'石灯籠', labelEn:'Stone Lantern', sound:'stone' },
+      { type:'lantern', x:2, z:-24, radius:15, label:'石灯籠', labelEn:'Stone Lantern', sound:'stone' },
+      // 大岩
+      { type:'rock', x:-5, z:2, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
+      { type:'rock', x:6, z:-3, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
+      { type:'rock', x:3, z:5, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
+      // 本堂の柱
+      { type:'pillar', x:-3, z:10, radius:18, label:'本堂の柱', labelEn:'Main Hall Pillar', sound:'thud' },
+      { type:'pillar', x:3, z:10, radius:18, label:'本堂の柱', labelEn:'Main Hall Pillar', sound:'thud' },
+      // 庫裏の壁
+      { type:'wall', x:15, z:10, radius:15, label:'庫裏の壁', labelEn:'Kitchen Wall', sound:'thud' },
+      // 山門
+      { type:'gate', x:0, z:-32, radius:20, label:'山門の柱', labelEn:'Temple Gate Pillar', sound:'thud' },
+      // 地蔵尊
+      { type:'statue', x:22, z:24, radius:10, label:'地蔵尊', labelEn:'Jizo Statue', sound:'stone' },
+      { type:'statue', x:26, z:20, radius:10, label:'地蔵尊', labelEn:'Jizo Statue', sound:'stone' },
+      { type:'statue', x:24, z:16, radius:10, label:'地蔵尊', labelEn:'Jizo Statue', sound:'stone' },
+      // 壺（庫裏内）
+      { type:'pot', x:17, z:12, radius:12, label:'壺', labelEn:'Ceramic Pot', sound:'stone' },
+      // ベンチ（縁側）
+      { type:'bench', x:-18, z:14, radius:12, label:'縁側', labelEn:'Veranda', sound:'thud' }
     ]
   }
 };
@@ -2903,7 +3067,28 @@ function buildTerrain(g, stageNum) {
   const groundGeo = new THREE.PlaneGeometry(size, size, segments, segments);
   const verts = groundGeo.attributes.position.array;
 
-  if (stageNum === 5) {
+  if (stageNum === 6) {
+    // === STAGE 6: 古刹の大屋敷（Score Attack）===
+    // ほぼ平坦な庭園 + 築山エリア高さ+2m
+    for (let i = 0; i < verts.length; i += 3) {
+      const x = verts[i], y = verts[i+1];
+      const wz = -y;
+      // 基本の微起伏
+      let h = noise.noise2D(x * 0.05, wz * 0.05) * 0.03;
+      h += noise2.noise2D(x * 0.2, wz * 0.2) * 0.01;
+      // 築山エリア（中心: -22, 22、半径4m）
+      const hillDist = Math.sqrt((x + 22) ** 2 + (wz - 22) ** 2);
+      if (hillDist < 4) {
+        h += 2.0 * Math.cos(hillDist / 4 * Math.PI / 2);
+      }
+      // 池エリア（中心: -15, -20、半径3m）- わずかに凹む
+      const pondDist = Math.sqrt((x + 15) ** 2 + (wz + 20) ** 2);
+      if (pondDist < 3) {
+        h -= 0.3 * Math.cos(pondDist / 3 * Math.PI / 2);
+      }
+      verts[i+2] = h;
+    }
+  } else if (stageNum === 5) {
     // === STAGE 5: 団地（真夏の公営住宅群）===
     // コンクリート舗装 + 公園草地の微起伏
     for (let i = 0; i < verts.length; i += 3) {
@@ -3008,7 +3193,22 @@ function buildTerrain(g, stageNum) {
       tex.anisotropy = 4;
       return tex;
     };
-    if (stageNum === 5) {
+    if (stageNum === 6) {
+      // ステージ6: 古刹の大屋敷（苔+砂利のブレンド、プロシージャル生成）
+      const rep6 = 18;
+      const d6Diff = setRepeat(loader.load('textures/grass_diff.jpg'), rep6);
+      const d6Nor  = setRepeat(loader.load('textures/grass_nor.jpg'), rep6);
+      const d6Rough = setRepeat(loader.load('textures/grass_rough.jpg'), rep6);
+      const d6Ao   = setRepeat(loader.load('textures/grass_ao.jpg'), rep6);
+      g.textures.push(d6Diff, d6Nor, d6Rough, d6Ao);
+      groundMat = new THREE.MeshStandardMaterial({
+        map: d6Diff, normalMap: d6Nor,
+        normalScale: new THREE.Vector2(0.8, 0.8),
+        roughnessMap: d6Rough, roughness: 0.95,
+        aoMap: d6Ao, aoMapIntensity: 0.5,
+        color: 0x4a6a3a
+      });
+    } else if (stageNum === 5) {
       // ステージ5: 団地の地面（コンクリート舗装）
       const rep5 = 22;
       const d5Diff = setRepeat(loader.load('textures/concrete_diff.jpg'), rep5);
@@ -3243,10 +3443,17 @@ function buildTerrain(g, stageNum) {
 
   // Boundary walls (all stages)
   const half = size / 2;
-  const wallH = stageNum === 5 ? 3 : (stageNum === 4 ? 3 : (stageNum === 3 ? 12 : (stageNum === 2 ? 2.5 : 2)));
+  const wallH = stageNum === 6 ? 3 : (stageNum === 5 ? 3 : (stageNum === 4 ? 3 : (stageNum === 3 ? 12 : (stageNum === 2 ? 2.5 : 2))));
   const fenceGeo = new THREE.BoxGeometry(size + 2, wallH, 0.1);
   let fenceMat;
-  if (stageNum === 5) {
+  if (stageNum === 6) {
+    // ステージ6: 透明な境界壁（白壁はbuildTempleObjectsで生成済み）
+    fenceMat = new THREE.MeshStandardMaterial({
+      color: 0xF5F0E8, roughness: 0.9, metalness: 0.0,
+      transparent: true, opacity: 0
+    });
+    g.materials.push(fenceMat);
+  } else if (stageNum === 5) {
     // ステージ5: 団地の金網フェンス
     fenceGeo.setAttribute('uv2', fenceGeo.attributes.uv);
     fenceMat = new THREE.MeshStandardMaterial({
@@ -6664,6 +6871,546 @@ function buildDanchiObjects(g) {
   g.kickableSigns = g.kickableSigns || [];
 }
 
+// ============================================================
+// SECTION: STAGE 6 — 古刹の大屋敷（Score Attack）
+// ============================================================
+
+/**
+ * buildTempleObjects — Stage 6「古刹の大屋敷」の全オブジェクトをプロシージャル生成
+ * 呼び出し元: startGame (stageNum === 6)
+ */
+function buildTempleObjects(g) {
+  const gH = (x, z) => getGroundHeight(g, x, z);
+  const addGeo = (geo) => { g.geometries.push(geo); return geo; };
+
+  // === マテリアル定義 ===
+  // 木材（柱・梁・床）
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: 0x5C4033, roughness: 0.85, metalness: 0.0,
+    emissive: 0x1a0f0a, emissiveIntensity: 0.05
+  });
+  g.materials.push(woodMat);
+
+  // 暗い木材（古い柱・梵鐘台）
+  const darkWoodMat = new THREE.MeshStandardMaterial({
+    color: 0x3B2716, roughness: 0.9, metalness: 0.0,
+    emissive: 0x0f0805, emissiveIntensity: 0.05
+  });
+  g.materials.push(darkWoodMat);
+
+  // 屋根瓦
+  const roofMat = new THREE.MeshStandardMaterial({
+    color: 0x2C2C2C, roughness: 0.7, metalness: 0.1,
+    emissive: 0x080808, emissiveIntensity: 0.05
+  });
+  g.materials.push(roofMat);
+
+  // 白壁
+  const wallMat = new THREE.MeshStandardMaterial({
+    color: 0xF5F0E8, roughness: 0.9, metalness: 0.0,
+    emissive: 0x1a1815, emissiveIntensity: 0.05
+  });
+  g.materials.push(wallMat);
+
+  // 石材
+  const stoneMat = new THREE.MeshStandardMaterial({
+    color: 0x8A8A80, roughness: 0.95, metalness: 0.0,
+    emissive: 0x0a0a08, emissiveIntensity: 0.05
+  });
+  g.materials.push(stoneMat);
+
+  // 白砂利
+  const gravelMat = new THREE.MeshStandardMaterial({
+    color: 0xE8E0D0, roughness: 0.95, metalness: 0.0
+  });
+  g.materials.push(gravelMat);
+
+  // 苔
+  const mossMat = new THREE.MeshStandardMaterial({
+    color: 0x3A6B35, roughness: 0.95, metalness: 0.0
+  });
+  g.materials.push(mossMat);
+
+  // 畳
+  const tatamiMat = new THREE.MeshStandardMaterial({
+    color: 0xA3B86C, roughness: 0.9, metalness: 0.0,
+    emissive: 0x0a0f06, emissiveIntensity: 0.05
+  });
+  g.materials.push(tatamiMat);
+
+  // 土間
+  const earthMat = new THREE.MeshStandardMaterial({
+    color: 0x6B5B45, roughness: 0.95, metalness: 0.0
+  });
+  g.materials.push(earthMat);
+
+  // 竹
+  const bambooMat = new THREE.MeshStandardMaterial({
+    color: 0x6B8E23, roughness: 0.7, metalness: 0.05,
+    emissive: 0x0a1005, emissiveIntensity: 0.05
+  });
+  g.materials.push(bambooMat);
+
+  // 水面
+  const waterMat = new THREE.MeshStandardMaterial({
+    color: 0x2266AA, roughness: 0.1, metalness: 0.3,
+    transparent: true, opacity: 0.7,
+    emissive: 0x112244, emissiveIntensity: 0.15
+  });
+  g.materials.push(waterMat);
+
+  // 金属（梵鐘）
+  const bellMetalMat = new THREE.MeshStandardMaterial({
+    color: 0x8B7355, roughness: 0.4, metalness: 0.7,
+    emissive: 0x0a0805, emissiveIntensity: 0.1
+  });
+  g.materials.push(bellMetalMat);
+
+  // 障子紙
+  const shojiMat = new THREE.MeshStandardMaterial({
+    color: 0xFFF8E7, roughness: 0.95, metalness: 0.0,
+    transparent: true, opacity: 0.85,
+    emissive: 0x1a1510, emissiveIntensity: 0.1
+  });
+  g.materials.push(shojiMat);
+
+  // 飛び石
+  const steppingStoneMat = new THREE.MeshStandardMaterial({
+    color: 0x7A7A70, roughness: 0.85, metalness: 0.0
+  });
+  g.materials.push(steppingStoneMat);
+
+  // ヘルパー: 箱メッシュ追加
+  function addBox(mat, w, h, d, x, y, z, opts) {
+    const geo = addGeo(new THREE.BoxGeometry(w, h, d));
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    if (opts && opts.ry) mesh.rotation.y = opts.ry;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    g.scene.add(mesh);
+    return mesh;
+  }
+
+  // ヘルパー: コライダー登録
+  function addBoxCollider(x, z, hw, hd, h) {
+    g.colliders.push({ type: 'box', x: x, z: z, hw: hw, hd: hd, minY: 0, maxY: h || 6 });
+  }
+  function addCylCollider(x, z, r, h) {
+    g.colliders.push({ type: 'cylinder', x: x, z: z, r: r, minY: 0, maxY: h || 6 });
+  }
+
+  // ========================================
+  //  本堂（15×10×6m、中心: (0, 0, 10)）
+  // ========================================
+  const honX = 0, honZ = 10;
+  // 基壇（石積み）
+  addBox(stoneMat, 16, 0.5, 11, honX, 0.25, honZ);
+  // 床（板の間）
+  addBox(woodMat, 15, 0.15, 10, honX, 0.575, honZ);
+  // 壁 — 北壁
+  addBox(wallMat, 15, 5, 0.3, honX, 3.1, honZ + 5);
+  addBoxCollider(honX, honZ + 5, 7.7, 0.3, 6);
+  // 壁 — 南壁（入口2箇所を開口: x=-4~-2 と x=2~4）
+  addBox(wallMat, 4.5, 5, 0.3, honX - 5.25, 3.1, honZ - 5);
+  addBoxCollider(honX - 5.25, honZ - 5, 2.5, 0.3, 6);
+  addBox(wallMat, 2, 5, 0.3, honX, 3.1, honZ - 5);
+  addBoxCollider(honX, honZ - 5, 1.2, 0.3, 6);
+  addBox(wallMat, 4.5, 5, 0.3, honX + 5.25, 3.1, honZ - 5);
+  addBoxCollider(honX + 5.25, honZ - 5, 2.5, 0.3, 6);
+  // 壁 — 東壁
+  addBox(wallMat, 0.3, 5, 10, honX + 7.5, 3.1, honZ);
+  addBoxCollider(honX + 7.5, honZ, 0.3, 5.2, 6);
+  // 壁 — 西壁（裏口開口 z=12~14）
+  addBox(wallMat, 0.3, 5, 3, honX - 7.5, 3.1, honZ - 3.5);
+  addBoxCollider(honX - 7.5, honZ - 3.5, 0.3, 1.7, 6);
+  addBox(wallMat, 0.3, 5, 5, honX - 7.5, 3.1, honZ + 2.5);
+  addBoxCollider(honX - 7.5, honZ + 2.5, 0.3, 2.7, 6);
+  // 屋根
+  const honRoofGeo = addGeo(new THREE.ConeGeometry(11, 3, 4));
+  const honRoof = new THREE.Mesh(honRoofGeo, roofMat);
+  honRoof.position.set(honX, 7.5, honZ);
+  honRoof.rotation.y = Math.PI / 4;
+  honRoof.castShadow = true;
+  g.scene.add(honRoof);
+  // 内部柱4本
+  const pillarPositions = [[-3, honZ - 3], [3, honZ - 3], [-3, honZ + 3], [3, honZ + 3]];
+  for (const [px, pz] of pillarPositions) {
+    const pillarGeo = addGeo(new THREE.CylinderGeometry(0.2, 0.2, 5, 8));
+    const pillar = new THREE.Mesh(pillarGeo, darkWoodMat);
+    pillar.position.set(px, 3.1, pz);
+    pillar.castShadow = true;
+    g.scene.add(pillar);
+    addCylCollider(px, pz, 0.35, 6);
+  }
+
+  // ========================================
+  //  庫裏（10×8×4m、中心: (15, 0, 10)）
+  // ========================================
+  const kuriX = 15, kuriZ = 10;
+  // 基壇
+  addBox(stoneMat, 11, 0.4, 9, kuriX, 0.2, kuriZ);
+  // 床（土間+板の間）
+  addBox(earthMat, 5, 0.1, 8, kuriX - 2.5, 0.45, kuriZ);
+  addBox(woodMat, 5, 0.1, 8, kuriX + 2.5, 0.45, kuriZ);
+  // 壁 — 北
+  addBox(wallMat, 10, 3.5, 0.3, kuriX, 2.2, kuriZ + 4);
+  addBoxCollider(kuriX, kuriZ + 4, 5.2, 0.3, 4);
+  // 壁 — 南（引き戸開口 x=13~15）
+  addBox(wallMat, 3, 3.5, 0.3, kuriX - 3.5, 2.2, kuriZ - 4);
+  addBoxCollider(kuriX - 3.5, kuriZ - 4, 1.7, 0.3, 4);
+  addBox(wallMat, 3, 3.5, 0.3, kuriX + 3.5, 2.2, kuriZ - 4);
+  addBoxCollider(kuriX + 3.5, kuriZ - 4, 1.7, 0.3, 4);
+  // 壁 — 東
+  addBox(wallMat, 0.3, 3.5, 8, kuriX + 5, 2.2, kuriZ);
+  addBoxCollider(kuriX + 5, kuriZ, 0.3, 4.2, 4);
+  // 壁 — 西（勝手口開口 z=10~12）
+  addBox(wallMat, 0.3, 3.5, 3, kuriX - 5, 2.2, kuriZ - 2.5);
+  addBoxCollider(kuriX - 5, kuriZ - 2.5, 0.3, 1.7, 4);
+  addBox(wallMat, 0.3, 3.5, 3, kuriX - 5, 2.2, kuriZ + 2.5);
+  addBoxCollider(kuriX - 5, kuriZ + 2.5, 0.3, 1.7, 4);
+  // 屋根
+  const kuriRoofGeo = addGeo(new THREE.ConeGeometry(8, 2.5, 4));
+  const kuriRoof = new THREE.Mesh(kuriRoofGeo, roofMat);
+  kuriRoof.position.set(kuriX, 5.3, kuriZ);
+  kuriRoof.rotation.y = Math.PI / 4;
+  kuriRoof.castShadow = true;
+  g.scene.add(kuriRoof);
+  // 土間の棚
+  addBox(woodMat, 1.5, 1.5, 0.4, kuriX - 3, 1.2, kuriZ + 3.5);
+  // 壺
+  const potGeo = addGeo(new THREE.CylinderGeometry(0.25, 0.35, 0.8, 8));
+  const pot = new THREE.Mesh(potGeo, stoneMat);
+  pot.position.set(kuriX + 2, 0.85, kuriZ + 3);
+  pot.castShadow = true;
+  g.scene.add(pot);
+
+  // ========================================
+  //  離れ（8×6×4m、中心: (-18, 0, 10)）
+  // ========================================
+  const hanX = -18, hanZ = 10;
+  // 基壇
+  addBox(stoneMat, 9, 0.4, 7, hanX, 0.2, hanZ);
+  // 床（畳）
+  addBox(tatamiMat, 8, 0.1, 6, hanX, 0.45, hanZ);
+  // 壁 — 北
+  addBox(wallMat, 8, 3.5, 0.3, hanX, 2.2, hanZ + 3);
+  addBoxCollider(hanX, hanZ + 3, 4.2, 0.3, 4);
+  // 壁 — 南（障子戸開口 x=-20~-16）
+  addBox(wallMat, 2, 3.5, 0.3, hanX + 3, 2.2, hanZ - 3);
+  addBoxCollider(hanX + 3, hanZ - 3, 1.2, 0.3, 4);
+  addBox(wallMat, 2, 3.5, 0.3, hanX - 3, 2.2, hanZ - 3);
+  addBoxCollider(hanX - 3, hanZ - 3, 1.2, 0.3, 4);
+  // 障子戸（開閉可能）
+  const shojiGeo = addGeo(new THREE.BoxGeometry(2.5, 3, 0.08));
+  const shojiMesh = new THREE.Mesh(shojiGeo, shojiMat);
+  shojiMesh.position.set(hanX, 2.0, hanZ - 3);
+  shojiMesh.castShadow = true;
+  g.scene.add(shojiMesh);
+  g._shojiDoor = { mesh: shojiMesh, open: false, baseX: hanX, baseZ: hanZ - 3 };
+  // 壁 — 東（縁側開口）
+  addBox(wallMat, 0.3, 3.5, 2, hanX + 4, 2.2, hanZ + 2);
+  addBoxCollider(hanX + 4, hanZ + 2, 0.3, 1.2, 4);
+  addBox(wallMat, 0.3, 3.5, 2, hanX + 4, 2.2, hanZ - 2);
+  addBoxCollider(hanX + 4, hanZ - 2, 0.3, 1.2, 4);
+  // 壁 — 西
+  addBox(wallMat, 0.3, 3.5, 6, hanX - 4, 2.2, hanZ);
+  addBoxCollider(hanX - 4, hanZ, 0.3, 3.2, 4);
+  // 屋根
+  const hanRoofGeo = addGeo(new THREE.ConeGeometry(6.5, 2, 4));
+  const hanRoof = new THREE.Mesh(hanRoofGeo, roofMat);
+  hanRoof.position.set(hanX, 5.0, hanZ);
+  hanRoof.rotation.y = Math.PI / 4;
+  hanRoof.castShadow = true;
+  g.scene.add(hanRoof);
+  // 縁側
+  addBox(woodMat, 1.5, 0.15, 4, hanX + 4.5, 0.45, hanZ);
+
+  // ========================================
+  //  渡り廊下（本堂↔庫裏、本堂↔離れ、幅1.5m）
+  // ========================================
+  // 本堂東壁 → 庫裏西壁 (x: 7.5 ~ 10)
+  addBox(woodMat, 2.5, 0.15, 1.5, 8.75, 0.5, honZ);
+  const watari1RoofGeo = addGeo(new THREE.BoxGeometry(2.5, 0.1, 2, 1));
+  const watari1Roof = new THREE.Mesh(watari1RoofGeo, roofMat);
+  watari1Roof.position.set(8.75, 3.5, honZ);
+  g.scene.add(watari1Roof);
+  // 手すり（コライダーなし、視覚のみ）
+  addBox(woodMat, 2.5, 0.8, 0.05, 8.75, 1.0, honZ + 0.75);
+  addBox(woodMat, 2.5, 0.8, 0.05, 8.75, 1.0, honZ - 0.75);
+
+  // 本堂西壁 → 離れ東壁 (x: -7.5 ~ -14)
+  addBox(woodMat, 6.5, 0.15, 1.5, -10.75, 0.5, honZ);
+  const watari2RoofGeo = addGeo(new THREE.BoxGeometry(6.5, 0.1, 2, 1));
+  const watari2Roof = new THREE.Mesh(watari2RoofGeo, roofMat);
+  watari2Roof.position.set(-10.75, 3.5, honZ);
+  g.scene.add(watari2Roof);
+  addBox(woodMat, 6.5, 0.8, 0.05, -10.75, 1.0, honZ + 0.75);
+  addBox(woodMat, 6.5, 0.8, 0.05, -10.75, 1.0, honZ - 0.75);
+
+  // ========================================
+  //  枯山水庭園（30×25m、中央 (0, 0, 0)）
+  // ========================================
+  // 白砂利の敷地（地面よりわずかに高い薄いプレーン）
+  const zenGeo = addGeo(new THREE.PlaneGeometry(30, 25));
+  const zenGround = new THREE.Mesh(zenGeo, gravelMat);
+  zenGround.rotation.x = -Math.PI / 2;
+  zenGround.position.set(0, 0.02, 0);
+  zenGround.receiveShadow = true;
+  g.scene.add(zenGround);
+
+  // 大岩3個
+  const rockPositions = [[-5, 2], [6, -3], [3, 5]];
+  for (const [rx, rz] of rockPositions) {
+    const rw = 1 + Math.random() * 0.8;
+    const rh = 0.8 + Math.random() * 0.6;
+    const rd = 0.8 + Math.random() * 0.5;
+    const rockGeo = addGeo(new THREE.SphereGeometry(rw, 8, 6));
+    const rock = new THREE.Mesh(rockGeo, stoneMat);
+    rock.position.set(rx, rh * 0.5 + gH(rx, rz), rz);
+    rock.scale.set(1, rh / rw, rd / rw);
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    g.scene.add(rock);
+    addCylCollider(rx, rz, rw + 0.2, rh + 0.5);
+  }
+
+  // 飛び石（庭園を横断する8個）
+  const steppingStones = [
+    [-10, -3], [-7, -2], [-4, -1], [-1, 0], [2, 1], [5, 2], [8, 1], [11, -1]
+  ];
+  for (const [sx, sz] of steppingStones) {
+    const ssGeo = addGeo(new THREE.CylinderGeometry(0.45, 0.5, 0.12, 8));
+    const ss = new THREE.Mesh(ssGeo, steppingStoneMat);
+    ss.position.set(sx, 0.06 + gH(sx, sz), sz);
+    ss.receiveShadow = true;
+    g.scene.add(ss);
+  }
+
+  // ========================================
+  //  山門（南端、中心: (0, 0, -32)、幅6×高5m）
+  // ========================================
+  const gateZ = -32;
+  // 柱2本
+  const gatePillarGeo = addGeo(new THREE.CylinderGeometry(0.35, 0.4, 5, 8));
+  for (const gx of [-2.5, 2.5]) {
+    const gp = new THREE.Mesh(gatePillarGeo, darkWoodMat);
+    gp.position.set(gx, 2.5, gateZ);
+    gp.castShadow = true;
+    g.scene.add(gp);
+    addCylCollider(gx, gateZ, 0.5, 5);
+  }
+  // 梁
+  addBox(darkWoodMat, 6, 0.4, 0.6, 0, 4.5, gateZ);
+  // 屋根
+  const gateRoofGeo = addGeo(new THREE.ConeGeometry(4.5, 1.5, 4));
+  const gateRoof = new THREE.Mesh(gateRoofGeo, roofMat);
+  gateRoof.position.set(0, 5.5, gateZ);
+  gateRoof.rotation.y = Math.PI / 4;
+  gateRoof.castShadow = true;
+  g.scene.add(gateRoof);
+
+  // ========================================
+  //  参道（山門→庭園、x=0, z=-30~-15）
+  // ========================================
+  // 石畳
+  addBox(stoneMat, 3, 0.08, 15, 0, 0.04, -22.5);
+  // 石灯籠4基
+  const lanternZs = [-18, -24];
+  for (const lz of lanternZs) {
+    for (const lx of [-2, 2]) {
+      // 台座
+      const lBase = addBox(stoneMat, 0.6, 0.4, 0.6, lx, 0.2, lz);
+      // 柱
+      const lPillar = addBox(stoneMat, 0.25, 1.2, 0.25, lx, 1.0, lz);
+      // 火袋
+      const lCap = addBox(stoneMat, 0.7, 0.5, 0.7, lx, 1.85, lz);
+      // 笠
+      const lRoof = addGeo(new THREE.ConeGeometry(0.6, 0.4, 4));
+      const lRoofM = new THREE.Mesh(lRoof, stoneMat);
+      lRoofM.position.set(lx, 2.3, lz);
+      lRoofM.rotation.y = Math.PI / 4;
+      g.scene.add(lRoofM);
+      addCylCollider(lx, lz, 0.5, 2.5);
+    }
+  }
+
+  // 松の木6本（参道沿い）
+  const pinePositions = [
+    [-5, -17], [5, -17], [-6, -21], [6, -21], [-5, -27], [5, -27]
+  ];
+  for (const [px, pz] of pinePositions) {
+    // 幹
+    const trunkGeo = addGeo(new THREE.CylinderGeometry(0.2, 0.3, 3, 6));
+    const trunk = new THREE.Mesh(trunkGeo, darkWoodMat);
+    trunk.position.set(px, 1.5 + gH(px, pz), pz);
+    trunk.castShadow = true;
+    g.scene.add(trunk);
+    // 枝葉（3段の球体）
+    for (let i = 0; i < 3; i++) {
+      const canopyGeo = addGeo(new THREE.SphereGeometry(1.2 - i * 0.2, 6, 4));
+      const canopy = new THREE.Mesh(canopyGeo, mossMat);
+      canopy.position.set(px + (Math.random() - 0.5) * 0.5, 3 + i * 1.2 + gH(px, pz), pz + (Math.random() - 0.5) * 0.5);
+      canopy.castShadow = true;
+      g.scene.add(canopy);
+    }
+    addCylCollider(px, pz, 0.5, 6);
+  }
+
+  // ========================================
+  //  鐘楼（4×4×5m、中心: (-22, 0, -8)）
+  // ========================================
+  const bellX = -22, bellZ = -8;
+  // 4本柱
+  for (const [bpx, bpz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) {
+    const bpGeo = addGeo(new THREE.CylinderGeometry(0.2, 0.25, 4.5, 6));
+    const bp = new THREE.Mesh(bpGeo, darkWoodMat);
+    bp.position.set(bellX + bpx, 2.25, bellZ + bpz);
+    bp.castShadow = true;
+    g.scene.add(bp);
+    addCylCollider(bellX + bpx, bellZ + bpz, 0.35, 5);
+  }
+  // 梁
+  addBox(darkWoodMat, 4, 0.3, 0.3, bellX, 4.2, bellZ - 1.5);
+  addBox(darkWoodMat, 4, 0.3, 0.3, bellX, 4.2, bellZ + 1.5);
+  addBox(darkWoodMat, 0.3, 0.3, 3, bellX - 1.5, 4.2, bellZ);
+  addBox(darkWoodMat, 0.3, 0.3, 3, bellX + 1.5, 4.2, bellZ);
+  // 屋根
+  const bellRoofGeo = addGeo(new THREE.ConeGeometry(3.5, 1.5, 4));
+  const bellRoof = new THREE.Mesh(bellRoofGeo, roofMat);
+  bellRoof.position.set(bellX, 5.5, bellZ);
+  bellRoof.rotation.y = Math.PI / 4;
+  bellRoof.castShadow = true;
+  g.scene.add(bellRoof);
+  // 梵鐘
+  const bellGeo = addGeo(new THREE.CylinderGeometry(0.5, 0.65, 1.2, 12));
+  const bellMesh = new THREE.Mesh(bellGeo, bellMetalMat);
+  bellMesh.position.set(bellX, 3.2, bellZ);
+  bellMesh.castShadow = true;
+  g.scene.add(bellMesh);
+  g._templeBell = { x: bellX, z: bellZ, cooldownTimer: 0 };
+
+  // ========================================
+  //  竹林（北東10×10m、中心: (22, 0, 20)）
+  // ========================================
+  const bambooCount = 40;
+  const bambooBaseX = 22, bambooBaseZ = 20;
+  const bambooData = [];
+  // InstancedMesh for bamboo stalks
+  const stalkGeo = addGeo(new THREE.CylinderGeometry(0.06, 0.08, 6, 5));
+  const bambooInstMesh = new THREE.InstancedMesh(stalkGeo, bambooMat, bambooCount);
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < bambooCount; i++) {
+    const bx = bambooBaseX + (Math.random() - 0.5) * 10;
+    const bz = bambooBaseZ + (Math.random() - 0.5) * 10;
+    dummy.position.set(bx, 3 + gH(bx, bz), bz);
+    dummy.rotation.set(0, Math.random() * Math.PI, (Math.random() - 0.5) * 0.05);
+    dummy.scale.set(1, 0.8 + Math.random() * 0.4, 1);
+    dummy.updateMatrix();
+    bambooInstMesh.setMatrixAt(i, dummy.matrix);
+    bambooData.push({ x: bx, z: bz });
+    // コライダーは数本おきに（パフォーマンス）
+    if (i % 4 === 0) addCylCollider(bx, bz, 0.15, 6);
+  }
+  bambooInstMesh.castShadow = true;
+  g.scene.add(bambooInstMesh);
+
+  // 竹林の葉（上部のキャノピー）
+  for (let i = 0; i < 8; i++) {
+    const cx = bambooBaseX + (Math.random() - 0.5) * 10;
+    const cz = bambooBaseZ + (Math.random() - 0.5) * 10;
+    const leafGeo = addGeo(new THREE.SphereGeometry(1.5 + Math.random(), 5, 4));
+    const leaf = new THREE.Mesh(leafGeo, bambooMat);
+    leaf.position.set(cx, 5.5 + Math.random(), cz);
+    leaf.scale.set(1.5, 0.5, 1.5);
+    leaf.castShadow = true;
+    g.scene.add(leaf);
+  }
+
+  // 地蔵尊3体
+  const jizoPositions = [[22, 24], [26, 20], [24, 16]];
+  for (const [jx, jz] of jizoPositions) {
+    // 台座
+    addBox(stoneMat, 0.5, 0.3, 0.5, jx, 0.15, jz);
+    // 体
+    const jizoBodyGeo = addGeo(new THREE.CylinderGeometry(0.2, 0.25, 0.6, 6));
+    const jizoBody = new THREE.Mesh(jizoBodyGeo, stoneMat);
+    jizoBody.position.set(jx, 0.6, jz);
+    jizoBody.castShadow = true;
+    g.scene.add(jizoBody);
+    // 頭
+    const jizoHeadGeo = addGeo(new THREE.SphereGeometry(0.18, 6, 5));
+    const jizoHead = new THREE.Mesh(jizoHeadGeo, stoneMat);
+    jizoHead.position.set(jx, 1.08, jz);
+    g.scene.add(jizoHead);
+    addCylCollider(jx, jz, 0.4, 1.5);
+  }
+
+  // ========================================
+  //  池（南西、直径6m、中心: (-15, 0, -20)）
+  // ========================================
+  const pondX = -15, pondZ = -20;
+  // 水面
+  const pondGeo = addGeo(new THREE.CircleGeometry(3, 24));
+  const pond = new THREE.Mesh(pondGeo, waterMat);
+  pond.rotation.x = -Math.PI / 2;
+  pond.position.set(pondX, -0.15, pondZ);
+  pond.receiveShadow = true;
+  g.scene.add(pond);
+  g._pond = { x: pondX, z: pondZ, r: 3 };
+
+  // 池の縁石
+  const pondRimGeo = addGeo(new THREE.TorusGeometry(3, 0.25, 6, 24));
+  const pondRim = new THREE.Mesh(pondRimGeo, stoneMat);
+  pondRim.rotation.x = -Math.PI / 2;
+  pondRim.position.set(pondX, 0.05, pondZ);
+  g.scene.add(pondRim);
+
+  // 石橋
+  addBox(stoneMat, 2, 0.3, 1, pondX, 0.15, pondZ);
+
+  // ========================================
+  //  築山（北西、高2m、中心: (-22, 0, 22)）
+  // ========================================
+  const hillX = -22, hillZ = 22;
+  const hillGeo = addGeo(new THREE.SphereGeometry(4, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2));
+  const hill = new THREE.Mesh(hillGeo, mossMat);
+  hill.position.set(hillX, 0, hillZ);
+  hill.scale.set(1, 0.5, 1); // 半球を潰して高さ2mに
+  hill.receiveShadow = true;
+  hill.castShadow = true;
+  g.scene.add(hill);
+
+  // ========================================
+  //  外周白壁の塀（高2.5m）
+  // ========================================
+  const fenceHalf = 34;
+  const fenceH = 2.5;
+  const fenceThick = 0.3;
+  // 北壁（山門の開口なし）
+  addBox(wallMat, fenceHalf * 2, fenceH, fenceThick, 0, fenceH / 2, fenceHalf);
+  addBoxCollider(0, fenceHalf, fenceHalf, fenceThick / 2 + 0.1, fenceH);
+  // 南壁（山門開口 x=-3~3）
+  addBox(wallMat, fenceHalf - 3, fenceH, fenceThick, -(fenceHalf + 3) / 2, fenceH / 2, -fenceHalf);
+  addBoxCollider(-(fenceHalf + 3) / 2, -fenceHalf, (fenceHalf - 3) / 2, fenceThick / 2 + 0.1, fenceH);
+  addBox(wallMat, fenceHalf - 3, fenceH, fenceThick, (fenceHalf + 3) / 2, fenceH / 2, -fenceHalf);
+  addBoxCollider((fenceHalf + 3) / 2, -fenceHalf, (fenceHalf - 3) / 2, fenceThick / 2 + 0.1, fenceH);
+  // 東壁
+  addBox(wallMat, fenceThick, fenceH, fenceHalf * 2, fenceHalf, fenceH / 2, 0);
+  addBoxCollider(fenceHalf, 0, fenceThick / 2 + 0.1, fenceHalf, fenceH);
+  // 西壁
+  addBox(wallMat, fenceThick, fenceH, fenceHalf * 2, -fenceHalf, fenceH / 2, 0);
+  addBoxCollider(-fenceHalf, 0, fenceThick / 2 + 0.1, fenceHalf, fenceH);
+
+  // ========================================
+  //  鹿威し（庭園内、環境音演出用）
+  // ========================================
+  g._shishiOdoshi = { timer: 0, interval: 8 };
+
+  // kickableSigns の初期化
+  g.kickableSigns = g.kickableSigns || [];
+}
+
 // --- CAN ---
 function createCan(g) {
   const canGroup = new THREE.Group();
@@ -7643,6 +8390,23 @@ function getGroundHeight(g, x, z) {
   const noise = g._noise || (g._noise = new SimplexNoise2D(42));
   const noise2 = g._noise2 || (g._noise2 = new SimplexNoise2D(137));
 
+  if (g._stageNum === 6) {
+    // Stage 6: 古刹の大屋敷 — ほぼ平坦 + 築山
+    let h = noise.noise2D(x * 0.05, z * 0.05) * 0.03;
+    h += noise2.noise2D(x * 0.2, z * 0.2) * 0.01;
+    // 築山（中心: -22, 22、半径4m、高さ2m）
+    const hillDist = Math.sqrt((x + 22) ** 2 + (z - 22) ** 2);
+    if (hillDist < 4) {
+      h += 2.0 * Math.cos(hillDist / 4 * Math.PI / 2);
+    }
+    // 池（中心: -15, -20、半径3m）
+    const pondDist = Math.sqrt((x + 15) ** 2 + (z + 20) ** 2);
+    if (pondDist < 3) {
+      h -= 0.3 * Math.cos(pondDist / 3 * Math.PI / 2);
+    }
+    return h;
+  }
+
   if (g._stageNum === 5) {
     // Stage 5: 団地 — コンクリ舗装 + 公園草地
     let h = noise.noise2D(x * 0.06, z * 0.06) * 0.03;
@@ -8561,7 +9325,27 @@ function getFootSoundRange(g) {
   // ステージごとの足音基本距離
   // Stage 5: コンクリ=12m, 芝生=8m（階段室のエコー=25mは別途チェック）
   let baseRange = 8;
-  if (g._stageNum === 3) baseRange = 12;
+  if (g._stageNum === 6) {
+    // Stage 6: 古刹の大屋敷 — エリア別足音検知距離
+    const px = g.player.position.x, pz = g.player.position.z;
+    // 砂利: 庭園中央エリア (|x|<15, |z|<12)
+    if (Math.abs(px) < 15 && Math.abs(pz) < 12) baseRange = 18;
+    // 板の間: 本堂内部 (|x|<7.5, z:5~15) または渡り廊下
+    else if ((Math.abs(px) < 7.5 && pz > 5 && pz < 15) ||
+             (px > 7.5 && px < 10 && Math.abs(pz - 10) < 1) ||
+             (px < -7.5 && px > -14 && Math.abs(pz - 10) < 1)) baseRange = 15;
+    // 畳: 離れ内部 (x:-22~-14, z:7~13)
+    else if (px > -22 && px < -14 && pz > 7 && pz < 13) baseRange = 6;
+    // 竹林: (x:17~27, z:15~25)
+    else if (px > 17 && px < 27 && pz > 15 && pz < 25) baseRange = 16;
+    // 土間: 庫裏内部 (x:10~20, z:6~14)
+    else if (px > 10 && px < 20 && pz > 6 && pz < 14) baseRange = 10;
+    // 飛び石: 庭園内の飛び石上
+    else if (Math.abs(pz) < 3 && px > -12 && px < 12) baseRange = 12;
+    // 苔: 外周・築山付近
+    else baseRange = 8;
+  }
+  else if (g._stageNum === 3) baseRange = 12;
   else if (g._stageNum === 2) baseRange = 18;
   else if (g._stageNum === 5) {
     // 階段室内ならエコーで足音が響く (25m)
@@ -9621,14 +10405,43 @@ function performHit(g, interactable) {
     }
   }
 
-  if (!isSignKick) {
+  // === 梵鐘ギミック（Stage 6: 全鬼反応、CD30秒）===
+  let isBellRing = false;
+  if (interactable.type === 'bell' && g._templeBell) {
+    if (g._templeBell.cooldownTimer > 0) {
+      showNotification(gameState.language === 'ja' ? '梵鐘はまだ鳴らせない...' : 'Bell is still cooling down...');
+      g._hitCooldown = false; // クールダウン中はヒットをキャンセル
+      return;
+    }
+    isBellRing = true;
+    g._templeBell.cooldownTimer = interactable.cooldown || 30;
+    SoundManager.playGameSE('hit_metal');
+    showCenterAlert('梵鐘を鳴らした！', '全ての鬼の注意がこちらに向いた！', 3500);
+  }
+
+  // === 障子戸ギミック（開閉切替）===
+  if (interactable.type === 'shoji' && g._shojiDoor) {
+    g._shojiDoor.open = !g._shojiDoor.open;
+    const door = g._shojiDoor;
+    if (door.open) {
+      door.mesh.position.x = door.baseX + 2;
+      showNotification(gameState.language === 'ja' ? '障子を開けた' : 'Opened the shoji');
+    } else {
+      door.mesh.position.x = door.baseX;
+      showNotification(gameState.language === 'ja' ? '障子を閉めた' : 'Closed the shoji');
+    }
+    g._hitCooldown = false; // 障子開閉はクールダウンなし
+    return;
+  }
+
+  if (!isSignKick && !isBellRing) {
     showNotification('💥 ' + interactable.label + ' を蹴った！');
   }
 
-  // Alert oni — 看板/机は範囲が広く、patrol以外の鬼も引き寄せる
-  const alertRadius = isSignKick ? interactable.radius * 2.5 : interactable.radius;
-  const alertStates = isSignKick
-    ? ['patrol', 'search', 'footSound']  // 看板/机は広範囲の鬼に影響
+  // Alert oni — 梵鐘は全鬼反応、看板/机は範囲が広く、patrol以外の鬼も引き寄せる
+  const alertRadius = isBellRing ? 999 : (isSignKick ? interactable.radius * 2.5 : interactable.radius);
+  const alertStates = (isSignKick || isBellRing)
+    ? ['patrol', 'search', 'footSound']  // 看板/机/梵鐘は広範囲の鬼に影響
     : ['patrol'];
   let alerted = 0;
   for (const oni of g.onis) {
@@ -9640,7 +10453,7 @@ function performHit(g, interactable) {
       oni.distractionPos = new THREE.Vector3(interactable.x, 0, interactable.z);
       oni.stateTimer = 0;
       alerted++;
-      if (!isSignKick) break; // 通常オブジェクトは1体のみ
+      if (!isSignKick && !isBellRing) break; // 通常オブジェクトは1体のみ
     }
   }
 }
@@ -9842,6 +10655,50 @@ function updateWetGround(g, dt) {
   mat.opacity += (targetOpacity - mat.opacity) * dt * 2;
 }
 
+// --- Stage 6: 古刹ギミック更新 ---
+function updateTempleGimmicks(g, dt) {
+  if (g._stageNum !== 6) return;
+
+  // 鹿威し（8秒間隔でSE）
+  if (g._shishiOdoshi) {
+    g._shishiOdoshi.timer += dt;
+    if (g._shishiOdoshi.timer >= g._shishiOdoshi.interval) {
+      g._shishiOdoshi.timer = 0;
+      SoundManager.playGameSE('stone'); // 「カコーン」の代替
+    }
+  }
+
+  // 梵鐘クールダウン更新
+  if (g._templeBell && g._templeBell.cooldownTimer > 0) {
+    g._templeBell.cooldownTimer -= dt;
+  }
+
+  // 渡り廊下の板鳴り: 渡り廊下エリアの追加検知
+  // 本堂↔庫裏: x=7.5~10, z≈10 / 本堂↔離れ: x=-14~-7.5, z≈10
+  if (g.player && g.gamePhase === 'seek') {
+    const px = g.player.position.x, pz = g.player.position.z;
+    const onWatari = (px > 7.5 && px < 10 && Math.abs(pz - 10) < 1) ||
+                     (px < -7.5 && px > -14 && Math.abs(pz - 10) < 1);
+    if (onWatari && !g.player.isCrouching && (g.player.isDashing || g.player.moveSpeed > 0.5)) {
+      // 板鳴りで追加検知12m（毎フレームではなく2秒おきにチェック）
+      g._watariTimer = (g._watariTimer || 0) + dt;
+      if (g._watariTimer > 2) {
+        g._watariTimer = 0;
+        for (const oni of g.onis) {
+          const d = Math.sqrt((oni.position.x - px) ** 2 + (oni.position.z - pz) ** 2);
+          if (d < 12 && oni.state === 'patrol') {
+            oni.state = 'investigate';
+            oni.investigateTarget = { x: px, z: pz };
+            oni.stateTimer = 0;
+          }
+        }
+      }
+    } else {
+      g._watariTimer = 0;
+    }
+  }
+}
+
 // --- 蹴れる看板の倒れアニメーション更新 ---
 function updateKickableSigns(g, dt) {
   if (!g.kickableSigns) return;
@@ -10002,8 +10859,42 @@ function updateGamePhases(g, dt) {
       break;
 
     case 'seek':
-      g.gameTimer -= dt;
+      // Score Attack: カウントアップ / 通常: カウントダウン
+      if (g._isScoreAttack) {
+        g.gameTimer += dt;
+      } else {
+        g.gameTimer -= dt;
+      }
       updateKickGauge(g, dt); // Rescue kick gauge update
+
+      // Score Attack: キャンプ防止 — 20秒間同じ場所にいると鬼に位置通知
+      if (g._isScoreAttack) {
+        const px = g.player.position.x, pz = g.player.position.z;
+        if (g._lastPlayerPos) {
+          const moveDist = Math.sqrt((px - g._lastPlayerPos.x) ** 2 + (pz - g._lastPlayerPos.z) ** 2);
+          if (moveDist < 2) {
+            g._stayTimer += dt;
+          } else {
+            g._stayTimer = 0;
+          }
+        }
+        g._lastPlayerPos = { x: px, z: pz };
+        if (g._stayTimer > 20) {
+          g._stayTimer = 0;
+          showCenterAlert('⚠ 位置が鬼に感知された！', '動かないと見つかるぞ！', 2500);
+          // 最寄り鬼がプレイヤー位置に直行
+          let closest = g.onis[0], minD = Infinity;
+          for (const o of g.onis) {
+            const d = (o.position.x - px) ** 2 + (o.position.z - pz) ** 2;
+            if (d < minD) { minD = d; closest = o; }
+          }
+          if (closest) {
+            closest.state = 'chase';
+            closest.chaseTarget = g.player.position;
+            closest.stateTimer = 0;
+          }
+        }
+      }
 
       // 缶が未回収の場合: 鬼は捕獲不可 + 回収強制 + 長期未回収で捕虜解放
       if (!g.can.isAtHome && !g.can.isFlying) {
@@ -10039,13 +10930,22 @@ function updateGamePhases(g, dt) {
       }
       // Oni spawn at time thresholds
       checkOniSpawn(g);
-      // Check win (timer runs out — win if at least one player/ally is free)
-      if (g.gameTimer <= 0) {
+
+      // Score Attack: 全員捕獲（自分1人）→即終了
+      if (g._isScoreAttack) {
         const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
-        if (g.capturedCount < totalPlayers) {
-          endGame(g, true); // At least one survived
-        } else {
-          endGame(g, false); // All captured
+        if (g.capturedCount >= totalPlayers) {
+          endGame(g, false);
+        }
+      } else {
+        // 通常モード: Check win (timer runs out — win if at least one player/ally is free)
+        if (g.gameTimer <= 0) {
+          const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+          if (g.capturedCount < totalPlayers) {
+            endGame(g, true); // At least one survived
+          } else {
+            endGame(g, false); // All captured
+          }
         }
       }
       break;
@@ -10053,12 +10953,20 @@ function updateGamePhases(g, dt) {
 }
 
 function checkOniSpawn(g) {
-  // oniAddAt配列の残り時間で2体目以降をスポーン
-  // Stage 2: oniAddAt=[null, 90] → 残り90秒（ゲーム開始30秒後）に2体目出現
-  const remaining = g.gameTimer;
+  // Score Attack: oniAddAt[i]秒 = 経過時間でスポーン（カウントアップ）
+  // 通常モード: oniAddAt[i]秒 = 残り時間でスポーン（カウントダウン）
   for (let i = g.onis.length; i < g.config.maxOni; i++) {
     const threshold = g.config.oniAddAt[i];
-    if (threshold && remaining <= threshold && !g['_oniSpawned' + i]) {
+    if (!threshold || g['_oniSpawned' + i]) continue;
+    let shouldSpawn = false;
+    if (g._isScoreAttack) {
+      // Score Attack: 経過時間 >= threshold でスポーン
+      shouldSpawn = g.gameTimer >= threshold;
+    } else {
+      // 通常モード: 残り時間 <= threshold でスポーン
+      shouldSpawn = g.gameTimer <= threshold;
+    }
+    if (shouldSpawn) {
       g['_oniSpawned' + i] = true;
       // 缶から離れた位置にスポーン
       const canPos = g.can.homePos;
@@ -10137,26 +11045,46 @@ function endGame(g, playerWon) {
   }
 
   if (stats) {
-    const survived = g.config.timeLimit - g.gameTimer;
-    const mm = Math.floor(survived / 60);
-    const ss = Math.floor(survived % 60);
-    const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
-    let html = `
-      ${t('RESULT_SURVIVED')}: ${playerWon ? t('RESULT_YES') : t('RESULT_NO')}<br>
-      ${t('RESULT_TIME')}: ${mm}:${String(ss).padStart(2,'0')}<br>
-      ${t('RESULT_CAPTURED')}: ${g.capturedCount}/${totalPlayers}
-    `;
-    // Show individual ally status
-    if (g.cpuAllies && g.cpuAllies.length > 0) {
-      html += `<br><span style="color:var(--neon-cyan);font-size:12px">${t('RESULT_ALLY_HEADER')}</span><br>`;
-      for (const ally of g.cpuAllies) {
-        const status = ally.captured
-          ? `<span style="color:#ff4444">${t('RESULT_ALLY_CAPTURED')}</span>`
-          : `<span style="color:#44ffaa">${t('RESULT_ALLY_SURVIVED')}</span>`;
-        html += `${escapeHTML(ally.name)}: ${status}<br>`;
+    if (g._isScoreAttack) {
+      // Score Attack: 生存時間をそのまま表示
+      const survivalTime = g.gameTimer;
+      const mm = Math.floor(survivalTime / 60);
+      const ss = Math.floor(survivalTime % 60);
+      const ms = Math.floor((survivalTime % 1) * 100);
+      const lang = gameState.language === 'ja';
+      let html = `
+        <span style="font-size:24px;color:var(--neon-cyan)">
+          ${lang ? '生存時間' : 'Survival Time'}: ${mm}:${String(ss).padStart(2,'0')}.${String(ms).padStart(2,'0')}
+        </span><br>
+        <span style="font-size:13px;color:var(--text-dim)">
+          ${lang ? '鬼の数' : 'Oni Count'}: ${g.onis.length}${lang ? '体' : ''}
+        </span>
+      `;
+      stats.innerHTML = html;
+      // ランキング保存
+      saveScoreAttackRanking(survivalTime);
+    } else {
+      const survived = g.config.timeLimit - g.gameTimer;
+      const mm = Math.floor(survived / 60);
+      const ss = Math.floor(survived % 60);
+      const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+      let html = `
+        ${t('RESULT_SURVIVED')}: ${playerWon ? t('RESULT_YES') : t('RESULT_NO')}<br>
+        ${t('RESULT_TIME')}: ${mm}:${String(ss).padStart(2,'0')}<br>
+        ${t('RESULT_CAPTURED')}: ${g.capturedCount}/${totalPlayers}
+      `;
+      // Show individual ally status
+      if (g.cpuAllies && g.cpuAllies.length > 0) {
+        html += `<br><span style="color:var(--neon-cyan);font-size:12px">${t('RESULT_ALLY_HEADER')}</span><br>`;
+        for (const ally of g.cpuAllies) {
+          const status = ally.captured
+            ? `<span style="color:#ff4444">${t('RESULT_ALLY_CAPTURED')}</span>`
+            : `<span style="color:#44ffaa">${t('RESULT_ALLY_SURVIVED')}</span>`;
+          html += `${escapeHTML(ally.name)}: ${status}<br>`;
+        }
       }
+      stats.innerHTML = html;
     }
-    stats.innerHTML = html;
   }
 
   if (overlay) overlay.style.display = 'flex';
@@ -10167,11 +11095,20 @@ function updateHUD(g) {
   // Timer
   const timerEl = document.getElementById('hud-timer');
   if (timerEl) {
-    const t = Math.max(0, g.gameTimer);
-    const mm = Math.floor(t / 60);
-    const ss = Math.floor(t % 60);
-    timerEl.textContent = mm + ':' + String(ss).padStart(2, '0');
-    timerEl.classList.toggle('warning', t < 30);
+    if (g._isScoreAttack) {
+      // Score Attack: カウントアップ表示
+      const t = Math.max(0, g.gameTimer);
+      const mm = Math.floor(t / 60);
+      const ss = Math.floor(t % 60);
+      timerEl.textContent = mm + ':' + String(ss).padStart(2, '0');
+      timerEl.classList.remove('warning');
+    } else {
+      const t = Math.max(0, g.gameTimer);
+      const mm = Math.floor(t / 60);
+      const ss = Math.floor(t % 60);
+      timerEl.textContent = mm + ':' + String(ss).padStart(2, '0');
+      timerEl.classList.toggle('warning', t < 30);
+    }
   }
 
   // Stamina
@@ -10391,6 +11328,7 @@ function gameLoop(timestamp) {
     ['updateLaundrySheets', () => updateLaundrySheets(G, dt)],
     ['updateWindowLights', () => updateWindowLights(G, dt)],
     ['updateWetGround', () => updateWetGround(G, dt)],
+    ['updateTempleGimmicks', () => updateTempleGimmicks(G, dt)],
     ['updateGamePhases', () => updateGamePhases(G, dt)],
     ['updateHUD', () => updateHUD(G)]
   ];
@@ -10439,17 +11377,30 @@ function startGame(stageNum, mode) {
   // Show game screen
   showScreen('game-screen');
   stopBGM();
-  playBGM('stage' + stageNum);
+  // Score Attack専用BGM or ステージBGM
+  if (mode === 'score') {
+    playBGM('scoreAttack');
+  } else {
+    playBGM('stage' + stageNum);
+  }
 
   // Update stage name display
   const stageNameEl = document.getElementById('hud-stage-name');
-  if (stageNameEl) stageNameEl.textContent = 'Stage ' + stageNum + ' — ' + config.name;
+  if (stageNameEl) {
+    if (mode === 'score') {
+      stageNameEl.textContent = 'SCORE ATTACK — ' + config.name;
+    } else {
+      stageNameEl.textContent = 'Stage ' + stageNum + ' — ' + config.name;
+    }
+  }
 
   // Create scene
   G = createGameScene(config);
   G._stageNum = stageNum;
+  G._gameMode = mode;
+  G._isScoreAttack = (mode === 'score');
   G.gamePhase = 'placement';
-  G.gameTimer = config.timeLimit;
+  G.gameTimer = G._isScoreAttack ? 0 : config.timeLimit; // Score Attack: カウントアップ
   G.capturedCount = 0;
   G.paused = false;
   G.overheadView = false;
@@ -10459,13 +11410,17 @@ function startGame(stageNum, mode) {
   G.hideTime = 10;
   G.cpuAllies = [];
   G.onis = [];
+  G._stayTimer = 0; // キャンプ防止タイマー
+  G._lastPlayerPos = null;
   // 鬼スポーンフラグをリセット
   for (let i = 0; i < (G.config.maxOni || 4); i++) G['_oniSpawned' + i] = false;
   G._hitCooldown = false;
 
   // Build stage — dispatch by stage number
   buildTerrain(G, stageNum);
-  if (stageNum === 5) {
+  if (stageNum === 6) {
+    buildTempleObjects(G);
+  } else if (stageNum === 5) {
     buildDanchiObjects(G);
   } else if (stageNum === 4) {
     buildSchoolObjects(G);
@@ -10526,8 +11481,14 @@ function startGame(stageNum, mode) {
     G.onis.push(oni);
   }
 
-  // Create CPU allies
-  const cpuCount = gameState.storySettings.cpuCount || 0;
+  // Score Attack: プレイヤーを山門付近にスポーン
+  if (G._isScoreAttack) {
+    const spawnSafe = findSafeSpawn(G, 0, -30);
+    G.playerFig.group.position.set(spawnSafe.x, 0, spawnSafe.z);
+  }
+
+  // Create CPU allies (Score Attack時はCPU味方なし)
+  const cpuCount = G._isScoreAttack ? 0 : (gameState.storySettings.cpuCount || 0);
   const cpuLevels = gameState.storySettings.cpuLevels || ['normal', 'normal', 'normal'];
   const allyNames = ['味方A', '味方B', '味方C'];
   for (let i = 0; i < cpuCount; i++) {
