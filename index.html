@@ -10336,11 +10336,6 @@ function updateCanPhysics(g, dt) {
         g.gamePhase = 'hide';
         g.phaseTimer = g.hideTime || 10;
         showHideCountdown(g, true);
-        // Score Attack: hide開始時に山門付近の安全な位置へ瞬間移動
-        if (g._isScoreAttack) {
-          g.player.position.set(0, 0, -28);
-          g.playerFig.group.position.copy(g.player.position);
-        }
       }
     }
   }
@@ -10899,20 +10894,26 @@ function updateGamePhases(g, dt) {
           } else {
             g.onis[i].state = 'patrol';
           }
-          g.onis[i].restTimer = 3;
+          // Score Attack: 即座に動き出す / 通常: 3秒待機
+          g.onis[i].restTimer = g._isScoreAttack ? 0 : 3;
+          // 鬼の表示位置を実際の位置に同期（hide中にずれた分を修正）
+          g.onis[i].fig.group.position.copy(g.onis[i].position);
         }
       }
-      // Oni walks to can during hide phase
-      const hideTimeOfDay = g.dayNight ? g.dayNight.phase : 'day';
-      const hideNightMult = (hideTimeOfDay === 'night' || hideTimeOfDay === 'evening') ? 1.25 : 1.0;
-      for (const oni of g.onis) {
-        const canPos = g.can.isAtHome ? g.can.homePos : g.can.group.position;
-        moveOni(oni, canPos.x, canPos.z, oni.speed * 0.8 * hideNightMult, dt, g);
-        const crx = oni.position.x - canPos.x, crz = oni.position.z - canPos.z;
-        if (Math.sqrt(crx*crx + crz*crz) < 1.5 && !g.can.isAtHome) {
-          g.can.group.position.copy(g.can.homePos);
-          g.can.isAtHome = true;
-          showCenterAlert('鬼が缶を回収した！', null, 2000);
+      // Oni walks to can during hide phase（Score Attackでは鬼を動かさない）
+      if (!g._isScoreAttack) {
+        const hideTimeOfDay = g.dayNight ? g.dayNight.phase : 'day';
+        const hideNightMult = (hideTimeOfDay === 'night' || hideTimeOfDay === 'evening') ? 1.25 : 1.0;
+        for (const oni of g.onis) {
+          const canPos = g.can.isAtHome ? g.can.homePos : g.can.group.position;
+          moveOni(oni, canPos.x, canPos.z, oni.speed * 0.8 * hideNightMult, dt, g);
+          oni.fig.group.position.copy(oni.position); // 表示位置も同期
+          const crx = oni.position.x - canPos.x, crz = oni.position.z - canPos.z;
+          if (Math.sqrt(crx*crx + crz*crz) < 1.5 && !g.can.isAtHome) {
+            g.can.group.position.copy(g.can.homePos);
+            g.can.isAtHome = true;
+            showCenterAlert('鬼が缶を回収した！', null, 2000);
+          }
         }
       }
       break;
