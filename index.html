@@ -1606,11 +1606,22 @@ function updateLobbyUI() {
   const stageSection = document.getElementById('lobby-stage-section');
   const stageSel = document.getElementById('lobby-stage-select');
   if (stageSection) {
-    stageSection.style.display = (multiState.gameMode === 'team') ? 'block' : 'block';
+    // Co-op: ステージ選択を無効化（常にStage 1からスタート）
+    if (multiState.gameMode === 'coop') {
+      stageSection.style.display = 'block';
+    } else {
+      stageSection.style.display = 'block';
+    }
   }
   if (stageSel) {
-    stageSel.disabled = !multiState.isHost;
-    stageSel.value = multiState.stage;
+    if (multiState.gameMode === 'coop') {
+      stageSel.disabled = true;
+      stageSel.value = 1;
+      multiState.stage = 1; // Co-opは常にStage 1から
+    } else {
+      stageSel.disabled = !multiState.isHost;
+      stageSel.value = multiState.stage;
+    }
   }
 
   // プレイヤーリスト
@@ -11832,7 +11843,12 @@ function updateGamePhases(g, dt) {
         if (g.gameTimer <= 0) {
           const totalPlayers = getTotalPlayers(g);
           if (g.capturedCount < totalPlayers) {
-            endGame(g, true); // At least one survived
+            // Co-op: ステージクリア → 次ステージ自動遷移（Stage 5完了で最終勝利）
+            if (g._isMultiplayer && g._multiMode === 'coop' && g._stageNum < 5) {
+              coopStageClear(g);
+            } else {
+              endGame(g, true); // At least one survived (or Co-op all stages cleared)
+            }
           } else {
             endGame(g, false); // All captured
           }
@@ -11845,8 +11861,14 @@ function updateGamePhases(g, dt) {
 function checkOniSpawn(g) {
   // Score Attack: oniAddAt[i]秒 = 経過時間でスポーン（カウントアップ）
   // 通常モード: oniAddAt[i]秒 = 残り時間でスポーン（カウントダウン）
-  for (let i = g.onis.length; i < g.config.maxOni; i++) {
-    const threshold = g.config.oniAddAt[i];
+  const maxOniLimit = g._effectiveMaxOni || g.config.maxOni;
+  // Co-op: oniAddAtに+1体分のタイミングを動的追加（制限時間の50%地点）
+  const oniAddAt = [...g.config.oniAddAt];
+  if (g._multiMode === 'coop' && oniAddAt.length < maxOniLimit) {
+    oniAddAt.push(Math.floor(g.config.timeLimit * 0.5)); // 残り50%時点
+  }
+  for (let i = g.onis.length; i < maxOniLimit; i++) {
+    const threshold = oniAddAt[i];
     if (!threshold || g['_oniSpawned' + i]) continue;
     let shouldSpawn = false;
     if (g._isScoreAttack) {
@@ -11955,11 +11977,24 @@ function endGame(g, playerWon) {
     if (g._isMultiplayer && g._multiMode === 'ffa') {
       myWon = !g.player.captured;
     }
-    title.textContent = myWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
-    title.style.color = myWon ? '#00ff41' : '#ff4444';
-    title.style.textShadow = myWon
-      ? '0 0 20px rgba(0,255,65,0.5)'
-      : '0 0 20px rgba(255,68,68,0.5)';
+    // Co-op: ステージ5クリアで最終勝利、それ以外は全滅
+    if (g._isMultiplayer && g._multiMode === 'coop') {
+      if (playerWon && g._stageNum >= 5) {
+        title.textContent = '🎉 ALL STAGES CLEAR!';
+        title.style.color = '#ffd700';
+        title.style.textShadow = '0 0 30px rgba(255,215,0,0.7)';
+      } else {
+        title.textContent = 'Stage ' + g._stageNum + ' — 全滅…';
+        title.style.color = '#ff4444';
+        title.style.textShadow = '0 0 20px rgba(255,68,68,0.5)';
+      }
+    } else {
+      title.textContent = myWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
+      title.style.color = myWon ? '#00ff41' : '#ff4444';
+      title.style.textShadow = myWon
+        ? '0 0 20px rgba(0,255,65,0.5)'
+        : '0 0 20px rgba(255,68,68,0.5)';
+    }
   }
 
   if (stats) {
@@ -11988,15 +12023,46 @@ function endGame(g, playerWon) {
       const mm = Math.floor(survived / 60);
       const ss = Math.floor(survived % 60);
       const totalPlayers = Object.keys(multiState.players).length;
-      let html = `
-        <span style="font-size:16px;color:var(--neon-cyan)">
-          ${MODE_LABELS[g._multiMode] || 'MULTIPLAYER'}
-        </span><br>
-        ${t('RESULT_SURVIVED')}: ${playerWon ? t('RESULT_YES') : t('RESULT_NO')}<br>
-        ${t('RESULT_TIME')}: ${mm}:${String(ss).padStart(2,'0')}<br>
-        ${t('RESULT_CAPTURED')}: ${g.capturedCount}/${totalPlayers}
-      `;
-      // 各プレイヤーのステータス
+      let html = '';
+
+      if (g._multiMode === 'coop') {
+        // Co-opリザルト
+        if (playerWon && g._stageNum >= 5) {
+          // 全ステージクリア
+          html += `
+            <span style="font-size:20px;color:var(--neon-yellow)">
+              🏆 全5ステージ制覇！
+            </span><br>
+            <span style="font-size:14px;color:var(--text-secondary)">
+              協力プレイ完全クリア
+            </span><br>
+          `;
+        } else {
+          // 全滅（同ステージやり直し）
+          html += `
+            <span style="font-size:16px;color:var(--neon-pink)">
+              Stage ${g._stageNum} — ${g.config.name}
+            </span><br>
+            <span style="font-size:14px;color:#ff6666">
+              全員捕獲… リトライで再挑戦！
+            </span><br>
+          `;
+        }
+        html += `${t('RESULT_TIME')}: ${mm}:${String(ss).padStart(2,'0')}<br>`;
+        html += `鬼の数: ${g.onis.length}体<br>`;
+      } else {
+        // FFA / その他マルチプレイリザルト
+        html += `
+          <span style="font-size:16px;color:var(--neon-cyan)">
+            ${MODE_LABELS[g._multiMode] || 'MULTIPLAYER'}
+          </span><br>
+          ${t('RESULT_SURVIVED')}: ${playerWon ? t('RESULT_YES') : t('RESULT_NO')}<br>
+          ${t('RESULT_TIME')}: ${mm}:${String(ss).padStart(2,'0')}<br>
+          ${t('RESULT_CAPTURED')}: ${g.capturedCount}/${totalPlayers}
+        `;
+      }
+
+      // 各プレイヤーのステータス（全モード共通）
       html += `<br><span style="color:var(--neon-cyan);font-size:12px">プレイヤー状況</span><br>`;
       Object.keys(multiState.players).forEach(k => {
         const idx = parseInt(k);
@@ -12035,6 +12101,28 @@ function endGame(g, playerWon) {
         }
       }
       stats.innerHTML = html;
+    }
+  }
+
+  // Co-op: リトライボタンのラベルを動的変更
+  const retryBtnEl = document.getElementById('btn-retry');
+  if (retryBtnEl && g._isMultiplayer && g._multiMode === 'coop') {
+    if (playerWon && g._stageNum >= 5) {
+      retryBtnEl.textContent = 'ロビーへ戻る';
+      // 全クリア時はロビーに戻す
+      retryBtnEl.onclick = () => {
+        cleanupGame();
+        if (multiState.roomId) {
+          multiState.ready = false;
+          db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
+          db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
+          showScreen('lobby-screen');
+          initLobbyListeners();
+          updateLobbyUI();
+        }
+      };
+    } else {
+      retryBtnEl.textContent = '🔄 同じステージをリトライ';
     }
   }
 
@@ -12347,8 +12435,12 @@ function startGame(stageNum, mode) {
     if (mode === 'score') {
       stageNameEl.textContent = 'SCORE ATTACK — ' + config.name;
     } else if (mode.startsWith('multi_')) {
-      const modeLabel = mode.includes('ffa') ? 'FFA' : mode.includes('coop') ? 'CO-OP' : 'TEAM';
-      stageNameEl.textContent = modeLabel + ' — Stage ' + stageNum + ' — ' + config.name;
+      if (mode === 'multi_coop') {
+        stageNameEl.textContent = 'CO-OP — Stage ' + stageNum + '/5 — ' + config.name;
+      } else {
+        const modeLabel = mode.includes('ffa') ? 'FFA' : 'TEAM';
+        stageNameEl.textContent = modeLabel + ' — Stage ' + stageNum + ' — ' + config.name;
+      }
     } else {
       stageNameEl.textContent = 'Stage ' + stageNum + ' — ' + config.name;
     }
@@ -12433,9 +12525,15 @@ function startGame(stageNum, mode) {
     return { x: 0, z: 0 }; // フォールバック: 中心
   }
 
+  // Co-op: 鬼スケーリング（仕様書§3準拠: +1体）
+  const coopOniBonus = (mode === 'multi_coop') ? 1 : 0;
+  const effectiveInitialOni = Math.min(config.initialOni + coopOniBonus, (config.maxOni + coopOniBonus));
+  const effectiveMaxOni = config.maxOni + coopOniBonus;
+  G._effectiveMaxOni = effectiveMaxOni; // checkOniSpawnで参照
+
   // Create initial oni — spawn at map edge (findSafeSpawnでビル内回避)
   // マルチプレイ: 全クライアントでOniを描画するが、AI更新はホストのみ
-  for (let i = 0; i < config.initialOni; i++) {
+  for (let i = 0; i < effectiveInitialOni; i++) {
     const angle = Math.random() * Math.PI * 2;
     const dist = config.size / 2 - 3; // マップ端付近
     const baseX = Math.cos(angle) * dist;
@@ -12510,8 +12608,11 @@ function startGame(stageNum, mode) {
   if (quitBtn) quitBtn.onclick = () => cleanupGame();
   const retryBtn = document.getElementById('btn-retry');
   if (retryBtn) retryBtn.onclick = () => {
-    if (mode.startsWith('multi_')) {
-      // マルチプレイ: ロビーに戻る
+    if (mode === 'multi_coop') {
+      // Co-op: 同ステージやり直し（ホストがFirebase経由で全員に通知）
+      coopRetryStage(G);
+    } else if (mode.startsWith('multi_')) {
+      // FFA/Team: ロビーに戻る
       cleanupGame();
       if (multiState.roomId) {
         multiState.ready = false;
@@ -12663,6 +12764,27 @@ function initMultiplayerSync(g) {
       }
       syncGameState(g);
     }, 300);
+
+    // ホスト: Co-opリトライ信号を受信（非ホストがリトライボタンを押した場合）
+    const advRefHost = roomRef.child('coopAdvance');
+    let advInitialHost = true;
+    const onAdvHost = advRefHost.on('value', (snap) => {
+      if (advInitialHost) { advInitialHost = false; return; }
+      const advData = snap.val();
+      if (!advData || !g || g.disposed || g._coopAdvancing) return;
+      if (g._multiMode !== 'coop' || !advData.retry) return;
+      // 非ホストからのリトライ → ホストも同ステージを再開
+      g._coopAdvancing = true;
+      g.gamePhase = 'result';
+      stopBGM();
+      showCenterAlert('🔄 リトライ', 'Stage ' + advData.stage + ' やり直し', 3000);
+      setTimeout(() => {
+        multiState.stage = advData.stage;
+        cleanupGame();
+        startGame(advData.stage, 'multi_coop');
+      }, 3000);
+    });
+    g._multiListeners.push({ ref: advRefHost, event: 'value', fn: onAdvHost });
   } else {
     // 非ホスト: 鬼の位置を受信
     const oniRef = roomRef.child('oniPositions');
@@ -12722,6 +12844,39 @@ function initMultiplayerSync(g) {
       }
     });
     g._multiListeners.push({ ref: canRef, event: 'value', fn: onCan });
+
+    // 非ホスト: Co-opステージ遷移を受信
+    const advRef = roomRef.child('coopAdvance');
+    let advInitial = true;
+    const onAdv = advRef.on('value', (snap) => {
+      // 初回読み込みはスキップ（既存データで遷移しないように）
+      if (advInitial) { advInitial = false; return; }
+      const advData = snap.val();
+      if (!advData || !g || g.disposed || g._coopAdvancing) return;
+      if (g._multiMode !== 'coop') return;
+      const nextStage = advData.stage;
+      if (!nextStage) return;
+      g._coopAdvancing = true;
+      g.gamePhase = 'result';
+      stopBGM();
+      if (advData.retry) {
+        showCenterAlert('🔄 リトライ', 'Stage ' + nextStage + ' やり直し', 3000);
+      } else {
+        showCenterAlert(
+          '✨ Stage ' + g._stageNum + ' クリア！',
+          'Next → Stage ' + nextStage + ' — ' + (STAGE_CONFIGS[nextStage] ? STAGE_CONFIGS[nextStage].name : ''),
+          4000
+        );
+        SoundManager.playGameSE('free');
+      }
+      const delay = advData.retry ? 3000 : 4000;
+      setTimeout(() => {
+        multiState.stage = nextStage;
+        cleanupGame();
+        startGame(nextStage, 'multi_coop');
+      }, delay);
+    });
+    g._multiListeners.push({ ref: advRef, event: 'value', fn: onAdv });
   }
 }
 
@@ -12842,6 +12997,70 @@ function updateMultiplayerRemotePlayers(g, dt) {
       remote.fig.group.visible = true;
     }
   });
+}
+
+/**
+ * coopStageClear — Co-opモードでステージクリア時の処理
+ * 呼び出し元: seekフェーズのタイマー終了判定
+ */
+function coopStageClear(g) {
+  if (g._coopAdvancing) return; // 二重遷移防止
+  g._coopAdvancing = true;
+  g.gamePhase = 'result'; // ゲームループの更新を停止
+  stopBGM();
+
+  const nextStage = g._stageNum + 1;
+  const stageNum = g._stageNum;
+
+  // "Stage X クリア！" オーバーレイを表示
+  showCenterAlert(
+    '✨ Stage ' + stageNum + ' クリア！',
+    'Next → Stage ' + nextStage + ' — ' + (STAGE_CONFIGS[nextStage] ? STAGE_CONFIGS[nextStage].name : ''),
+    4000
+  );
+  SoundManager.playGameSE('free');
+
+  // ホスト: Firebaseに次ステージ情報を書き込み & クリーンアップ
+  if (multiState.isHost && multiState.roomId) {
+    const roomRef = db.ref('rooms/' + multiState.roomId);
+    roomRef.update({
+      currentStage: nextStage,
+      coopAdvance: { stage: nextStage, t: firebase.database.ServerValue.TIMESTAMP }
+    });
+    // 前ステージのゲームデータをクリア
+    roomRef.child('capturedPlayers').remove();
+    roomRef.child('oniPositions').remove();
+    roomRef.child('gameState').remove();
+    roomRef.child('canState').remove();
+  }
+
+  // 4秒後に次ステージへ遷移
+  setTimeout(() => {
+    multiState.stage = nextStage;
+    cleanupGame();
+    startGame(nextStage, 'multi_coop');
+  }, 4000);
+}
+
+/**
+ * coopRetryStage — Co-opモードで全員捕獲時の同ステージやり直し
+ * 呼び出し元: リトライボタン
+ */
+function coopRetryStage(g) {
+  const stageNum = g ? g._stageNum : multiState.stage;
+  // Firebaseにリトライ信号を書き込み & クリーンアップ（誰でも可能）
+  if (multiState.roomId) {
+    const roomRef = db.ref('rooms/' + multiState.roomId);
+    roomRef.update({
+      coopAdvance: { stage: stageNum, t: firebase.database.ServerValue.TIMESTAMP, retry: true }
+    });
+    roomRef.child('capturedPlayers').remove();
+    roomRef.child('oniPositions').remove();
+    roomRef.child('gameState').remove();
+    roomRef.child('canState').remove();
+  }
+  cleanupGame();
+  startGame(stageNum, 'multi_coop');
 }
 
 function showCapturedOverlay(g) {
