@@ -10336,6 +10336,11 @@ function updateCanPhysics(g, dt) {
         g.gamePhase = 'hide';
         g.phaseTimer = g.hideTime || 10;
         showHideCountdown(g, true);
+        // Score Attack: hide開始時に山門付近の安全な位置へ瞬間移動
+        if (g._isScoreAttack) {
+          g.player.position.set(0, 0, -28);
+          g.playerFig.group.position.copy(g.player.position);
+        }
       }
     }
   }
@@ -11052,9 +11057,8 @@ function confirmCanPlacement(g) {
 
   // Move to kick phase — コライダーに埋まらない安全な位置にスポーン
   g.gamePhase = 'kick';
-  // Score Attack: 山門付近の安全な位置にスポーン（建物から離れた場所）
+  // キックフェーズ: 缶の近くにスポーン（実際に蹴れるように）
   let spBaseX = pos.x, spBaseZ = pos.z + 2;
-  if (g._isScoreAttack) { spBaseX = 0; spBaseZ = -28; }
   let spX = spBaseX, spZ = spBaseZ;
   for (let attempt = 0; attempt < 20; attempt++) {
     let inside = false;
