@@ -6991,7 +6991,7 @@ function buildTempleObjects(g) {
   });
   g.materials.push(steppingStoneMat);
 
-  // ヘルパー: 箱メッシュ追加
+  // ヘルパー: 箱メッシュ追加（cameraMeshes登録付き — カメラ壁貫通防止）
   function addBox(mat, w, h, d, x, y, z, opts) {
     const geo = addGeo(new THREE.BoxGeometry(w, h, d));
     const mesh = new THREE.Mesh(geo, mat);
@@ -7000,6 +7000,7 @@ function buildTempleObjects(g) {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     g.scene.add(mesh);
+    g.cameraMeshes.push(mesh); // ★カメラ衝突判定用に登録
     return mesh;
   }
 
@@ -7019,24 +7020,24 @@ function buildTempleObjects(g) {
   // 基壇（石積み）
   addBox(stoneMat, 16, 0.5, 11, honX, 0.25, honZ);
   // --- 北壁（全面） ---
-  addBox(wallMat, honW, honH, 0.3, honX, honH/2 + 0.5, honZ + honD/2);
-  addBoxCollider(honX, honZ + honD/2, honW/2 + 0.1, 0.3, honH);
+  addBox(wallMat, honW, honH, 0.4, honX, honH/2 + 0.5, honZ + honD/2);
+  addBoxCollider(honX, honZ + honD/2, honW/2 + 0.2, 0.5, honH);
   // --- 南壁（中央4m開口: x=-2~2） ---
-  addBox(wallMat, 5.5, honH, 0.3, honX - 4.75, honH/2 + 0.5, honZ - honD/2); // 左 x:-7.5~-2
-  addBox(wallMat, 5.5, honH, 0.3, honX + 4.75, honH/2 + 0.5, honZ - honD/2); // 右 x:2~7.5
+  addBox(wallMat, 5.5, honH, 0.4, honX - 4.75, honH/2 + 0.5, honZ - honD/2); // 左 x:-7.5~-2
+  addBox(wallMat, 5.5, honH, 0.4, honX + 4.75, honH/2 + 0.5, honZ - honD/2); // 右 x:2~7.5
   // まぐさ（入口上部 y:3.5~6.5）
-  addBox(wallMat, 4, 3, 0.3, honX, 5.0, honZ - honD/2);
-  addBoxCollider(honX - 4.75, honZ - honD/2, 5.5/2, 0.3, honH); // 左壁コライダー
-  addBoxCollider(honX + 4.75, honZ - honD/2, 5.5/2, 0.3, honH); // 右壁コライダー
+  addBox(wallMat, 4, 3, 0.4, honX, 5.0, honZ - honD/2);
+  addBoxCollider(honX - 4.75, honZ - honD/2, 5.5/2, 0.5, honH); // 左壁コライダー
+  addBoxCollider(honX + 4.75, honZ - honD/2, 5.5/2, 0.5, honH); // 右壁コライダー
   // --- 東壁（全面） ---
-  addBox(wallMat, 0.3, honH, honD, honX + honW/2, honH/2 + 0.5, honZ);
-  addBoxCollider(honX + honW/2, honZ, 0.3, honD/2 + 0.1, honH);
+  addBox(wallMat, 0.4, honH, honD, honX + honW/2, honH/2 + 0.5, honZ);
+  addBoxCollider(honX + honW/2, honZ, 0.5, honD/2 + 0.2, honH);
   // --- 西壁（裏口3m開口: z=8.5~11.5） ---
-  addBox(wallMat, 0.3, honH, 3.5, honX - honW/2, honH/2 + 0.5, honZ - 3.25); // z:5~8.5
-  addBox(wallMat, 0.3, honH, 3.5, honX - honW/2, honH/2 + 0.5, honZ + 3.25); // z:11.5~15
-  addBox(wallMat, 0.3, 3, 3, honX - honW/2, 5.0, honZ); // 裏口まぐさ
-  addBoxCollider(honX - honW/2, honZ - 3.25, 0.3, 1.75, honH); // 下壁
-  addBoxCollider(honX - honW/2, honZ + 3.25, 0.3, 1.75, honH); // 上壁
+  addBox(wallMat, 0.4, honH, 3.5, honX - honW/2, honH/2 + 0.5, honZ - 3.25); // z:5~8.5
+  addBox(wallMat, 0.4, honH, 3.5, honX - honW/2, honH/2 + 0.5, honZ + 3.25); // z:11.5~15
+  addBox(wallMat, 0.4, 3, 3, honX - honW/2, 5.0, honZ); // 裏口まぐさ
+  addBoxCollider(honX - honW/2, honZ - 3.25, 0.5, 1.75, honH); // 下壁
+  addBoxCollider(honX - honW/2, honZ + 3.25, 0.5, 1.75, honH); // 上壁
   // --- 入口段差（南入口） ---
   addBox(stoneMat, 4.5, 0.25, 1.2, honX, 0.13, honZ - honD/2 - 0.6);
   addBox(stoneMat, 4.5, 0.15, 0.8, honX, 0.58, honZ - honD/2);
@@ -7049,7 +7050,7 @@ function buildTempleObjects(g) {
   var honLight2 = new THREE.PointLight(0xffe8cc, 0.2, 8);
   honLight2.position.set(honX, 2.5, honZ - 4); // 入口付近
   g.scene.add(honLight2);
-  // --- 内部柱4本（視覚のみ、コライダーなし） ---
+  // --- 内部柱4本（コライダー付き — プレイヤー貫通防止） ---
   var honPillarGeo = addGeo(new THREE.CylinderGeometry(0.2, 0.25, honH - 0.5, 6));
   for (var hpi = 0; hpi < 4; hpi++) {
     var hpx = (hpi % 2 === 0 ? -3 : 3);
@@ -7058,6 +7059,8 @@ function buildTempleObjects(g) {
     hpMesh.position.set(hpx, (honH - 0.5)/2 + 0.5, hpz);
     hpMesh.castShadow = true;
     g.scene.add(hpMesh);
+    g.cameraMeshes.push(hpMesh);
+    addCylCollider(hpx, hpz, 0.35, honH); // 柱コライダー
   }
   // --- 内部床（板の間） ---
   addBox(woodMat, honW - 0.6, 0.08, honD - 0.6, honX, 0.54, honZ);
@@ -7068,6 +7071,7 @@ function buildTempleObjects(g) {
   honRoof.rotation.y = Math.PI / 4;
   honRoof.castShadow = true;
   g.scene.add(honRoof);
+  g.cameraMeshes.push(honRoof);
 
   // ========================================
   //  庫裏（10×8×4m、中心: (15, 0, 10)）— 壁分割・入口付き
@@ -7077,23 +7081,23 @@ function buildTempleObjects(g) {
   // 基壇
   addBox(stoneMat, 11, 0.4, 9, kuriX, 0.2, kuriZ);
   // --- 北壁（全面） ---
-  addBox(wallMat, kuriW, kuriH, 0.3, kuriX, kuriH/2 + 0.4, kuriZ + kuriD/2);
-  addBoxCollider(kuriX, kuriZ + kuriD/2, kuriW/2 + 0.1, 0.3, kuriH);
+  addBox(wallMat, kuriW, kuriH, 0.4, kuriX, kuriH/2 + 0.4, kuriZ + kuriD/2);
+  addBoxCollider(kuriX, kuriZ + kuriD/2, kuriW/2 + 0.2, 0.5, kuriH);
   // --- 南壁（中央3m開口: x=13.5~16.5） ---
-  addBox(wallMat, 3.5, kuriH, 0.3, kuriX - 3.25, kuriH/2 + 0.4, kuriZ - kuriD/2); // 左 x:10~13.5
-  addBox(wallMat, 3.5, kuriH, 0.3, kuriX + 3.25, kuriH/2 + 0.4, kuriZ - kuriD/2); // 右 x:16.5~20
-  addBox(wallMat, 3, 1.5, 0.3, kuriX, kuriH - 0.35, kuriZ - kuriD/2); // まぐさ
-  addBoxCollider(kuriX - 3.25, kuriZ - kuriD/2, 3.5/2, 0.3, kuriH);
-  addBoxCollider(kuriX + 3.25, kuriZ - kuriD/2, 3.5/2, 0.3, kuriH);
+  addBox(wallMat, 3.5, kuriH, 0.4, kuriX - 3.25, kuriH/2 + 0.4, kuriZ - kuriD/2); // 左 x:10~13.5
+  addBox(wallMat, 3.5, kuriH, 0.4, kuriX + 3.25, kuriH/2 + 0.4, kuriZ - kuriD/2); // 右 x:16.5~20
+  addBox(wallMat, 3, 1.5, 0.4, kuriX, kuriH - 0.35, kuriZ - kuriD/2); // まぐさ
+  addBoxCollider(kuriX - 3.25, kuriZ - kuriD/2, 3.5/2, 0.5, kuriH);
+  addBoxCollider(kuriX + 3.25, kuriZ - kuriD/2, 3.5/2, 0.5, kuriH);
   // --- 東壁（全面） ---
-  addBox(wallMat, 0.3, kuriH, kuriD, kuriX + kuriW/2, kuriH/2 + 0.4, kuriZ);
-  addBoxCollider(kuriX + kuriW/2, kuriZ, 0.3, kuriD/2 + 0.1, kuriH);
+  addBox(wallMat, 0.4, kuriH, kuriD, kuriX + kuriW/2, kuriH/2 + 0.4, kuriZ);
+  addBoxCollider(kuriX + kuriW/2, kuriZ, 0.5, kuriD/2 + 0.2, kuriH);
   // --- 西壁（渡り廊下接続のため3m開口: z=8.5~11.5） ---
-  addBox(wallMat, 0.3, kuriH, 2.5, kuriX - kuriW/2, kuriH/2 + 0.4, kuriZ - 2.75); // z:6~8.5
-  addBox(wallMat, 0.3, kuriH, 2.5, kuriX - kuriW/2, kuriH/2 + 0.4, kuriZ + 2.75); // z:11.5~14
-  addBox(wallMat, 0.3, 1.5, 3, kuriX - kuriW/2, kuriH - 0.35, kuriZ); // まぐさ
-  addBoxCollider(kuriX - kuriW/2, kuriZ - 2.75, 0.3, 1.25, kuriH);
-  addBoxCollider(kuriX - kuriW/2, kuriZ + 2.75, 0.3, 1.25, kuriH);
+  addBox(wallMat, 0.4, kuriH, 2.5, kuriX - kuriW/2, kuriH/2 + 0.4, kuriZ - 2.75); // z:6~8.5
+  addBox(wallMat, 0.4, kuriH, 2.5, kuriX - kuriW/2, kuriH/2 + 0.4, kuriZ + 2.75); // z:11.5~14
+  addBox(wallMat, 0.4, 1.5, 3, kuriX - kuriW/2, kuriH - 0.35, kuriZ); // まぐさ
+  addBoxCollider(kuriX - kuriW/2, kuriZ - 2.75, 0.5, 1.25, kuriH);
+  addBoxCollider(kuriX - kuriW/2, kuriZ + 2.75, 0.5, 1.25, kuriH);
   // --- 入口段差（南入口） ---
   addBox(stoneMat, 3.5, 0.2, 1.0, kuriX, 0.1, kuriZ - kuriD/2 - 0.5);
   addBox(earthMat, 3.5, 0.12, 0.6, kuriX, 0.46, kuriZ - kuriD/2);
@@ -7110,6 +7114,7 @@ function buildTempleObjects(g) {
   kuriRoof.rotation.y = Math.PI / 4;
   kuriRoof.castShadow = true;
   g.scene.add(kuriRoof);
+  g.cameraMeshes.push(kuriRoof);
 
   // ========================================
   //  離れ（8×6×4m、中心: (-18, 0, 10)）— 壁分割・障子戸入口付き
@@ -7119,23 +7124,23 @@ function buildTempleObjects(g) {
   // 基壇
   addBox(stoneMat, 9, 0.4, 7, hanX, 0.2, hanZ);
   // --- 北壁（全面） ---
-  addBox(wallMat, hanW, hanH, 0.3, hanX, hanH/2 + 0.4, hanZ + hanD/2);
-  addBoxCollider(hanX, hanZ + hanD/2, hanW/2 + 0.1, 0.3, hanH);
+  addBox(wallMat, hanW, hanH, 0.4, hanX, hanH/2 + 0.4, hanZ + hanD/2);
+  addBoxCollider(hanX, hanZ + hanD/2, hanW/2 + 0.2, 0.5, hanH);
   // --- 南壁（中央3m開口: x=-19.5~-16.5）— 障子戸 ---
-  addBox(wallMat, 2.5, hanH, 0.3, hanX - 2.75, hanH/2 + 0.4, hanZ - hanD/2); // 左 x:-22~-19.5
-  addBox(wallMat, 2.5, hanH, 0.3, hanX + 2.75, hanH/2 + 0.4, hanZ - hanD/2); // 右 x:-16.5~-14
-  addBox(wallMat, 3, 1, 0.3, hanX, hanH - 0.1, hanZ - hanD/2); // まぐさ
-  addBoxCollider(hanX - 2.75, hanZ - hanD/2, 2.5/2, 0.3, hanH);
-  addBoxCollider(hanX + 2.75, hanZ - hanD/2, 2.5/2, 0.3, hanH);
+  addBox(wallMat, 2.5, hanH, 0.4, hanX - 2.75, hanH/2 + 0.4, hanZ - hanD/2); // 左 x:-22~-19.5
+  addBox(wallMat, 2.5, hanH, 0.4, hanX + 2.75, hanH/2 + 0.4, hanZ - hanD/2); // 右 x:-16.5~-14
+  addBox(wallMat, 3, 1, 0.4, hanX, hanH - 0.1, hanZ - hanD/2); // まぐさ
+  addBoxCollider(hanX - 2.75, hanZ - hanD/2, 2.5/2, 0.5, hanH);
+  addBoxCollider(hanX + 2.75, hanZ - hanD/2, 2.5/2, 0.5, hanH);
   // --- 東壁（渡り廊下接続3m開口: z=8.5~11.5） ---
-  addBox(wallMat, 0.3, hanH, 1.5, hanX + hanW/2, hanH/2 + 0.4, hanZ - 2.25); // z:7~8.5
-  addBox(wallMat, 0.3, hanH, 1.5, hanX + hanW/2, hanH/2 + 0.4, hanZ + 2.25); // z:11.5~13
-  addBox(wallMat, 0.3, 1.5, 3, hanX + hanW/2, hanH - 0.35, hanZ); // まぐさ
-  addBoxCollider(hanX + hanW/2, hanZ - 2.25, 0.3, 0.75, hanH);
-  addBoxCollider(hanX + hanW/2, hanZ + 2.25, 0.3, 0.75, hanH);
+  addBox(wallMat, 0.4, hanH, 1.5, hanX + hanW/2, hanH/2 + 0.4, hanZ - 2.25); // z:7~8.5
+  addBox(wallMat, 0.4, hanH, 1.5, hanX + hanW/2, hanH/2 + 0.4, hanZ + 2.25); // z:11.5~13
+  addBox(wallMat, 0.4, 1.5, 3, hanX + hanW/2, hanH - 0.35, hanZ); // まぐさ
+  addBoxCollider(hanX + hanW/2, hanZ - 2.25, 0.5, 0.75, hanH);
+  addBoxCollider(hanX + hanW/2, hanZ + 2.25, 0.5, 0.75, hanH);
   // --- 西壁（全面） ---
-  addBox(wallMat, 0.3, hanH, hanD, hanX - hanW/2, hanH/2 + 0.4, hanZ);
-  addBoxCollider(hanX - hanW/2, hanZ, 0.3, hanD/2 + 0.1, hanH);
+  addBox(wallMat, 0.4, hanH, hanD, hanX - hanW/2, hanH/2 + 0.4, hanZ);
+  addBoxCollider(hanX - hanW/2, hanZ, 0.5, hanD/2 + 0.2, hanH);
   // --- 障子戸（開閉可能） ---
   const shojiGeo = addGeo(new THREE.BoxGeometry(3, 3, 0.08));
   const shojiMesh = new THREE.Mesh(shojiGeo, shojiMat);
@@ -7165,6 +7170,7 @@ function buildTempleObjects(g) {
   hanRoof.rotation.y = Math.PI / 4;
   hanRoof.castShadow = true;
   g.scene.add(hanRoof);
+  g.cameraMeshes.push(hanRoof);
   // 縁側（視覚 + 歩行可能）
   addBox(woodMat, 1.5, 0.15, 4, hanX + 4.5, 0.45, hanZ);
 
@@ -7181,6 +7187,7 @@ function buildTempleObjects(g) {
   const watari1Roof = new THREE.Mesh(watari1RoofGeo, roofMat);
   watari1Roof.position.set(8.75, 3.5, honZ);
   g.scene.add(watari1Roof);
+  g.cameraMeshes.push(watari1Roof);
 
   // 本堂西壁 → 離れ東壁 (x: -7.5 ~ -14)
   addBox(woodMat, 6.5, 0.15, 3, -10.75, 0.5, honZ); // 床（幅3m）
@@ -7192,6 +7199,7 @@ function buildTempleObjects(g) {
   const watari2Roof = new THREE.Mesh(watari2RoofGeo, roofMat);
   watari2Roof.position.set(-10.75, 3.5, honZ);
   g.scene.add(watari2Roof);
+  g.cameraMeshes.push(watari2Roof);
 
   // ========================================
   //  枯山水庭園（30×25m、中央 (0, 0, 0)）
