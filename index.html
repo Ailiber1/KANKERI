@@ -10349,8 +10349,8 @@ function performCanKick(g, power, kickerName) {
     // Wait for can to land, then go to hide phase
   }
 
-  // Score Attack: 缶キック回数をカウント
-  if (g._isScoreAttack) {
+  // Score Attack: 缶キック回数をカウント（seekフェーズ中のみ。初回kickフェーズはカウントしない）
+  if (g._isScoreAttack && g.gamePhase === 'seek') {
     g._kickCount = (g._kickCount || 0) + 1;
   }
 
@@ -10953,19 +10953,21 @@ function updateGamePhases(g, dt) {
           g.onis[i].fig.group.position.copy(g.onis[i].position);
         }
       }
-      // Oni walks to can during hide phase（Score Attackでは鬼を動かさない）
-      if (!g._isScoreAttack) {
+      // Oni walks to can during hide phase
+      {
         const hideTimeOfDay = g.dayNight ? g.dayNight.phase : 'day';
         const hideNightMult = (hideTimeOfDay === 'night' || hideTimeOfDay === 'evening') ? 1.25 : 1.0;
         for (const oni of g.onis) {
           const canPos = g.can.isAtHome ? g.can.homePos : g.can.group.position;
           moveOni(oni, canPos.x, canPos.z, oni.speed * 0.8 * hideNightMult, dt, g);
-          oni.fig.group.position.copy(oni.position); // 表示位置も同期
-          const crx = oni.position.x - canPos.x, crz = oni.position.z - canPos.z;
-          if (Math.sqrt(crx*crx + crz*crz) < 1.5 && !g.can.isAtHome) {
-            g.can.group.position.copy(g.can.homePos);
-            g.can.isAtHome = true;
-            showCenterAlert('鬼が缶を回収した！', null, 2000);
+          // Score Attackでは缶に近づくが回収はしない（seekフェーズで回収させる）
+          if (!g._isScoreAttack) {
+            const crx = oni.position.x - canPos.x, crz = oni.position.z - canPos.z;
+            if (Math.sqrt(crx*crx + crz*crz) < 1.5 && !g.can.isAtHome) {
+              g.can.group.position.copy(g.can.homePos);
+              g.can.isAtHome = true;
+              showCenterAlert('鬼が缶を回収した！', null, 2000);
+            }
           }
         }
       }
