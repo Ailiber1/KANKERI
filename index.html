@@ -1267,6 +1267,11 @@ const MODE_LABELS = {
   team: 'チーム戦（Team Battle）'
 };
 
+function getTotalPlayers(g) {
+  if (g && g._isMultiplayer) return Object.keys(multiState.players).length;
+  return 1 + (g && g.cpuAllies ? g.cpuAllies.length : 0);
+}
+
 // ============================================================
 // SECTION: FIREBASE
 // ============================================================
@@ -9446,6 +9451,24 @@ function updateOni(g, oni, dt) {
     }
   }
 
+  // マルチプレイ（ホスト）: リモートプレイヤーも検知対象
+  if (g._isMultiplayer && multiState.isHost) {
+    Object.keys(multiState.remotePlayers).forEach(k => {
+      const rp = multiState.remotePlayers[k];
+      if (!rp || rp.captured || !rp.fig || !rp.fig.group.visible) return;
+      const rpPos = rp.fig.group.position;
+      const rDir = new THREE.Vector2(rpPos.x - oni.position.x, rpPos.z - oni.position.z);
+      const rDist = rDir.length();
+      const canSeeRemote = checkTargetVisibility(rpPos, rp.crouching || false, rp.captured, rp.fig);
+      if (canSeeRemote && rDist < closestVisibleDist) {
+        closestVisibleTarget = { _remoteIndex: parseInt(k), position: rpPos.clone(), name: rp.username || 'Player' + k };
+        closestVisibleDist = rDist;
+        closestVisiblePos = rpPos.clone();
+        closestVisibleName = rp.username || 'Player' + k;
+      }
+    });
+  }
+
   const canSeeAny = closestVisibleTarget !== null;
 
   // Also check foot sounds from CPU allies
@@ -9469,6 +9492,23 @@ function updateOni(g, oni, dt) {
         loudestFootTarget = ally.position.clone();
       }
     }
+  }
+
+  // マルチプレイ（ホスト）: リモートプレイヤーの足音チェック
+  if (g._isMultiplayer && multiState.isHost) {
+    Object.keys(multiState.remotePlayers).forEach(k => {
+      const rp = multiState.remotePlayers[k];
+      if (!rp || rp.captured || !rp.fig || !rp.fig.group.visible) return;
+      const rpPos = rp.fig.group.position;
+      const rdx = oni.position.x - rpPos.x, rdz = oni.position.z - rpPos.z;
+      const rDist = Math.sqrt(rdx*rdx + rdz*rdz);
+      // リモートプレイヤーの移動速度は補間から推定（簡易）
+      const rFootRange = rp.crouching ? 2 : 8;
+      if (rDist < rFootRange && rDist < loudestFootDist) {
+        loudestFootDist = rDist;
+        loudestFootTarget = rpPos.clone();
+      }
+    });
   }
 
   // --- Role assignment for multiple onis ---
@@ -10471,7 +10511,7 @@ function updateCpuAlly(g, ally, dt) {
 
   // --- Time-aware strategy: remaining time affects decisions ---
   const remainingTime = g.gameTimer || 90;
-  const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+  const totalPlayers = getTotalPlayers(g);
   const uncapturedCount = totalPlayers - capturedCount;
   // If time is running out and we're not captured, prioritize survival
   const endgameMode = remainingTime < 30;
@@ -10875,6 +10915,13 @@ function updateAllCpuAllies(g, dt) {
 function capturePlayer(g, oni) {
   // Check if oni was targeting a CPU ally
   if (oni && oni.foundTarget && oni.foundTarget !== 'player') {
+    // マルチプレイ: リモートプレイヤーの捕獲
+    if (oni.foundTarget._remoteIndex !== undefined) {
+      const rpIdx = oni.foundTarget._remoteIndex;
+      captureRemotePlayer(g, rpIdx);
+      oni.foundTarget = null;
+      return;
+    }
     const ally = oni.foundTarget;
     if (ally && !ally.captured) {
       captureAlly(g, ally);
@@ -10882,7 +10929,7 @@ function capturePlayer(g, oni) {
       return;
     }
   }
-  // Default: capture the human player
+  // Default: capture the human player (this host's own player)
   if (g.player.captured) return; // Already captured
   g.player.captured = true;
   g.capturedCount++;
@@ -10899,10 +10946,36 @@ function capturePlayer(g, oni) {
   const capOv = document.getElementById('hud-captured-overlay');
   if (capOv) capOv.style.display = 'flex';
 
+  // マルチプレイ: Firebaseに捕獲を同期
+  if (g._isMultiplayer && multiState.isHost) {
+    db.ref('rooms/' + multiState.roomId + '/capturedPlayers/' + multiState.playerIndex)
+      .set({ captureTime: firebase.database.ServerValue.TIMESTAMP });
+  }
+
   // Check game over — only if ALL players captured
-  const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+  const totalPlayers = g._isMultiplayer
+    ? Object.keys(multiState.players).length
+    : 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false); // Oni wins
+  }
+}
+
+function captureRemotePlayer(g, remoteIndex) {
+  if (!g._isMultiplayer || !multiState.isHost) return;
+  const rp = multiState.remotePlayers[remoteIndex];
+  if (!rp || rp.captured) return;
+  rp.captured = true;
+  g.capturedCount++;
+  showNotification('捕まった！ ' + (rp.username || 'Player' + remoteIndex));
+  SoundManager.playGameSE('capture');
+  // Firebaseに捕獲を同期
+  db.ref('rooms/' + multiState.roomId + '/capturedPlayers/' + remoteIndex)
+    .set({ captureTime: firebase.database.ServerValue.TIMESTAMP });
+  // ゲームオーバーチェック
+  const totalPlayers = Object.keys(multiState.players).length;
+  if (g.capturedCount >= totalPlayers) {
+    endGame(g, false);
   }
 }
 
@@ -10928,7 +11001,7 @@ function captureAlly(g, ally) {
   SoundManager.playGameSE('capture');
 
   // Check game over
-  const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+  const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false); // Oni wins
   }
@@ -11104,6 +11177,17 @@ function freeAllCaptured(g) {
         ally.position.y = getGroundHeight(g, ally.position.x, ally.position.z);
         ally.fig.group.position.copy(ally.position);
       }
+    }
+  }
+  // マルチプレイ: リモートプレイヤーも解放
+  if (g._isMultiplayer) {
+    Object.keys(multiState.remotePlayers).forEach(k => {
+      const rp = multiState.remotePlayers[k];
+      if (rp) rp.captured = false;
+    });
+    // ホスト: Firebaseの捕獲データをクリア
+    if (multiState.isHost && multiState.roomId) {
+      db.ref('rooms/' + multiState.roomId + '/capturedPlayers').remove();
     }
   }
   showNotification('全員解放！');
@@ -11739,14 +11823,14 @@ function updateGamePhases(g, dt) {
 
       // Score Attack: 全員捕獲（自分1人）→即終了
       if (g._isScoreAttack) {
-        const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+        const totalPlayers = getTotalPlayers(g);
         if (g.capturedCount >= totalPlayers) {
           endGame(g, false);
         }
       } else {
         // 通常モード: Check win (timer runs out — win if at least one player/ally is free)
         if (g.gameTimer <= 0) {
-          const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+          const totalPlayers = getTotalPlayers(g);
           if (g.capturedCount < totalPlayers) {
             endGame(g, true); // At least one survived
           } else {
@@ -11853,14 +11937,27 @@ function endGame(g, playerWon) {
   const capOv = document.getElementById('hud-captured-overlay');
   if (capOv) capOv.style.display = 'none';
 
+  // マルチプレイ: ホストがルーム状態を更新
+  if (g._isMultiplayer && multiState.isHost && multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId).update({
+      status: 'result',
+      result: { playerWon: playerWon, endTime: firebase.database.ServerValue.TIMESTAMP }
+    });
+  }
+
   const overlay = document.getElementById('result-overlay');
   const title = document.getElementById('result-title');
   const stats = document.getElementById('result-stats');
 
   if (title) {
-    title.textContent = playerWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
-    title.style.color = playerWon ? '#00ff41' : '#ff4444';
-    title.style.textShadow = playerWon
+    // マルチプレイFFA: 自分が捕まっていなければ勝利
+    let myWon = playerWon;
+    if (g._isMultiplayer && g._multiMode === 'ffa') {
+      myWon = !g.player.captured;
+    }
+    title.textContent = myWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
+    title.style.color = myWon ? '#00ff41' : '#ff4444';
+    title.style.textShadow = myWon
       ? '0 0 20px rgba(0,255,65,0.5)'
       : '0 0 20px rgba(255,68,68,0.5)';
   }
@@ -11885,11 +11982,43 @@ function endGame(g, playerWon) {
       stats.innerHTML = html;
       // ランキング保存（缶キック回数）
       saveScoreAttackRanking(kicks);
+    } else if (g._isMultiplayer) {
+      // マルチプレイリザルト
+      const survived = g.config.timeLimit - g.gameTimer;
+      const mm = Math.floor(survived / 60);
+      const ss = Math.floor(survived % 60);
+      const totalPlayers = Object.keys(multiState.players).length;
+      let html = `
+        <span style="font-size:16px;color:var(--neon-cyan)">
+          ${MODE_LABELS[g._multiMode] || 'MULTIPLAYER'}
+        </span><br>
+        ${t('RESULT_SURVIVED')}: ${playerWon ? t('RESULT_YES') : t('RESULT_NO')}<br>
+        ${t('RESULT_TIME')}: ${mm}:${String(ss).padStart(2,'0')}<br>
+        ${t('RESULT_CAPTURED')}: ${g.capturedCount}/${totalPlayers}
+      `;
+      // 各プレイヤーのステータス
+      html += `<br><span style="color:var(--neon-cyan);font-size:12px">プレイヤー状況</span><br>`;
+      Object.keys(multiState.players).forEach(k => {
+        const idx = parseInt(k);
+        const p = multiState.players[k];
+        let isCaptured = false;
+        if (idx === multiState.playerIndex) {
+          isCaptured = g.player.captured;
+        } else if (multiState.remotePlayers[idx]) {
+          isCaptured = multiState.remotePlayers[idx].captured;
+        }
+        const status = isCaptured
+          ? '<span style="color:#ff4444">捕獲</span>'
+          : '<span style="color:#44ffaa">生存</span>';
+        const isMe = idx === multiState.playerIndex ? ' (あなた)' : '';
+        html += escapeHTML(p.username || 'Player') + isMe + ': ' + status + '<br>';
+      });
+      stats.innerHTML = html;
     } else {
       const survived = g.config.timeLimit - g.gameTimer;
       const mm = Math.floor(survived / 60);
       const ss = Math.floor(survived % 60);
-      const totalPlayers = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+      const totalPlayers = getTotalPlayers(g);
       let html = `
         ${t('RESULT_SURVIVED')}: ${playerWon ? t('RESULT_YES') : t('RESULT_NO')}<br>
         ${t('RESULT_TIME')}: ${mm}:${String(ss).padStart(2,'0')}<br>
@@ -11945,7 +12074,9 @@ function updateHUD(g) {
   // Capture count
   const capEl = document.getElementById('hud-capture');
   if (capEl) {
-    const total = 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
+    const total = g._isMultiplayer
+      ? Object.keys(multiState.players).length
+      : 1 + (g.cpuAllies ? g.cpuAllies.length : 0);
     capEl.textContent = '捕獲: ' + g.capturedCount + '/' + total;
   }
 
@@ -12378,9 +12509,31 @@ function startGame(stageNum, mode) {
   const quitBtn = document.getElementById('btn-quit-game');
   if (quitBtn) quitBtn.onclick = () => cleanupGame();
   const retryBtn = document.getElementById('btn-retry');
-  if (retryBtn) retryBtn.onclick = () => { cleanupGame(); startGame(stageNum, mode); };
+  if (retryBtn) retryBtn.onclick = () => {
+    if (mode.startsWith('multi_')) {
+      // マルチプレイ: ロビーに戻る
+      cleanupGame();
+      if (multiState.roomId) {
+        multiState.ready = false;
+        db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
+        db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
+        showScreen('lobby-screen');
+        initLobbyListeners();
+        updateLobbyUI();
+      }
+    } else {
+      cleanupGame(); startGame(stageNum, mode);
+    }
+  };
   const titleBtn = document.getElementById('btn-to-title');
-  if (titleBtn) titleBtn.onclick = () => cleanupGame();
+  if (titleBtn) titleBtn.onclick = () => {
+    if (mode.startsWith('multi_')) {
+      cleanupGame();
+      leaveLobby();
+    } else {
+      cleanupGame();
+    }
+  };
 
   // Cache meshes for camera raycasting (excludes lights, sprites, line helpers)
   G.cameraMeshes = [];
