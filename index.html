@@ -9132,12 +9132,32 @@ function updateOni(g, oni, dt) {
         g.can.group.position.copy(g.can.homePos);
         g.can.isAtHome = true;
         g._canRecoveryTimer = 0;
-        showCenterAlert('鬼が缶を回収した！', null, 2000);
-        oni.state = 'patrol';
         oni.fatigue = Math.max(0, oni.fatigue - 15);
+
+        // seekフェーズ中の缶回収 → 全鬼に猶予タイマー（プレイヤーが隠れる時間）
+        if (g.gamePhase === 'seek') {
+          const graceSec = 5;
+          for (const o of g.onis) {
+            o.state = 'patrol';
+            o.restTimer = graceSec;
+            o.stateTimer = 0;
+            o.foundTarget = null;
+            o.chaseTarget = null;
+            o.chasedPlayer = null;
+          }
+          const lang = gameState.language === 'ja';
+          showCenterAlert(
+            lang ? '鬼が缶を回収！' : 'Oni recovered the can!',
+            lang ? graceSec + '秒以内に隠れろ！' : 'Hide within ' + graceSec + ' seconds!',
+            3000
+          );
+        } else {
+          showCenterAlert('鬼が缶を回収した！', null, 2000);
+          oni.state = 'patrol';
+        }
       }
       // 缶が既に回収済みならpatrolへ
-      if (g.can.isAtHome) {
+      if (g.can.isAtHome && oni.state === 'recovery') {
         oni.state = 'patrol';
         oni.stateTimer = 0;
       }
@@ -11026,7 +11046,7 @@ function updateGamePhases(g, dt) {
           closest.state = 'recovery';
           closest.stateTimer = 0;
         }
-        // 15秒以上未回収 → 捕虜全員解放 + 缶を自動回収
+        // 15秒以上未回収 → 捕虜全員解放 + 缶を自動回収 + 鬼に猶予タイマー
         if (g._canRecoveryTimer > 15) {
           if (g.capturedCount > 0) {
             freeAllCaptured(g);
@@ -11035,6 +11055,16 @@ function updateGamePhases(g, dt) {
           g.can.group.position.copy(g.can.homePos);
           g.can.isAtHome = true;
           g._canRecoveryTimer = 0;
+          // 自動回収後も猶予（プレイヤーが隠れる時間）
+          const autoGrace = 5;
+          for (const o of g.onis) {
+            o.state = 'patrol';
+            o.restTimer = autoGrace;
+            o.stateTimer = 0;
+            o.foundTarget = null;
+            o.chaseTarget = null;
+            o.chasedPlayer = null;
+          }
         }
       } else {
         g._canRecoveryTimer = 0;
