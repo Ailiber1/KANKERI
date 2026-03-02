@@ -759,6 +759,48 @@ html, body {
 #hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
 @keyframes promptPulse { 0%,100% { box-shadow: 0 0 8px rgba(85,153,255,0.3); } 50% { box-shadow: 0 0 20px rgba(85,153,255,0.6); } }
 #hud-peek-prompt { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #00e5ff; background: rgba(0,0,0,0.6); border: 1px solid rgba(0,229,255,0.4); padding: 6px 16px; border-radius: 6px; text-align: center; white-space: nowrap; }
+/* 鬼プレイヤー専用HUD */
+#oni-player-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 35; }
+#oni-reticle {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-size: 36px; color: rgba(255,68,68,0.4); text-shadow: 0 0 10px rgba(255,0,0,0.2);
+  transition: color 0.15s, text-shadow 0.15s;
+}
+#oni-reticle.locked {
+  color: #ff2222; text-shadow: 0 0 20px rgba(255,0,0,0.8); font-size: 40px;
+}
+#oni-can-direction {
+  position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+  font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ff6666;
+  background: rgba(0,0,0,0.6); padding: 6px 14px; border-radius: 4px;
+  display: flex; gap: 8px; align-items: center;
+}
+#oni-can-arrow { font-size: 20px; transition: transform 0.2s; }
+#oni-fatigue-wrap {
+  position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #ff6666;
+}
+#oni-fatigue-track { width: 120px; height: 8px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,68,68,0.3); border-radius: 4px; }
+#oni-fatigue-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff6666, #ff2222); border-radius: 3px; transition: width 0.3s; }
+#oni-can-touch-btn, #oni-pickup-btn {
+  position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
+  font-family: 'Share Tech Mono', monospace; font-size: 18px; color: #fff;
+  background: rgba(255,34,34,0.8); border: 2px solid #ff4444; padding: 10px 24px;
+  border-radius: 8px; pointer-events: auto; cursor: pointer;
+  animation: promptPulse 1.5s ease-in-out infinite;
+}
+#oni-lockon-btn {
+  position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+  font-family: 'Noto Sans JP', sans-serif; font-size: 16px; font-weight: bold;
+  color: #fff; background: rgba(255,34,34,0.7); border: 2px solid #ff4444;
+  padding: 14px 18px; border-radius: 50%; pointer-events: auto; cursor: pointer;
+}
+#oni-lockon-failed {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-size: 60px; color: #ff0000; opacity: 0; transition: opacity 0.3s;
+}
+#oni-lockon-failed.show { opacity: 1; }
 #hud-captured-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 40; background: rgba(0,0,0,0.3); }
 #hud-captured-text { font-family: 'Share Tech Mono', monospace; font-size: 36px; color: #ff4444; text-shadow: 0 0 20px rgba(255,68,68,0.8); letter-spacing: 4px; animation: capturedPulse 2s ease-in-out infinite; }
 #hud-captured-sub { font-family: 'Noto Sans JP', sans-serif; font-size: 16px; color: #ffaa44; margin-top: 12px; text-shadow: 0 0 10px rgba(255,170,68,0.5); }
@@ -1130,6 +1172,22 @@ html, body {
       <div id="kick-gauge-title">缶を蹴れ！</div>
       <div id="kick-gauge-track"><div id="kick-gauge-fill"></div><div id="kick-gauge-marker">▲</div></div>
       <div id="kick-gauge-hint">F / タップ</div>
+    </div>
+    <!-- 鬼プレイヤー専用HUD（チーム戦） -->
+    <div id="oni-player-hud" style="display:none;">
+      <div id="oni-reticle">◎</div>
+      <div id="oni-can-direction">
+        <span id="oni-can-arrow">→</span>
+        <span id="oni-can-dist">缶まで --m</span>
+      </div>
+      <div id="oni-fatigue-wrap">
+        <div id="oni-fatigue-label">疲労</div>
+        <div id="oni-fatigue-track"><div id="oni-fatigue-fill"></div></div>
+      </div>
+      <div id="oni-can-touch-btn" style="display:none;">Space: 缶タッチ！</div>
+      <div id="oni-lockon-btn" class="mobile-only" style="display:none;">発見！</div>
+      <div id="oni-pickup-btn" style="display:none;">Space: 缶を拾う</div>
+      <div id="oni-lockon-failed" style="display:none;">✕</div>
     </div>
     <div id="can-placement-wrap" style="display:none;">
       <div id="placement-title">缶の配置を選択 <span id="placement-timer">15</span>秒</div>
@@ -8804,7 +8862,13 @@ function createPlayerController(g) {
   };
 
   // Keyboard
-  const onKeyDown = (e) => { ctrl.keys[e.code] = true; };
+  const onKeyDown = (e) => {
+    ctrl.keys[e.code] = true;
+    // 鬼プレイヤー: Space/F入力を処理
+    if (g._isOniPlayer && (e.code === 'Space' || e.code === 'KeyF')) {
+      handleOniPlayerInput(g, e.code === 'Space' ? ' ' : 'f');
+    }
+  };
   const onKeyUp = (e) => { ctrl.keys[e.code] = false; };
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
@@ -8964,6 +9028,11 @@ function updatePlayer(g, dt) {
   // Dash
   ctrl.isDashing = (keys['ShiftLeft'] || keys['ShiftRight']) && !ctrl.isCrouching && ctrl.stamina > 0;
 
+  // 鬼プレイヤー: ダッシュのスタミナ消費なし（無限ダッシュ）
+  if (g._isOniPlayer) {
+    ctrl.isDashing = (keys['ShiftLeft'] || keys['ShiftRight']) && !ctrl.isCrouching;
+  }
+
   // Movement input
   let mx = 0, mz = 0;
   if (ctrl.isMobile && ctrl.joystickMag > 0.1) {
@@ -8988,8 +9057,15 @@ function updatePlayer(g, dt) {
   // Speed (peeking blocks movement)
   let speed = ctrl.isPeeking !== 'none' ? 0 : (ctrl.isCrouching ? ctrl.crouchSpeed : (ctrl.isDashing ? ctrl.dashSpeed : ctrl.speed));
 
-  // Stamina
-  if (ctrl.isDashing) {
+  // 鬼プレイヤー: 疲労による速度補正
+  if (g._isOniPlayer && ctrl._fatigueMultiplier !== undefined) {
+    speed *= ctrl._fatigueMultiplier;
+  }
+
+  // Stamina（鬼プレイヤーは消費しない）
+  if (g._isOniPlayer) {
+    ctrl.stamina = ctrl.maxStamina; // 常に満タン
+  } else if (ctrl.isDashing) {
     ctrl.stamina = Math.max(0, ctrl.stamina - ctrl.staminaDrain * dt);
     if (ctrl.stamina <= 0) ctrl.isDashing = false;
   } else {
@@ -9246,7 +9322,7 @@ function updatePlayer(g, dt) {
   const canDx = ctrl.position.x - g.can.group.position.x;
   const canDz = ctrl.position.z - g.can.group.position.z;
   const canDist = Math.sqrt(canDx*canDx + canDz*canDz);
-  ctrl.canKick = canDist < 2.5 && g.can.isAtHome && !g.can.isFlying;
+  ctrl.canKick = canDist < 2.5 && g.can.isAtHome && !g.can.isFlying && !g._isOniPlayer;
 
   // Check interactable proximity
   ctrl.canHit = null;
@@ -9273,8 +9349,9 @@ function updatePlayer(g, dt) {
   }
 
   // F key action (interact: kick can / hit objects / kick animation)
+  // 鬼プレイヤーはkeydownで処理済み（handleOniPlayerInput）
   const fDown = keys['KeyF'] || keys['Space'];
-  if (fDown && !ctrl._fPrev && g.gamePhase !== 'result' && g.gamePhase !== 'placement') {
+  if (fDown && !ctrl._fPrev && g.gamePhase !== 'result' && g.gamePhase !== 'placement' && !g._isOniPlayer) {
     if (ctrl.canKick && (g.gamePhase === 'seek' || g.gamePhase === 'hide' || g.gamePhase === 'kick')) {
       startKickGauge(g);
     } else if (ctrl.canHit && !g._hitCooldown) {
@@ -11431,6 +11508,15 @@ function freeAllCaptured(g) {
     if (multiState.isHost && multiState.roomId) {
       db.ref('rooms/' + multiState.roomId + '/capturedPlayers').remove();
     }
+    // チーム戦: 缶蹴りでロックオンを全解除
+    if (multiState.roomId) {
+      db.ref('rooms/' + multiState.roomId + '/lockOn').remove();
+    }
+  }
+  // 鬼プレイヤー: ロックオン状態をリセット
+  if (g._isOniPlayer && g._oniPlayer) {
+    g._oniPlayer.lockedTarget = -1;
+    g._oniPlayer.lockValidated = false;
   }
   showNotification('全員解放！');
   SoundManager.playGameSE('free');
@@ -12382,9 +12468,13 @@ function updateHUD(g) {
     }
   }
 
-  // Stamina
+  // Stamina（鬼プレイヤーは疲労バーを別HUDで表示するため非表示）
   const staminaFill = document.getElementById('hud-stamina-fill');
   if (staminaFill) {
+    if (g._isOniPlayer) {
+      const staminaWrap = document.getElementById('hud-stamina-wrap');
+      if (staminaWrap) staminaWrap.style.display = 'none';
+    }
     const pct = (g.player.stamina / g.player.maxStamina) * 100;
     staminaFill.style.width = pct + '%';
     staminaFill.classList.toggle('low', pct < 20);
@@ -12427,7 +12517,24 @@ function updateHUD(g) {
   // Action prompt
   const actionEl = document.getElementById('hud-action-prompt');
   if (actionEl) {
-    if (g.player.canKick && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
+    if (g._isOniPlayer && g._oniPlayer) {
+      // 鬼プレイヤー用アクションプロンプト
+      const op = g._oniPlayer;
+      const canPos = g.can ? g.can.group.position : null;
+      const nearCan = canPos && g.player.position.distanceTo(canPos) < 2.5;
+      if (nearCan && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
+        actionEl.textContent = 'Space: 缶タッチ！（捕獲）';
+        actionEl.style.display = 'block';
+      } else if (nearCan && !g.can.isAtHome && !op.canCarrying) {
+        actionEl.textContent = 'Space: 缶を拾う';
+        actionEl.style.display = 'block';
+      } else if (op._reticleTarget >= 0 && op.lockedTarget < 0 && op.lockCooldown <= 0) {
+        actionEl.textContent = 'Space: ロックオン';
+        actionEl.style.display = 'block';
+      } else {
+        actionEl.style.display = 'none';
+      }
+    } else if (g.player.canKick && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
       actionEl.textContent = 'F: 缶を蹴る！';
       actionEl.style.display = 'block';
     } else if (g.player.canHit && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g._hitCooldown) {
@@ -12604,6 +12711,7 @@ function gameLoop(timestamp) {
     ['updateTempleGimmicks', () => updateTempleGimmicks(G, dt)],
     ['updateGamePhases', () => updateGamePhases(G, dt)],
     ['updateMultiRemote', () => updateMultiplayerRemotePlayers(G, dt)],
+    ['updateOniPlayer', () => { updateOniPlayerHUD(G, dt); updateOniCanCarry(G); }],
     ['updateHUD', () => updateHUD(G)]
   ];
   for (const [name, fn] of updates) {
@@ -12810,6 +12918,11 @@ function startGame(stageNum, mode) {
     }
 
     initMultiplayerSync(G);
+
+    // チーム戦: 鬼プレイヤーの操作初期化
+    if (G._isOniPlayer) {
+      initOniPlayerControls(G);
+    }
   } else {
     // ソロプレイ: CPU味方を生成（Score Attack時はなし）
     const cpuCount = G._isScoreAttack ? 0 : (gameState.storySettings.cpuCount || 0);
@@ -12934,6 +13047,419 @@ function showCanPlacementUI(g) {
 }
 
 // ============================================================
+// SECTION: ONI PLAYER (鬼プレイヤー操作 — チーム戦)
+// ============================================================
+
+/**
+ * initOniPlayerControls — 鬼プレイヤーのHUDと操作を初期化
+ * 呼び出し元: startGame（チーム戦で鬼ロール時）
+ */
+function initOniPlayerControls(g) {
+  const oniHud = document.getElementById('oni-player-hud');
+  if (oniHud) oniHud.style.display = 'block';
+
+  // 鬼プレイヤー状態
+  g._oniPlayer = {
+    fatigue: 0,               // 疲労値 0-100
+    lockedTarget: -1,         // ロックオン対象のplayerIndex (-1=なし)
+    lockValidated: false,     // ホストが検証済みか
+    canCarrying: false,       // 缶を運搬中か
+    canTouchCooldown: 0,      // 缶タッチ後の硬直
+    lockCooldown: 0           // ロックオン失敗後のクールダウン
+  };
+
+  // モバイル: ロックオンボタン
+  const isMobile = 'ontouchstart' in window;
+  const lockonBtn = document.getElementById('oni-lockon-btn');
+  if (lockonBtn && isMobile) {
+    lockonBtn.style.display = 'block';
+    lockonBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      attemptLockOn(g);
+    });
+  }
+
+  // 缶タッチボタン（PC: Space、モバイル: タップ）
+  const touchBtn = document.getElementById('oni-can-touch-btn');
+  if (touchBtn) {
+    touchBtn.addEventListener('click', () => oniCanTouch(g));
+  }
+  const pickupBtn = document.getElementById('oni-pickup-btn');
+  if (pickupBtn) {
+    pickupBtn.addEventListener('click', () => oniPickupCan(g));
+  }
+}
+
+/**
+ * updateOniPlayerHUD — 鬼プレイヤーHUDを毎フレーム更新
+ */
+function updateOniPlayerHUD(g, dt) {
+  if (!g._isOniPlayer || !g._oniPlayer) return;
+  const op = g._oniPlayer;
+
+  // 疲労バー更新
+  const fatigueFill = document.getElementById('oni-fatigue-fill');
+  if (fatigueFill) fatigueFill.style.width = op.fatigue + '%';
+
+  // クールダウン更新
+  if (op.canTouchCooldown > 0) op.canTouchCooldown -= dt;
+  if (op.lockCooldown > 0) op.lockCooldown -= dt;
+
+  // 疲労更新（ダッシュ中に蓄積）
+  if (g.player && g.player.isDashing) {
+    op.fatigue = Math.min(100, op.fatigue + dt * 8);
+  } else {
+    op.fatigue = Math.max(0, op.fatigue - dt * 3); // 回復
+  }
+  // 疲労段階による速度調整
+  if (op.fatigue > 80) {
+    g.player._fatigueMultiplier = 0.7;
+    if (!op._forceStop && op.fatigue >= 95) {
+      op._forceStop = true;
+      op._forceStopTimer = 3;
+    }
+  } else if (op.fatigue > 60) {
+    g.player._fatigueMultiplier = 0.8;
+  } else if (op.fatigue > 30) {
+    g.player._fatigueMultiplier = 0.9;
+  } else {
+    g.player._fatigueMultiplier = 1.0;
+  }
+  // 強制停止タイマー
+  if (op._forceStop) {
+    op._forceStopTimer -= dt;
+    g.player._fatigueMultiplier = 0;
+    if (op._forceStopTimer <= 0) {
+      op._forceStop = false;
+      op.fatigue = 60;
+    }
+  }
+
+  // レティクル — ランナーとの照準判定
+  const reticle = document.getElementById('oni-reticle');
+  if (reticle) {
+    const hasTarget = checkReticleOnRunner(g);
+    reticle.classList.toggle('locked', hasTarget);
+  }
+
+  // 缶方向矢印
+  if (g.can) {
+    const canPos = g.can.group.position;
+    const pPos = g.player.position;
+    const dx = canPos.x - pPos.x;
+    const dz = canPos.z - pPos.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const angle = Math.atan2(dx, dz) - (g.player.rotation || 0);
+
+    const arrowEl = document.getElementById('oni-can-arrow');
+    const distEl = document.getElementById('oni-can-dist');
+    if (arrowEl) arrowEl.style.transform = 'rotate(' + (-angle * 180 / Math.PI) + 'deg)';
+    if (distEl) distEl.textContent = '缶まで ' + dist.toFixed(0) + 'm';
+
+    // 缶タッチ/缶拾いボタン表示
+    const touchBtn = document.getElementById('oni-can-touch-btn');
+    const pickupBtn = document.getElementById('oni-pickup-btn');
+    const canAtHome = g.can.isAtHome;
+    const nearCan = dist < 2.5;
+
+    if (touchBtn) {
+      // 缶が定位置 + ロックオン対象あり + 近い + 硬直なし
+      touchBtn.style.display = (nearCan && canAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0)
+        ? 'block' : 'none';
+    }
+    if (pickupBtn) {
+      // 缶が定位置でない（蹴り飛ばされた） + 近い
+      pickupBtn.style.display = (nearCan && !canAtHome && !op.canCarrying)
+        ? 'block' : 'none';
+    }
+  }
+}
+
+/**
+ * checkReticleOnRunner — レティクルがランナーに重なっているか判定
+ */
+function checkReticleOnRunner(g) {
+  if (!g._isOniPlayer) return false;
+  const camera = g.camera;
+  if (!camera) return false;
+
+  // カメラの前方レイ
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  raycaster.far = 20; // 20m
+
+  // リモートプレイヤーのメッシュを集める
+  const targets = [];
+  Object.keys(multiState.remotePlayers).forEach(k => {
+    const rp = multiState.remotePlayers[k];
+    if (!rp || !rp.fig || rp.captured) return;
+    // ランナーチームのみ
+    const teamB = g._teamB || [];
+    if (!teamB.includes(parseInt(k))) return;
+    rp.fig.group.traverse(obj => {
+      if (obj.isMesh) {
+        obj._remotePlayerIndex = parseInt(k);
+        targets.push(obj);
+      }
+    });
+  });
+
+  const hits = raycaster.intersectObjects(targets, false);
+  if (hits.length > 0) {
+    g._oniPlayer._reticleTarget = hits[0].object._remotePlayerIndex;
+    return true;
+  }
+  g._oniPlayer._reticleTarget = -1;
+  return false;
+}
+
+/**
+ * attemptLockOn — ロックオン試行
+ */
+function attemptLockOn(g) {
+  if (!g._isOniPlayer || !g._oniPlayer) return;
+  const op = g._oniPlayer;
+  if (op.lockCooldown > 0) return;
+  if (op.lockedTarget >= 0) return; // 既にロックオン中
+
+  const targetIdx = op._reticleTarget;
+  if (targetIdx < 0) {
+    showLockOnFailed();
+    op.lockCooldown = 1.0;
+    return;
+  }
+
+  // ロックオンリクエストをFirebaseに送信
+  if (multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/lockOn/' + multiState.playerIndex).set({
+      targetIndex: targetIdx,
+      lockTime: firebase.database.ServerValue.TIMESTAMP,
+      validated: false
+    });
+  }
+
+  // ホスト自身の場合は即時検証
+  if (multiState.isHost) {
+    validateLockOn(g, multiState.playerIndex, targetIdx);
+  }
+}
+
+/**
+ * validateLockOn — ロックオン検証（ホストが実行）
+ */
+function validateLockOn(g, oniIdx, targetIdx) {
+  const remote = multiState.remotePlayers[targetIdx];
+  if (!remote || !remote.fig) {
+    rejectLockOn(g, oniIdx);
+    return;
+  }
+
+  // 1. 距離チェック（20m以内）
+  let oniPos;
+  if (oniIdx === multiState.playerIndex) {
+    oniPos = g.player.position;
+  } else if (multiState.remotePlayers[oniIdx]) {
+    oniPos = multiState.remotePlayers[oniIdx].fig.group.position;
+  } else {
+    rejectLockOn(g, oniIdx);
+    return;
+  }
+  const tPos = remote.fig.group.position;
+  const dist = oniPos.distanceTo(tPos);
+  if (dist > 20) {
+    rejectLockOn(g, oniIdx);
+    return;
+  }
+
+  // 2. 視線方向チェック（±30度）
+  let oniRotY;
+  if (oniIdx === multiState.playerIndex) {
+    oniRotY = g.playerFig.group.rotation.y;
+  } else if (multiState.remotePlayers[oniIdx]) {
+    oniRotY = multiState.remotePlayers[oniIdx].fig.group.rotation.y;
+  } else {
+    rejectLockOn(g, oniIdx);
+    return;
+  }
+  const angleToTarget = Math.atan2(tPos.x - oniPos.x, tPos.z - oniPos.z);
+  let angleDiff = angleToTarget - oniRotY;
+  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+  if (Math.abs(angleDiff) > Math.PI / 6) { // ±30度
+    rejectLockOn(g, oniIdx);
+    return;
+  }
+
+  // 3. レイキャスト遮蔽物チェック
+  const ray = new THREE.Raycaster();
+  const dir = new THREE.Vector3().subVectors(tPos, oniPos).normalize();
+  ray.set(new THREE.Vector3(oniPos.x, oniPos.y + 1.5, oniPos.z), dir);
+  ray.far = dist;
+  const obstacles = [];
+  g.scene.traverse(obj => {
+    if (obj.isMesh && !obj._remotePlayerIndex && obj.geometry) obstacles.push(obj);
+  });
+  const occHits = ray.intersectObjects(obstacles, false);
+  // プレイヤーフィギュアでない壁があれば遮蔽
+  const blocked = occHits.some(h => h.distance < dist - 0.5);
+  if (blocked) {
+    rejectLockOn(g, oniIdx);
+    return;
+  }
+
+  // 検証OK → ロックオン成立
+  if (multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/lockOn/' + oniIdx + '/validated').set(true);
+  }
+  // 通知
+  const targetName = remote.username || 'Player';
+  showCenterAlert('👁 見つけた！', targetName + '！', 2000);
+  SoundManager.playGameSE('found');
+
+  if (oniIdx === multiState.playerIndex) {
+    g._oniPlayer.lockedTarget = targetIdx;
+    g._oniPlayer.lockValidated = true;
+  }
+}
+
+function rejectLockOn(g, oniIdx) {
+  if (oniIdx === multiState.playerIndex) {
+    showLockOnFailed();
+    g._oniPlayer.lockCooldown = 1.5;
+  }
+  if (multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/lockOn/' + oniIdx).remove();
+  }
+}
+
+function showLockOnFailed() {
+  const el = document.getElementById('oni-lockon-failed');
+  if (el) {
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 500);
+  }
+}
+
+/**
+ * oniCanTouch — 鬼が缶タッチ（捕獲確定）
+ */
+function oniCanTouch(g) {
+  if (!g._isOniPlayer || !g._oniPlayer) return;
+  const op = g._oniPlayer;
+  if (op.lockedTarget < 0 || !op.lockValidated || op.canTouchCooldown > 0) return;
+  if (!g.can || !g.can.isAtHome) return;
+
+  // 缶との距離チェック
+  const canPos = g.can.group.position;
+  const dist = g.player.position.distanceTo(canPos);
+  if (dist > 2.5) return;
+
+  // 捕獲確定！
+  const targetIdx = op.lockedTarget;
+  op.canTouchCooldown = 2.0; // 2秒硬直
+  op.lockedTarget = -1;
+  op.lockValidated = false;
+
+  // ホスト自身の場合は即時捕獲
+  if (multiState.isHost) {
+    captureRemotePlayer(g, targetIdx);
+  } else {
+    // 非ホスト: Firebase経由でホストに通知
+    db.ref('rooms/' + multiState.roomId + '/capturedPlayers/' + targetIdx)
+      .set({ captureTime: firebase.database.ServerValue.TIMESTAMP, capturedBy: multiState.playerIndex });
+  }
+
+  showCenterAlert('✊ 缶タッチ！', '', 2000);
+  SoundManager.playGameSE('capture');
+
+  // ロックオンデータをクリア
+  if (multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/lockOn/' + multiState.playerIndex).remove();
+  }
+}
+
+/**
+ * oniPickupCan — 鬼が蹴り飛ばされた缶を拾う
+ */
+function oniPickupCan(g) {
+  if (!g._isOniPlayer || !g._oniPlayer) return;
+  if (!g.can || g.can.isAtHome) return;
+  const canPos = g.can.group.position;
+  const dist = g.player.position.distanceTo(canPos);
+  if (dist > 2.5) return;
+
+  g._oniPlayer.canCarrying = true;
+  showNotification('缶を拾った！定位置に戻せ！');
+  SoundManager.playGameSE('kick');
+}
+
+/**
+ * updateOniCanCarry — 缶運搬中のフレーム更新
+ */
+function updateOniCanCarry(g) {
+  if (!g._isOniPlayer || !g._oniPlayer || !g._oniPlayer.canCarrying) return;
+  if (!g.can) return;
+  // 缶をプレイヤーの前方に追従
+  const pPos = g.player.position;
+  const rotY = g.playerFig.group.rotation.y;
+  g.can.group.position.set(
+    pPos.x + Math.sin(rotY) * 1.2,
+    pPos.y + 0.5,
+    pPos.z + Math.cos(rotY) * 1.2
+  );
+
+  // 定位置に近いか？（2m以内で自動設置）
+  const homePos = g.can.homePos;
+  const homeDist = Math.sqrt((pPos.x - homePos.x) ** 2 + (pPos.z - homePos.z) ** 2);
+  if (homeDist < 2.0) {
+    // 缶を定位置に戻す
+    g._oniPlayer.canCarrying = false;
+    g.can.group.position.copy(homePos);
+    g.can.isAtHome = true;
+    showNotification('缶を定位置に戻した！');
+    SoundManager.playGameSE('place');
+
+    // Firebase同期
+    if (multiState.isHost && multiState.roomId) {
+      db.ref('rooms/' + multiState.roomId + '/canState').update({
+        status: 'placed',
+        position: { x: homePos.x, y: homePos.y, z: homePos.z },
+        carriedBy: -1
+      });
+    }
+  }
+}
+
+/**
+ * handleOniPlayerInput — 鬼プレイヤーのキー入力処理
+ * 呼び出し元: keydownイベント
+ */
+function handleOniPlayerInput(g, key) {
+  if (!g._isOniPlayer) return false;
+  if (key === ' ' || key === 'f') {
+    // Space/F: ロックオン or 缶タッチ or 缶拾い
+    const op = g._oniPlayer;
+    if (g.can) {
+      const canDist = g.player.position.distanceTo(g.can.group.position);
+      if (canDist < 2.5) {
+        if (g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated) {
+          oniCanTouch(g);
+          return true;
+        }
+        if (!g.can.isAtHome && !op.canCarrying) {
+          oniPickupCan(g);
+          return true;
+        }
+      }
+    }
+    // 遠い場合: ロックオン試行
+    attemptLockOn(g);
+    return true;
+  }
+  return false;
+}
+
+// ============================================================
 // SECTION: MULTIPLAYER SYNC (ゲーム中の同期処理)
 // ============================================================
 
@@ -13026,6 +13552,19 @@ function initMultiplayerSync(g) {
       syncGameState(g);
     }, 300);
 
+    // ホスト: 非ホスト鬼のロックオンリクエストを検証
+    if (g._multiMode === 'team') {
+      const lockAllRef = roomRef.child('lockOn');
+      const onLockAll = lockAllRef.on('child_added', (snap) => {
+        const oniIdx = parseInt(snap.key);
+        if (oniIdx === multiState.playerIndex) return; // 自分は自分で検証済み
+        const lockData = snap.val();
+        if (!lockData || lockData.validated) return;
+        validateLockOn(g, oniIdx, lockData.targetIndex);
+      });
+      g._multiListeners.push({ ref: lockAllRef, event: 'child_added', fn: onLockAll });
+    }
+
     // ホスト: Co-opリトライ信号を受信（非ホストがリトライボタンを押した場合）
     const advRefHost = roomRef.child('coopAdvance');
     let advInitialHost = true;
@@ -13105,6 +13644,24 @@ function initMultiplayerSync(g) {
       }
     });
     g._multiListeners.push({ ref: canRef, event: 'value', fn: onCan });
+
+    // 非ホスト鬼: ロックオン検証結果を受信
+    if (g._isOniPlayer) {
+      const lockRef = roomRef.child('lockOn/' + multiState.playerIndex);
+      const onLock = lockRef.on('value', (snap) => {
+        const lockData = snap.val();
+        if (!lockData || !g || g.disposed || !g._oniPlayer) return;
+        if (lockData.validated === true && g._oniPlayer.lockedTarget < 0) {
+          g._oniPlayer.lockedTarget = lockData.targetIndex;
+          g._oniPlayer.lockValidated = true;
+          const remote = multiState.remotePlayers[lockData.targetIndex];
+          const targetName = remote ? (remote.username || 'Player') : 'Player';
+          showCenterAlert('👁 見つけた！', targetName + '！', 2000);
+          SoundManager.playGameSE('found');
+        }
+      });
+      g._multiListeners.push({ ref: lockRef, event: 'value', fn: onLock });
+    }
 
     // 非ホスト: Co-opステージ遷移を受信
     const advRef = roomRef.child('coopAdvance');
