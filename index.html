@@ -10343,6 +10343,12 @@ function performCanKick(g, power, kickerName) {
   const kicker = kickerName || 'プレイヤー';
   showCenterAlert(kicker + ' が缶を蹴った！', quality + '!', 2500);
 
+  // 缶をプレイヤーの足元に移動（蹴る演出を自然にする）
+  const footX = g.player.position.x + Math.sin(g.player.rotation) * 0.5;
+  const footZ = g.player.position.z + Math.cos(g.player.rotation) * 0.5;
+  const footY = getGroundHeight(g, footX, footZ) + 0.1;
+  g.can.group.position.set(footX, footY, footZ);
+
   // Can physics
   const kickAngle = g.player.rotation;
   const strength = power / 100;
@@ -11152,29 +11158,38 @@ function confirmCanPlacement(g) {
   const wrap = document.getElementById('can-placement-wrap');
   if (wrap) wrap.style.display = 'none';
 
-  // Move to kick phase — コライダーに埋まらない安全な位置にスポーン
+  // Move to kick phase — 缶のすぐ近くにスポーン（8方向を近い順に試す）
   g.gamePhase = 'kick';
-  // キックフェーズ: 缶の近くにスポーン（実際に蹴れるように）
-  let spBaseX = pos.x, spBaseZ = pos.z + 2;
-  let spX = spBaseX, spZ = spBaseZ;
-  for (let attempt = 0; attempt < 20; attempt++) {
-    let inside = false;
-    for (const col of g.colliders) {
-      if (col.type === 'box' && Math.abs(spX - col.x) < col.hw + 1.0 && Math.abs(spZ - col.z) < col.hd + 1.0) {
-        inside = true; break;
+  const spawnDirs = [
+    [0, 1.5], [1.1, 1.1], [1.5, 0], [1.1, -1.1],
+    [0, -1.5], [-1.1, -1.1], [-1.5, 0], [-1.1, 1.1]
+  ];
+  let spX = pos.x, spZ = pos.z + 1.5;
+  let spFound = false;
+  for (let dist = 0; dist < 3 && !spFound; dist++) {
+    const extra = dist * 1.0; // 0, 1.0, 2.0
+    for (const [dx, dz] of spawnDirs) {
+      const tx = pos.x + dx + (dx > 0 ? extra : dx < 0 ? -extra : 0);
+      const tz = pos.z + dz + (dz > 0 ? extra : dz < 0 ? -extra : 0);
+      let inside = false;
+      for (const col of g.colliders) {
+        if (col.type === 'box' && Math.abs(tx - col.x) < col.hw + 0.6 && Math.abs(tz - col.z) < col.hd + 0.6) {
+          inside = true; break;
+        }
+        if (col.type === 'cylinder') {
+          const cd = Math.sqrt((tx - col.x) ** 2 + (tz - col.z) ** 2);
+          if (cd < col.r + 0.6) { inside = true; break; }
+        }
       }
-      if (col.type === 'cylinder') {
-        const cd = Math.sqrt((spX - col.x) ** 2 + (spZ - col.z) ** 2);
-        if (cd < col.r + 1.0) { inside = true; break; }
-      }
+      if (!inside) { spX = tx; spZ = tz; spFound = true; break; }
     }
-    if (!inside) break;
-    const a = Math.random() * Math.PI * 2;
-    spX = spBaseX + Math.cos(a) * (2 + attempt);
-    spZ = spBaseZ + Math.sin(a) * (2 + attempt);
   }
-  g.player.position.set(spX, 0, spZ);
+  const spY = getGroundHeight(g, spX, spZ);
+  g.player.position.set(spX, spY, spZ);
   g.playerFig.group.position.copy(g.player.position);
+  // プレイヤーが缶の方を向くようにする
+  g.player.rotation = Math.atan2(pos.x - spX, pos.z - spZ);
+  g.playerFig.group.rotation.y = g.player.rotation;
 
   showNotification('缶を蹴れ！ (F)');
   startKickGauge(g);
