@@ -9009,6 +9009,8 @@ function updateOni(g, oni, dt) {
           oni.state = 'recovery';
           oni.stateTimer = 0;
           showCenterAlert('缶が未回収！', '鬼は捕獲できない！', 2000);
+        } else if (g._captureImmunity > 0) {
+          // 捕獲免疫中 → canTouchに遷移せずchase継続
         } else {
           oni.state = 'canTouch';
           oni.foundTarget = oni.chaseTarget || closestVisibleTarget;
@@ -9059,13 +9061,21 @@ function updateOni(g, oni, dt) {
         (oni.position.x - canPos.x)**2 + (oni.position.z - canPos.z)**2
       );
       if (cDist < 2.5 && g.can.isAtHome) {
-        // Capture the found target!
-        capturePlayer(g, oni);
-        oni.state = 'patrol';
-        oni.restTimer = 2; // Post-capture pause
-        oni.stateTimer = 0;
-        oni.foundTarget = null;
-        oni.chaseTarget = null;
+        // 捕獲免疫中は捕獲できない（缶回収直後の猶予期間）
+        if (g._captureImmunity > 0) {
+          oni.state = 'patrol';
+          oni.stateTimer = 0;
+          oni.foundTarget = null;
+          oni.chaseTarget = null;
+        } else {
+          // Capture the found target!
+          capturePlayer(g, oni);
+          oni.state = 'patrol';
+          oni.restTimer = 2; // Post-capture pause
+          oni.stateTimer = 0;
+          oni.foundTarget = null;
+          oni.chaseTarget = null;
+        }
       }
       // If can was kicked while running
       if (!g.can.isAtHome || g.can.isFlying) {
@@ -9134,12 +9144,12 @@ function updateOni(g, oni, dt) {
         g._canRecoveryTimer = 0;
         oni.fatigue = Math.max(0, oni.fatigue - 15);
 
-        // seekフェーズ中の缶回収 → 全鬼に猶予タイマー（プレイヤーが隠れる時間）
+        // seekフェーズ中の缶回収 → 捕獲免疫タイマー（鬼は動くが捕獲だけできない）
         if (g.gamePhase === 'seek') {
           const graceSec = 5;
+          g._captureImmunity = graceSec;
           for (const o of g.onis) {
             o.state = 'patrol';
-            o.restTimer = graceSec;
             o.stateTimer = 0;
             o.foundTarget = null;
             o.chaseTarget = null;
@@ -11000,6 +11010,8 @@ function updateGamePhases(g, dt) {
       } else {
         g.gameTimer -= dt;
       }
+      // 捕獲免疫タイマーのカウントダウン
+      if (g._captureImmunity > 0) g._captureImmunity -= dt;
       updateKickGauge(g, dt); // Rescue kick gauge update
 
       // Score Attack: キャンプ防止 — 20秒間同じ場所にいると鬼に位置通知
@@ -11055,11 +11067,10 @@ function updateGamePhases(g, dt) {
           g.can.group.position.copy(g.can.homePos);
           g.can.isAtHome = true;
           g._canRecoveryTimer = 0;
-          // 自動回収後も猶予（プレイヤーが隠れる時間）
-          const autoGrace = 5;
+          // 自動回収後も捕獲免疫（鬼は動くが捕獲だけできない）
+          g._captureImmunity = 5;
           for (const o of g.onis) {
             o.state = 'patrol';
-            o.restTimer = autoGrace;
             o.stateTimer = 0;
             o.foundTarget = null;
             o.chaseTarget = null;
@@ -11566,6 +11577,7 @@ function startGame(stageNum, mode) {
   G.onis = [];
   G._stayTimer = 0; // キャンプ防止タイマー
   G._kickCount = 0; // Score Attack: 缶キック回数
+  G._captureImmunity = 0; // 缶回収後の捕獲免疫タイマー
   G._lastPlayerPos = null;
   // 鬼スポーンフラグをリセット
   for (let i = 0; i < (G.config.maxOni || 4); i++) G['_oniSpawned' + i] = false;
