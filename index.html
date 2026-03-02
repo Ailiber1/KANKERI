@@ -2667,8 +2667,16 @@ const STAGE_CONFIGS = {
     waypoints: [
       // 庭園巡回（建物南側の広場）
       {x:0,z:0},{x:-8,z:0},{x:8,z:0},{x:0,z:-8},{x:0,z:3},
-      // 建物南側（建物外壁沿い、進入不可）
-      {x:-10,z:3},{x:10,z:3},{x:22,z:4},{x:-24,z:4},
+      // ★ 建物入口前（入口を通って内部に巡回）
+      {x:0,z:4},{x:15,z:5},{x:-18,z:6},
+      // ★ 本堂内部
+      {x:0,z:10},{x:-3,z:8},{x:3,z:12},
+      // ★ 庫裏内部
+      {x:15,z:10},{x:13,z:9},{x:17,z:11},
+      // ★ 離れ内部
+      {x:-18,z:10},{x:-16,z:9},{x:-20,z:11},
+      // ★ 渡り廊下
+      {x:8.75,z:10},{x:-10.75,z:10},
       // 建物北側
       {x:-10,z:17},{x:0,z:17},{x:10,z:17},{x:22,z:17},
       // 建物東側（庫裏の外）
@@ -2700,10 +2708,15 @@ const STAGE_CONFIGS = {
       { type:'rock', x:-5, z:2, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
       { type:'rock', x:6, z:-3, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
       { type:'rock', x:3, z:5, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
-      // 建物外壁（固体化のため外側から叩く）
-      { type:'wall', x:0, z:3, radius:20, label:'本堂の壁', labelEn:'Main Hall Wall', sound:'thud' },
-      { type:'wall', x:22, z:10, radius:15, label:'庫裏の壁', labelEn:'Kitchen Wall', sound:'thud' },
-      { type:'wall', x:-24, z:10, radius:12, label:'離れの壁', labelEn:'Annex Wall', sound:'thud' },
+      // 建物内部の柱（本堂）
+      { type:'pillar', x:-3, z:8, radius:15, label:'本堂の柱', labelEn:'Main Hall Pillar', sound:'thud' },
+      { type:'pillar', x:3, z:12, radius:15, label:'本堂の柱', labelEn:'Main Hall Pillar', sound:'thud' },
+      // 庫裏の壁
+      { type:'wall', x:15, z:5, radius:15, label:'庫裏の壁', labelEn:'Kitchen Wall', sound:'thud' },
+      // 離れの壁
+      { type:'wall', x:-18, z:6, radius:12, label:'離れの壁', labelEn:'Annex Wall', sound:'thud' },
+      // 障子戸（離れの南入口、開閉可能）
+      { type:'shoji', x:-18, z:7, radius:3, label:'障子戸', labelEn:'Shoji Door', sound:'thud' },
       // 山門
       { type:'gate', x:0, z:-32, radius:20, label:'山門の柱', labelEn:'Temple Gate Pillar', sound:'thud' },
       // 地蔵尊
@@ -6999,16 +7012,55 @@ function buildTempleObjects(g) {
   }
 
   // ========================================
-  //  本堂（15×10×6m、中心: (0, 0, 10)）— 固体ブロック
+  //  本堂（15×10×6m、中心: (0, 0, 10)）— 壁分割・入口付き
   // ========================================
   const honX = 0, honZ = 10;
+  const honW = 15, honD = 10, honH = 6;
   // 基壇（石積み）
   addBox(stoneMat, 16, 0.5, 11, honX, 0.25, honZ);
-  // 壁 — 全面（入口なし）
-  addBox(wallMat, 15, 5, 0.3, honX, 3.1, honZ + 5);  // 北壁
-  addBox(wallMat, 15, 5, 0.3, honX, 3.1, honZ - 5);  // 南壁（全面閉鎖）
-  addBox(wallMat, 0.3, 5, 10, honX + 7.5, 3.1, honZ); // 東壁
-  addBox(wallMat, 0.3, 5, 10, honX - 7.5, 3.1, honZ); // 西壁（全面閉鎖）
+  // --- 北壁（全面） ---
+  addBox(wallMat, honW, honH, 0.3, honX, honH/2 + 0.5, honZ + honD/2);
+  addBoxCollider(honX, honZ + honD/2, honW/2 + 0.1, 0.3, honH);
+  // --- 南壁（中央4m開口: x=-2~2） ---
+  addBox(wallMat, 5.5, honH, 0.3, honX - 4.75, honH/2 + 0.5, honZ - honD/2); // 左 x:-7.5~-2
+  addBox(wallMat, 5.5, honH, 0.3, honX + 4.75, honH/2 + 0.5, honZ - honD/2); // 右 x:2~7.5
+  // まぐさ（入口上部 y:3.5~6.5）
+  addBox(wallMat, 4, 3, 0.3, honX, 5.0, honZ - honD/2);
+  addBoxCollider(honX - 4.75, honZ - honD/2, 5.5/2, 0.3, honH); // 左壁コライダー
+  addBoxCollider(honX + 4.75, honZ - honD/2, 5.5/2, 0.3, honH); // 右壁コライダー
+  // --- 東壁（全面） ---
+  addBox(wallMat, 0.3, honH, honD, honX + honW/2, honH/2 + 0.5, honZ);
+  addBoxCollider(honX + honW/2, honZ, 0.3, honD/2 + 0.1, honH);
+  // --- 西壁（裏口3m開口: z=8.5~11.5） ---
+  addBox(wallMat, 0.3, honH, 3.5, honX - honW/2, honH/2 + 0.5, honZ - 3.25); // z:5~8.5
+  addBox(wallMat, 0.3, honH, 3.5, honX - honW/2, honH/2 + 0.5, honZ + 3.25); // z:11.5~15
+  addBox(wallMat, 0.3, 3, 3, honX - honW/2, 5.0, honZ); // 裏口まぐさ
+  addBoxCollider(honX - honW/2, honZ - 3.25, 0.3, 1.75, honH); // 下壁
+  addBoxCollider(honX - honW/2, honZ + 3.25, 0.3, 1.75, honH); // 上壁
+  // --- 入口段差（南入口） ---
+  addBox(stoneMat, 4.5, 0.25, 1.2, honX, 0.13, honZ - honD/2 - 0.6);
+  addBox(stoneMat, 4.5, 0.15, 0.8, honX, 0.58, honZ - honD/2);
+  // --- 裏口段差（西） ---
+  addBox(stoneMat, 1.2, 0.25, 2.5, honX - honW/2 - 0.6, 0.13, honZ);
+  // --- 内部照明 ---
+  var honLight1 = new THREE.PointLight(0xffe8cc, 0.4, 12);
+  honLight1.position.set(honX, 3.5, honZ);
+  g.scene.add(honLight1);
+  var honLight2 = new THREE.PointLight(0xffe8cc, 0.2, 8);
+  honLight2.position.set(honX, 2.5, honZ - 4); // 入口付近
+  g.scene.add(honLight2);
+  // --- 内部柱4本（視覚のみ、コライダーなし） ---
+  var honPillarGeo = addGeo(new THREE.CylinderGeometry(0.2, 0.25, honH - 0.5, 6));
+  for (var hpi = 0; hpi < 4; hpi++) {
+    var hpx = (hpi % 2 === 0 ? -3 : 3);
+    var hpz = honZ + (hpi < 2 ? -2 : 2);
+    var hpMesh = new THREE.Mesh(honPillarGeo, darkWoodMat);
+    hpMesh.position.set(hpx, (honH - 0.5)/2 + 0.5, hpz);
+    hpMesh.castShadow = true;
+    g.scene.add(hpMesh);
+  }
+  // --- 内部床（板の間） ---
+  addBox(woodMat, honW - 0.6, 0.08, honD - 0.6, honX, 0.54, honZ);
   // 屋根
   const honRoofGeo = addGeo(new THREE.ConeGeometry(11, 3, 4));
   const honRoof = new THREE.Mesh(honRoofGeo, roofMat);
@@ -7016,20 +7068,41 @@ function buildTempleObjects(g) {
   honRoof.rotation.y = Math.PI / 4;
   honRoof.castShadow = true;
   g.scene.add(honRoof);
-  // ★ 固体コライダー1個（建物全体をブロック）
-  addBoxCollider(honX, honZ, 8.0, 5.5, 6);
 
   // ========================================
-  //  庫裏（10×8×4m、中心: (15, 0, 10)）— 固体ブロック
+  //  庫裏（10×8×4m、中心: (15, 0, 10)）— 壁分割・入口付き
   // ========================================
   const kuriX = 15, kuriZ = 10;
+  const kuriW = 10, kuriD = 8, kuriH = 4;
   // 基壇
   addBox(stoneMat, 11, 0.4, 9, kuriX, 0.2, kuriZ);
-  // 壁 — 全面（入口なし）
-  addBox(wallMat, 10, 3.5, 0.3, kuriX, 2.2, kuriZ + 4);  // 北壁
-  addBox(wallMat, 10, 3.5, 0.3, kuriX, 2.2, kuriZ - 4);  // 南壁（全面閉鎖）
-  addBox(wallMat, 0.3, 3.5, 8, kuriX + 5, 2.2, kuriZ);   // 東壁
-  addBox(wallMat, 0.3, 3.5, 8, kuriX - 5, 2.2, kuriZ);   // 西壁（全面閉鎖）
+  // --- 北壁（全面） ---
+  addBox(wallMat, kuriW, kuriH, 0.3, kuriX, kuriH/2 + 0.4, kuriZ + kuriD/2);
+  addBoxCollider(kuriX, kuriZ + kuriD/2, kuriW/2 + 0.1, 0.3, kuriH);
+  // --- 南壁（中央3m開口: x=13.5~16.5） ---
+  addBox(wallMat, 3.5, kuriH, 0.3, kuriX - 3.25, kuriH/2 + 0.4, kuriZ - kuriD/2); // 左 x:10~13.5
+  addBox(wallMat, 3.5, kuriH, 0.3, kuriX + 3.25, kuriH/2 + 0.4, kuriZ - kuriD/2); // 右 x:16.5~20
+  addBox(wallMat, 3, 1.5, 0.3, kuriX, kuriH - 0.35, kuriZ - kuriD/2); // まぐさ
+  addBoxCollider(kuriX - 3.25, kuriZ - kuriD/2, 3.5/2, 0.3, kuriH);
+  addBoxCollider(kuriX + 3.25, kuriZ - kuriD/2, 3.5/2, 0.3, kuriH);
+  // --- 東壁（全面） ---
+  addBox(wallMat, 0.3, kuriH, kuriD, kuriX + kuriW/2, kuriH/2 + 0.4, kuriZ);
+  addBoxCollider(kuriX + kuriW/2, kuriZ, 0.3, kuriD/2 + 0.1, kuriH);
+  // --- 西壁（渡り廊下接続のため3m開口: z=8.5~11.5） ---
+  addBox(wallMat, 0.3, kuriH, 2.5, kuriX - kuriW/2, kuriH/2 + 0.4, kuriZ - 2.75); // z:6~8.5
+  addBox(wallMat, 0.3, kuriH, 2.5, kuriX - kuriW/2, kuriH/2 + 0.4, kuriZ + 2.75); // z:11.5~14
+  addBox(wallMat, 0.3, 1.5, 3, kuriX - kuriW/2, kuriH - 0.35, kuriZ); // まぐさ
+  addBoxCollider(kuriX - kuriW/2, kuriZ - 2.75, 0.3, 1.25, kuriH);
+  addBoxCollider(kuriX - kuriW/2, kuriZ + 2.75, 0.3, 1.25, kuriH);
+  // --- 入口段差（南入口） ---
+  addBox(stoneMat, 3.5, 0.2, 1.0, kuriX, 0.1, kuriZ - kuriD/2 - 0.5);
+  addBox(earthMat, 3.5, 0.12, 0.6, kuriX, 0.46, kuriZ - kuriD/2);
+  // --- 内部照明 ---
+  var kuriLight = new THREE.PointLight(0xffe8cc, 0.35, 10);
+  kuriLight.position.set(kuriX, 2.8, kuriZ);
+  g.scene.add(kuriLight);
+  // --- 内部（土間テクスチャ） ---
+  addBox(earthMat, kuriW - 0.6, 0.06, kuriD - 0.6, kuriX, 0.43, kuriZ);
   // 屋根
   const kuriRoofGeo = addGeo(new THREE.ConeGeometry(8, 2.5, 4));
   const kuriRoof = new THREE.Mesh(kuriRoofGeo, roofMat);
@@ -7037,27 +7110,54 @@ function buildTempleObjects(g) {
   kuriRoof.rotation.y = Math.PI / 4;
   kuriRoof.castShadow = true;
   g.scene.add(kuriRoof);
-  // ★ 固体コライダー1個
-  addBoxCollider(kuriX, kuriZ, 5.5, 4.5, 4);
 
   // ========================================
-  //  離れ（8×6×4m、中心: (-18, 0, 10)）— 固体ブロック
+  //  離れ（8×6×4m、中心: (-18, 0, 10)）— 壁分割・障子戸入口付き
   // ========================================
   const hanX = -18, hanZ = 10;
+  const hanW = 8, hanD = 6, hanH = 4;
   // 基壇
   addBox(stoneMat, 9, 0.4, 7, hanX, 0.2, hanZ);
-  // 壁 — 全面（障子戸は閉鎖、視覚のみ）
-  addBox(wallMat, 8, 3.5, 0.3, hanX, 2.2, hanZ + 3);   // 北壁
-  addBox(wallMat, 8, 3.5, 0.3, hanX, 2.2, hanZ - 3);   // 南壁（全面閉鎖）
-  addBox(wallMat, 0.3, 3.5, 6, hanX + 4, 2.2, hanZ);   // 東壁（全面閉鎖）
-  addBox(wallMat, 0.3, 3.5, 6, hanX - 4, 2.2, hanZ);   // 西壁
-  // 障子戸（視覚のみ、開閉なし）
+  // --- 北壁（全面） ---
+  addBox(wallMat, hanW, hanH, 0.3, hanX, hanH/2 + 0.4, hanZ + hanD/2);
+  addBoxCollider(hanX, hanZ + hanD/2, hanW/2 + 0.1, 0.3, hanH);
+  // --- 南壁（中央3m開口: x=-19.5~-16.5）— 障子戸 ---
+  addBox(wallMat, 2.5, hanH, 0.3, hanX - 2.75, hanH/2 + 0.4, hanZ - hanD/2); // 左 x:-22~-19.5
+  addBox(wallMat, 2.5, hanH, 0.3, hanX + 2.75, hanH/2 + 0.4, hanZ - hanD/2); // 右 x:-16.5~-14
+  addBox(wallMat, 3, 1, 0.3, hanX, hanH - 0.1, hanZ - hanD/2); // まぐさ
+  addBoxCollider(hanX - 2.75, hanZ - hanD/2, 2.5/2, 0.3, hanH);
+  addBoxCollider(hanX + 2.75, hanZ - hanD/2, 2.5/2, 0.3, hanH);
+  // --- 東壁（渡り廊下接続3m開口: z=8.5~11.5） ---
+  addBox(wallMat, 0.3, hanH, 1.5, hanX + hanW/2, hanH/2 + 0.4, hanZ - 2.25); // z:7~8.5
+  addBox(wallMat, 0.3, hanH, 1.5, hanX + hanW/2, hanH/2 + 0.4, hanZ + 2.25); // z:11.5~13
+  addBox(wallMat, 0.3, 1.5, 3, hanX + hanW/2, hanH - 0.35, hanZ); // まぐさ
+  addBoxCollider(hanX + hanW/2, hanZ - 2.25, 0.3, 0.75, hanH);
+  addBoxCollider(hanX + hanW/2, hanZ + 2.25, 0.3, 0.75, hanH);
+  // --- 西壁（全面） ---
+  addBox(wallMat, 0.3, hanH, hanD, hanX - hanW/2, hanH/2 + 0.4, hanZ);
+  addBoxCollider(hanX - hanW/2, hanZ, 0.3, hanD/2 + 0.1, hanH);
+  // --- 障子戸（開閉可能） ---
   const shojiGeo = addGeo(new THREE.BoxGeometry(3, 3, 0.08));
   const shojiMesh = new THREE.Mesh(shojiGeo, shojiMat);
-  shojiMesh.position.set(hanX, 2.0, hanZ - 3);
+  shojiMesh.position.set(hanX, 2.0, hanZ - hanD/2);
   shojiMesh.castShadow = true;
   g.scene.add(shojiMesh);
-  g._shojiDoor = null; // 開閉無効化
+  g._shojiDoor = {
+    mesh: shojiMesh,
+    open: false,
+    x: hanX, z: hanZ - hanD/2,
+    closedX: hanX, openX: hanX + 3.2,
+    collider: null // 開放時はコライダーなし
+  };
+  // --- 入口段差（南入口） ---
+  addBox(stoneMat, 3.5, 0.2, 1.0, hanX, 0.1, hanZ - hanD/2 - 0.5);
+  addBox(woodMat, 3.5, 0.12, 0.6, hanX, 0.46, hanZ - hanD/2);
+  // --- 内部照明 ---
+  var hanLight = new THREE.PointLight(0xffe8cc, 0.3, 8);
+  hanLight.position.set(hanX, 2.5, hanZ);
+  g.scene.add(hanLight);
+  // --- 内部床（畳） ---
+  addBox(tatamiMat, hanW - 0.6, 0.06, hanD - 0.6, hanX, 0.43, hanZ);
   // 屋根
   const hanRoofGeo = addGeo(new THREE.ConeGeometry(6.5, 2, 4));
   const hanRoof = new THREE.Mesh(hanRoofGeo, roofMat);
@@ -7065,35 +7165,33 @@ function buildTempleObjects(g) {
   hanRoof.rotation.y = Math.PI / 4;
   hanRoof.castShadow = true;
   g.scene.add(hanRoof);
-  // 縁側（視覚のみ）
+  // 縁側（視覚 + 歩行可能）
   addBox(woodMat, 1.5, 0.15, 4, hanX + 4.5, 0.45, hanZ);
-  // ★ 固体コライダー1個
-  addBoxCollider(hanX, hanZ, 4.5, 3.5, 4);
 
   // ========================================
-  //  渡り廊下（本堂↔庫裏、本堂↔離れ）— 固体ブロック
+  //  渡り廊下（本堂↔庫裏、本堂↔離れ）— 通行可能、手すり壁のみコライダー
   // ========================================
   // 本堂東壁 → 庫裏西壁 (x: 7.5 ~ 10)
-  addBox(woodMat, 2.5, 0.15, 1.5, 8.75, 0.5, honZ);
-  addBox(wallMat, 2.5, 3, 0.2, 8.75, 1.5, honZ + 0.75); // 手すり壁化
-  addBox(wallMat, 2.5, 3, 0.2, 8.75, 1.5, honZ - 0.75);
-  const watari1RoofGeo = addGeo(new THREE.BoxGeometry(2.5, 0.1, 2, 1));
+  addBox(woodMat, 2.5, 0.15, 3, 8.75, 0.5, honZ); // 床（幅3m）
+  addBox(wallMat, 2.5, 2.5, 0.2, 8.75, 1.65, honZ + 1.5); // 北手すり壁
+  addBox(wallMat, 2.5, 2.5, 0.2, 8.75, 1.65, honZ - 1.5); // 南手すり壁
+  addBoxCollider(8.75, honZ + 1.5, 1.5, 0.2, 3); // 北手すりコライダー
+  addBoxCollider(8.75, honZ - 1.5, 1.5, 0.2, 3); // 南手すりコライダー
+  const watari1RoofGeo = addGeo(new THREE.BoxGeometry(2.5, 0.1, 2.4, 1));
   const watari1Roof = new THREE.Mesh(watari1RoofGeo, roofMat);
   watari1Roof.position.set(8.75, 3.5, honZ);
   g.scene.add(watari1Roof);
-  // ★ 渡り廊下1 コライダー
-  addBoxCollider(8.75, honZ, 1.5, 1.0, 4);
 
   // 本堂西壁 → 離れ東壁 (x: -7.5 ~ -14)
-  addBox(woodMat, 6.5, 0.15, 1.5, -10.75, 0.5, honZ);
-  addBox(wallMat, 6.5, 3, 0.2, -10.75, 1.5, honZ + 0.75);
-  addBox(wallMat, 6.5, 3, 0.2, -10.75, 1.5, honZ - 0.75);
-  const watari2RoofGeo = addGeo(new THREE.BoxGeometry(6.5, 0.1, 2, 1));
+  addBox(woodMat, 6.5, 0.15, 3, -10.75, 0.5, honZ); // 床（幅3m）
+  addBox(wallMat, 6.5, 2.5, 0.2, -10.75, 1.65, honZ + 1.5); // 北手すり壁
+  addBox(wallMat, 6.5, 2.5, 0.2, -10.75, 1.65, honZ - 1.5); // 南手すり壁
+  addBoxCollider(-10.75, honZ + 1.5, 3.5, 0.2, 3); // 北手すりコライダー
+  addBoxCollider(-10.75, honZ - 1.5, 3.5, 0.2, 3); // 南手すりコライダー
+  const watari2RoofGeo = addGeo(new THREE.BoxGeometry(6.5, 0.1, 2.4, 1));
   const watari2Roof = new THREE.Mesh(watari2RoofGeo, roofMat);
   watari2Roof.position.set(-10.75, 3.5, honZ);
   g.scene.add(watari2Roof);
-  // ★ 渡り廊下2 コライダー
-  addBoxCollider(-10.75, honZ, 3.5, 1.0, 4);
 
   // ========================================
   //  枯山水庭園（30×25m、中央 (0, 0, 0)）
@@ -9273,10 +9371,19 @@ function getFootSoundRange(g) {
   // Stage 5: コンクリ=12m, 芝生=8m（階段室のエコー=25mは別途チェック）
   let baseRange = 8;
   if (g._stageNum === 6) {
-    // Stage 6: 古刹の大屋敷 — エリア別足音検知距離（建物は固体ブロック、屋外のみ）
+    // Stage 6: 古刹の大屋敷 — エリア別足音検知距離
     const px = g.player.position.x, pz = g.player.position.z;
-    // 砂利: 庭園中央エリア (|x|<15, |z|<12)
-    if (Math.abs(px) < 15 && Math.abs(pz) < 12) baseRange = 18;
+    // 本堂内部（板の間）: x:-7.5~7.5, z:5~15
+    if (px > -7.5 && px < 7.5 && pz > 5 && pz < 15) baseRange = 15;
+    // 渡り廊下（板鳴り）: (x:7.5~10, z:9~11) or (x:-14~-7.5, z:9~11)
+    else if ((px > 7 && px < 10.5 && pz > 9 && pz < 11) ||
+             (px > -14.5 && px < -7 && pz > 9 && pz < 11)) baseRange = 12;
+    // 庫裏内部（土間）: x:10~20, z:6~14
+    else if (px > 10 && px < 20 && pz > 6 && pz < 14) baseRange = 10;
+    // 離れ内部（畳）: x:-22~-14, z:7~13
+    else if (px > -22 && px < -14 && pz > 7 && pz < 13) baseRange = 6;
+    // 砂利: 庭園中央エリア (|x|<15, |z|<5)
+    else if (Math.abs(px) < 15 && pz > -12 && pz < 5) baseRange = 18;
     // 竹林: (x:17~27, z:15~25)
     else if (px > 17 && px < 27 && pz > 15 && pz < 25) baseRange = 16;
     // 飛び石: 庭園内の飛び石上
@@ -10363,10 +10470,10 @@ function performHit(g, interactable) {
     g._shojiDoor.open = !g._shojiDoor.open;
     const door = g._shojiDoor;
     if (door.open) {
-      door.mesh.position.x = door.baseX + 2;
+      door.mesh.position.x = door.openX;
       showNotification(gameState.language === 'ja' ? '障子を開けた' : 'Opened the shoji');
     } else {
-      door.mesh.position.x = door.baseX;
+      door.mesh.position.x = door.closedX;
       showNotification(gameState.language === 'ja' ? '障子を閉めた' : 'Closed the shoji');
     }
     g._hitCooldown = false; // 障子開閉はクールダウンなし
