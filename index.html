@@ -598,6 +598,95 @@ html, body {
   .pc-only { display: none !important; }
 }
 
+/* ============================================================
+   SECTION: MULTIPLAYER / LOBBY
+   ============================================================ */
+#multi-modal .mode-cards { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.mode-card {
+  background: rgba(20, 30, 60, 0.6);
+  border: 1px solid rgba(85, 153, 255, 0.2);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.mode-card:hover, .mode-card.selected {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 229, 255, 0.08);
+}
+.mode-card.selected::before {
+  content: '✓'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--neon-cyan); font-size: 18px;
+}
+.mode-card-title { color: var(--neon-cyan); font-size: 14px; margin-bottom: 4px; font-weight: bold; }
+.mode-card-desc { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.room-input-row { display: flex; gap: 8px; margin: 12px 0; }
+.room-input-row .neon-input { flex: 1; text-transform: uppercase; letter-spacing: 3px; font-size: 18px; text-align: center; }
+
+#lobby-screen {
+  background: var(--bg-dark);
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(20,50,120,0.35) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(10,30,80,0.3) 0%, transparent 50%);
+}
+#lobby-screen .scanlines-bg {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none;
+}
+.lobby-panel {
+  position: relative; z-index: 2;
+  width: min(480px, 92vw);
+  background: var(--bg-panel);
+  border: 1px solid rgba(85, 153, 255, 0.25);
+  padding: 24px 20px;
+}
+.lobby-room-id {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(28px, 8vw, 42px);
+  color: var(--neon-cyan);
+  text-align: center;
+  letter-spacing: 6px;
+  text-shadow: 0 0 12px var(--neon-cyan-glow);
+  margin-bottom: 4px;
+}
+.lobby-mode { text-align: center; color: var(--text-secondary); font-size: 13px; margin-bottom: 16px; }
+.lobby-player-list { margin: 0 0 16px; }
+.lobby-player {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(85, 153, 255, 0.1);
+}
+.lobby-player:last-child { border-bottom: none; }
+.lobby-player-name { color: var(--text-primary); font-size: 14px; }
+.lobby-player-name .host-badge {
+  display: inline-block; background: var(--neon-pink); color: #fff; font-size: 10px;
+  padding: 1px 6px; margin-left: 8px; border-radius: 2px;
+}
+.lobby-player-status { font-size: 12px; }
+.lobby-player-status.ready { color: var(--neon-green); }
+.lobby-player-status.waiting { color: var(--text-dim); }
+.lobby-slot-empty {
+  padding: 10px 12px; border-bottom: 1px solid rgba(85, 153, 255, 0.1);
+  color: var(--text-dim); font-size: 13px; font-style: italic;
+}
+.lobby-stage-select { margin: 10px 0; }
+.lobby-stage-label { color: var(--text-secondary); font-size: 12px; margin-bottom: 4px; }
+.lobby-share {
+  text-align: center; margin: 12px 0 0;
+  color: var(--text-dim); font-size: 11px;
+}
+.lobby-share a {
+  color: var(--neon-cyan); text-decoration: none;
+  cursor: pointer;
+}
+.lobby-share a:hover { text-decoration: underline; }
+.lobby-btn-row { display: flex; gap: 10px; margin-top: 14px; }
+.lobby-btn-row .btn { flex: 1; }
+.lobby-chat { margin-top: 12px; max-height: 80px; overflow-y: auto; font-size: 12px; color: var(--text-secondary); }
+.lobby-chat-msg { padding: 2px 0; }
+.lobby-chat-msg .chat-name { color: var(--neon-cyan); }
+
 /* --- Game HUD responsive (smartphone) --- */
 @media (max-width: 600px) {
   #hud-top-bar { top: 6px; left: 6px; right: 6px; }
@@ -882,6 +971,84 @@ html, body {
 </div>
 
 <!-- ============================================================
+     SECTION: MULTIPLAYER MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="multi-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('multi-modal')">&times;</button>
+    <div class="corner-bl"></div>
+    <div class="corner-br"></div>
+    <div class="modal-title">MULTIPLAYER</div>
+
+    <div class="setting-label">● モード選択</div>
+    <div class="mode-cards">
+      <div class="mode-card selected" data-mode="ffa">
+        <div class="mode-card-title">個人戦（Free For All）</div>
+        <div class="mode-card-desc">全員がランナー vs AI鬼。最後まで逃げ切れ！</div>
+      </div>
+      <div class="mode-card" data-mode="coop">
+        <div class="mode-card-title">協力プレイ（Co-op）</div>
+        <div class="mode-card-desc">全員で協力してAI鬼から逃げ切れ！仲間を救出せよ。</div>
+      </div>
+      <div class="mode-card" data-mode="team">
+        <div class="mode-card-title">チーム戦（Team Battle）</div>
+        <div class="mode-card-desc">鬼チーム vs ランナーチーム。ラウンド制で攻守交代。</div>
+      </div>
+    </div>
+
+    <div class="setting-label">● ルームID</div>
+    <div class="room-input-row">
+      <input type="text" id="room-id-input" class="neon-input" placeholder="ルームIDを入力..." maxlength="12" autocomplete="off">
+    </div>
+    <div class="setting-note">同じIDを入力した人同士がマッチします。存在しないIDは新規作成されます。</div>
+    <div id="room-error" class="input-error-msg" style="display:none;"></div>
+
+    <div class="btn-group" style="margin-top:16px">
+      <button class="btn btn-neon" id="btn-join-room">ルームに参加</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION: LOBBY SCREEN
+     ============================================================ -->
+<div id="lobby-screen" class="screen">
+  <div class="scanlines-bg"></div>
+  <div class="lobby-panel">
+    <div class="corner-bl"></div>
+    <div class="corner-br"></div>
+    <div style="text-align:center;color:var(--text-dim);font-size:11px;margin-bottom:4px;">ROOM</div>
+    <div class="lobby-room-id" id="lobby-room-id">----</div>
+    <div class="lobby-mode" id="lobby-mode">個人戦（Free For All）</div>
+
+    <div class="lobby-stage-select" id="lobby-stage-section">
+      <div class="lobby-stage-label">● ステージ</div>
+      <select class="neon-select" id="lobby-stage-select">
+        <option value="1">Stage 1 — 児童公園</option>
+        <option value="2">Stage 2 — 雨上がりの神社</option>
+        <option value="3">Stage 3 — ネオン商店街の裏路地</option>
+        <option value="4">Stage 4 — 廃校の校庭</option>
+        <option value="5">Stage 5 — 団地（真夏の公営住宅群）</option>
+      </select>
+    </div>
+
+    <div class="lobby-player-list" id="lobby-player-list">
+      <div class="lobby-slot-empty">接続中...</div>
+    </div>
+
+    <div class="lobby-share" id="lobby-share-url"></div>
+
+    <div class="lobby-btn-row">
+      <button class="btn btn-neon" id="btn-lobby-ready">準備完了</button>
+      <button class="btn btn-neon" id="btn-lobby-start" style="display:none;">ゲーム開始</button>
+      <button class="btn btn-thin" id="btn-lobby-leave">退出</button>
+    </div>
+
+    <div class="lobby-chat" id="lobby-chat"></div>
+  </div>
+</div>
+
+<!-- ============================================================
      SECTION: LOADING SCREEN
      ============================================================ -->
 <div id="loading-screen" class="screen">
@@ -1067,6 +1234,40 @@ const gameState = {
 };
 
 // ============================================================
+// SECTION: MULTIPLAYER STATE
+// ============================================================
+const MAX_PLAYERS = 4;
+const ROOM_TIMEOUT_EMPTY = 5 * 60 * 1000; // 空ルーム5分で自動削除
+const ROOM_TIMEOUT_GAME = 30 * 60 * 1000; // ゲーム中30分で強制終了
+const POS_SYNC_INTERVAL = 100; // ms
+const POS_SYNC_IDLE_INTERVAL = 500; // 移動していない時
+
+const multiState = {
+  active: false,
+  roomId: null,
+  gameMode: 'ffa', // ffa | coop | team
+  isHost: false,
+  playerIndex: -1,
+  sessionId: null,
+  players: {},      // { 0: { username, deviceId, sessionId, ready, role }, ... }
+  ready: false,
+  stage: 1,
+  // Firebase listeners
+  _listeners: [],
+  // Position sync
+  _posSyncTimer: null,
+  _lastSentPos: null,
+  // Remote player figures
+  remotePlayers: {} // { index: { fig, lastPos, lastUpdate } }
+};
+
+const MODE_LABELS = {
+  ffa: '個人戦（Free For All）',
+  coop: '協力プレイ（Co-op）',
+  team: 'チーム戦（Team Battle）'
+};
+
+// ============================================================
 // SECTION: FIREBASE
 // ============================================================
 const app = firebase.initializeApp(FIREBASE_CONFIG);
@@ -1204,6 +1405,370 @@ function renderRankingList(entries, listEl, lang) {
     (lang ? '※登録ユーザーのみ対象' : '※Registered users only') + '</div>';
 
   listEl.innerHTML = html;
+}
+
+// ============================================================
+// SECTION: MULTIPLAYER ROOM MANAGEMENT
+// ============================================================
+
+/**
+ * joinOrCreateRoom — ルームに参加（存在しなければ新規作成）
+ * 呼び出し元: btn-join-room クリックイベント
+ */
+async function joinOrCreateRoom(roomId, mode) {
+  if (!roomId || roomId.trim().length === 0) {
+    showRoomError('ルームIDを入力してください');
+    return;
+  }
+  roomId = roomId.trim().toUpperCase();
+  if (!/^[A-Z0-9]+$/.test(roomId)) {
+    showRoomError('英数字のみ使用できます');
+    return;
+  }
+
+  // ユーザー名チェック
+  if (!gameState.username) {
+    showRoomError('先にユーザー名を登録してください');
+    return;
+  }
+
+  const roomRef = db.ref('rooms/' + roomId);
+  const snapshot = await roomRef.once('value');
+  const roomData = snapshot.val();
+
+  if (roomData) {
+    // 既存ルームに参加
+    if (roomData.status !== 'waiting') {
+      showRoomError('このルームはゲーム進行中です');
+      return;
+    }
+    const players = roomData.players || {};
+    const playerCount = Object.keys(players).length;
+    if (playerCount >= MAX_PLAYERS) {
+      showRoomError('ルームが満員です（最大' + MAX_PLAYERS + '人）');
+      return;
+    }
+    // 空きスロットを探す
+    let slotIndex = -1;
+    for (let i = 0; i < MAX_PLAYERS; i++) {
+      if (!players[i]) { slotIndex = i; break; }
+    }
+    if (slotIndex === -1) {
+      showRoomError('ルームが満員です');
+      return;
+    }
+    multiState.playerIndex = slotIndex;
+    multiState.isHost = false;
+    multiState.roomId = roomId;
+    multiState.gameMode = roomData.gameMode || 'ffa';
+    multiState.stage = roomData.currentStage || 1;
+  } else {
+    // 新規ルーム作成
+    multiState.playerIndex = 0;
+    multiState.isHost = true;
+    multiState.roomId = roomId;
+    multiState.gameMode = mode;
+    multiState.stage = 1;
+    await roomRef.set({
+      status: 'waiting',
+      gameMode: mode,
+      currentStage: 1,
+      host: 0,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      players: {}
+    });
+  }
+
+  // セッションIDを生成（タブごとに一意）
+  multiState.sessionId = 'ses_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+
+  // 自分のプレイヤーデータを書き込む
+  const myRef = roomRef.child('players/' + multiState.playerIndex);
+  await myRef.set({
+    username: gameState.username,
+    deviceId: gameState.deviceId,
+    sessionId: multiState.sessionId,
+    role: 'runner',
+    ready: false,
+    joinedAt: firebase.database.ServerValue.TIMESTAMP
+  });
+
+  // onDisconnectで自動退出
+  myRef.onDisconnect().remove();
+
+  multiState.active = true;
+  multiState.ready = false;
+  closeModal('multi-modal');
+  showScreen('lobby-screen');
+  initLobbyListeners();
+  updateLobbyUI();
+}
+
+function showRoomError(msg) {
+  const el = document.getElementById('room-error');
+  if (el) {
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 3000);
+  }
+}
+
+function initLobbyListeners() {
+  const roomRef = db.ref('rooms/' + multiState.roomId);
+
+  // プレイヤー変更監視
+  const playersRef = roomRef.child('players');
+  const onPlayers = playersRef.on('value', (snap) => {
+    multiState.players = snap.val() || {};
+    updateLobbyUI();
+
+    // 自分のスロットが消えている場合（キックされた等）
+    if (multiState.active && !multiState.players[multiState.playerIndex]) {
+      showNotification('ルームから退出しました');
+      leaveLobby();
+      return;
+    }
+  });
+  multiState._listeners.push({ ref: playersRef, event: 'value', fn: onPlayers });
+
+  // ルーム状態監視
+  const statusRef = roomRef.child('status');
+  const onStatus = statusRef.on('value', (snap) => {
+    const status = snap.val();
+    if (status === 'playing' || status === 'kickPhase') {
+      // ゲーム開始された
+      if (multiState.active && multiState.currentScreen !== 'game-screen') {
+        startMultiplayerGame();
+      }
+    }
+    if (status === null) {
+      // ルームが削除された
+      if (multiState.active) {
+        showNotification('ルームが閉じられました');
+        leaveLobby();
+      }
+    }
+  });
+  multiState._listeners.push({ ref: statusRef, event: 'value', fn: onStatus });
+
+  // ルーム設定変更（モード、ステージ）を監視
+  const modeRef = roomRef.child('gameMode');
+  const onMode = modeRef.on('value', (snap) => {
+    if (snap.val()) {
+      multiState.gameMode = snap.val();
+      updateLobbyUI();
+    }
+  });
+  multiState._listeners.push({ ref: modeRef, event: 'value', fn: onMode });
+
+  const stageRef = roomRef.child('currentStage');
+  const onStage = stageRef.on('value', (snap) => {
+    if (snap.val()) {
+      multiState.stage = parseInt(snap.val());
+      const sel = document.getElementById('lobby-stage-select');
+      if (sel) sel.value = multiState.stage;
+    }
+  });
+  multiState._listeners.push({ ref: stageRef, event: 'value', fn: onStage });
+
+  // ホスト変更監視
+  const hostRef = roomRef.child('host');
+  const onHost = hostRef.on('value', (snap) => {
+    const hostIdx = snap.val();
+    multiState.isHost = (hostIdx === multiState.playerIndex);
+    updateLobbyUI();
+  });
+  multiState._listeners.push({ ref: hostRef, event: 'value', fn: onHost });
+}
+
+function removeLobbyListeners() {
+  multiState._listeners.forEach(({ ref, event, fn }) => {
+    ref.off(event, fn);
+  });
+  multiState._listeners = [];
+}
+
+function updateLobbyUI() {
+  // ルームID表示
+  const idEl = document.getElementById('lobby-room-id');
+  if (idEl) idEl.textContent = multiState.roomId || '----';
+
+  // モード表示
+  const modeEl = document.getElementById('lobby-mode');
+  if (modeEl) modeEl.textContent = MODE_LABELS[multiState.gameMode] || multiState.gameMode;
+
+  // ステージ選択（ホストのみ変更可能）
+  const stageSection = document.getElementById('lobby-stage-section');
+  const stageSel = document.getElementById('lobby-stage-select');
+  if (stageSection) {
+    stageSection.style.display = (multiState.gameMode === 'team') ? 'block' : 'block';
+  }
+  if (stageSel) {
+    stageSel.disabled = !multiState.isHost;
+    stageSel.value = multiState.stage;
+  }
+
+  // プレイヤーリスト
+  const listEl = document.getElementById('lobby-player-list');
+  if (listEl) {
+    let html = '';
+    const players = multiState.players;
+    for (let i = 0; i < MAX_PLAYERS; i++) {
+      if (players[i]) {
+        const p = players[i];
+        const isMe = (i === multiState.playerIndex);
+        const isHost = (i === 0) || multiState.isHost && i === multiState.playerIndex;
+        html += '<div class="lobby-player">';
+        html += '<span class="lobby-player-name">' + escapeHTML(p.username);
+        if (i === findHostIndex()) html += '<span class="host-badge">HOST</span>';
+        if (isMe) html += ' <span style="color:var(--neon-green);font-size:11px;">(あなた)</span>';
+        html += '</span>';
+        html += '<span class="lobby-player-status ' + (p.ready ? 'ready' : 'waiting') + '">';
+        html += p.ready ? '✓ 準備完了' : '待機中';
+        html += '</span>';
+        html += '</div>';
+      } else {
+        html += '<div class="lobby-slot-empty">空きスロット</div>';
+      }
+    }
+    listEl.innerHTML = html;
+  }
+
+  // 共有URL
+  const shareEl = document.getElementById('lobby-share-url');
+  if (shareEl && multiState.roomId) {
+    const shareUrl = window.location.origin + window.location.pathname + '?room=' + multiState.roomId;
+    shareEl.innerHTML = '共有URL: <a onclick="copyShareUrl(\'' + shareUrl + '\')">' + shareUrl + '</a>';
+  }
+
+  // 準備完了/開始ボタン
+  const readyBtn = document.getElementById('btn-lobby-ready');
+  const startBtn = document.getElementById('btn-lobby-start');
+  if (readyBtn) {
+    readyBtn.textContent = multiState.ready ? '準備取消' : '準備完了';
+    readyBtn.style.display = multiState.isHost ? 'none' : 'block';
+  }
+  if (startBtn) {
+    startBtn.style.display = multiState.isHost ? 'block' : 'none';
+    // 全員準備完了か確認
+    const players = multiState.players;
+    const pKeys = Object.keys(players);
+    const allReady = pKeys.length >= 2 && pKeys.every(k => {
+      return parseInt(k) === multiState.playerIndex && multiState.isHost ? true : players[k].ready;
+    });
+    startBtn.disabled = !allReady || pKeys.length < 2;
+    startBtn.style.opacity = startBtn.disabled ? '0.4' : '1';
+  }
+}
+
+function findHostIndex() {
+  // ルーム内の最小playerIndex（ホスト移行時に使用）
+  const pKeys = Object.keys(multiState.players).map(Number).sort((a, b) => a - b);
+  return pKeys.length > 0 ? pKeys[0] : 0;
+}
+
+function copyShareUrl(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    showNotification('URLをコピーしました');
+  }).catch(() => {
+    showNotification('コピーに失敗しました');
+  });
+}
+
+async function toggleReady() {
+  if (!multiState.active || !multiState.roomId) return;
+  multiState.ready = !multiState.ready;
+  await db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(multiState.ready);
+  updateLobbyUI();
+}
+
+async function hostStartGame() {
+  if (!multiState.isHost || !multiState.active) return;
+  // 全員準備完了チェック
+  const players = multiState.players;
+  const pKeys = Object.keys(players);
+  if (pKeys.length < 2) {
+    showNotification('2人以上必要です');
+    return;
+  }
+  const nonHostReady = pKeys.filter(k => parseInt(k) !== multiState.playerIndex).every(k => players[k].ready);
+  if (!nonHostReady) {
+    showNotification('全員の準備完了を待ってください');
+    return;
+  }
+
+  // ゲーム設定をFirebaseに保存
+  const roomRef = db.ref('rooms/' + multiState.roomId);
+  await roomRef.update({
+    status: 'playing',
+    currentStage: multiState.stage,
+    gameConfig: {
+      stage: multiState.stage,
+      mode: multiState.gameMode,
+      oniCount: 1
+    }
+  });
+  // ステータス変更をリスナーが検知して全クライアントでstartMultiplayerGame()が呼ばれる
+}
+
+async function leaveLobby() {
+  if (multiState.roomId && multiState.playerIndex >= 0) {
+    const roomRef = db.ref('rooms/' + multiState.roomId);
+    // 自分を削除
+    await roomRef.child('players/' + multiState.playerIndex).remove().catch(() => {});
+    // onDisconnectをキャンセル
+    roomRef.child('players/' + multiState.playerIndex).onDisconnect().cancel();
+
+    // 残りプレイヤーチェック
+    const snap = await roomRef.child('players').once('value');
+    const remaining = snap.val();
+    if (!remaining || Object.keys(remaining).length === 0) {
+      // 全員退出 → ルーム削除
+      await roomRef.remove().catch(() => {});
+    } else if (multiState.isHost) {
+      // ホスト退出 → 最小インデックスのプレイヤーが新ホスト
+      const newHost = Math.min(...Object.keys(remaining).map(Number));
+      await roomRef.child('host').set(newHost).catch(() => {});
+    }
+  }
+
+  removeLobbyListeners();
+  multiState.active = false;
+  multiState.roomId = null;
+  multiState.playerIndex = -1;
+  multiState.sessionId = null;
+  multiState.players = {};
+  multiState.ready = false;
+  showScreen('title-screen');
+}
+
+async function hostChangeStage(stageNum) {
+  if (!multiState.isHost || !multiState.active) return;
+  multiState.stage = stageNum;
+  await db.ref('rooms/' + multiState.roomId + '/currentStage').set(stageNum);
+}
+
+function startMultiplayerGame() {
+  // ロビーからゲームへ遷移（全クライアント共通）
+  removeLobbyListeners();
+  const stageNum = multiState.stage;
+  const mode = 'multi_' + multiState.gameMode; // 'multi_ffa', 'multi_coop', 'multi_team'
+  startGame(stageNum, mode);
+}
+
+// URL ?room=XXXX で自動参加
+function checkRoomFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const roomId = params.get('room');
+  if (roomId) {
+    // ユーザー名が登録されていれば自動参加
+    if (gameState.username) {
+      joinOrCreateRoom(roomId, 'ffa');
+    } else {
+      // ユーザー名入力後に参加するためにroomIdを保存
+      multiState._pendingRoomId = roomId;
+    }
+  }
 }
 
 // ============================================================
@@ -2336,7 +2901,50 @@ function initButtonHandlers() {
 
   // Multiplayer button
   document.getElementById('btn-multi').addEventListener('click', () => {
-    showNotification('Coming Soon...');
+    resumeAudioContext();
+    if (!gameState.username) {
+      showNotification('先にユーザー名を登録してください');
+      return;
+    }
+    openModal('multi-modal');
+  });
+
+  // Multi modal: mode card selection
+  document.querySelectorAll('.mode-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+    });
+  });
+
+  // Multi modal: join room button
+  document.getElementById('btn-join-room').addEventListener('click', () => {
+    const roomId = document.getElementById('room-id-input').value;
+    const selectedMode = document.querySelector('.mode-card.selected');
+    const mode = selectedMode ? selectedMode.dataset.mode : 'ffa';
+    joinOrCreateRoom(roomId, mode);
+  });
+
+  // Lobby: ready button
+  document.getElementById('btn-lobby-ready').addEventListener('click', () => {
+    toggleReady();
+  });
+
+  // Lobby: start button (host only)
+  document.getElementById('btn-lobby-start').addEventListener('click', () => {
+    hostStartGame();
+  });
+
+  // Lobby: leave button
+  document.getElementById('btn-lobby-leave').addEventListener('click', () => {
+    leaveLobby();
+  });
+
+  // Lobby: stage select (host only)
+  document.getElementById('lobby-stage-select').addEventListener('change', (e) => {
+    if (multiState.isHost) {
+      hostChangeStage(parseInt(e.target.value));
+    }
   });
 
   // Score Attack button
@@ -8730,6 +9338,11 @@ function createOni(g, spawnX, spawnZ) {
 }
 
 function updateOni(g, oni, dt) {
+  // マルチプレイの非ホスト: 鬼AIの更新はスキップ（Firebaseから位置を受信して表示のみ）
+  if (g._isMultiplayer && !multiState.isHost) {
+    updateStickAnimation(oni.fig, dt, oni.state === 'chase' ? 1 : 0.5, false, false);
+    return;
+  }
   if (oni.restTimer > 0) {
     oni.restTimer -= dt;
     updateStickAnimation(oni.fig, dt, 0, false, false);
@@ -10253,7 +10866,7 @@ function updateCpuAlly(g, ally, dt) {
 }
 
 function updateAllCpuAllies(g, dt) {
-  if (!g.cpuAllies) return;
+  if (!g.cpuAllies || g._isMultiplayer) return; // マルチプレイ時はCPU味方なし
   for (const ally of g.cpuAllies) {
     updateCpuAlly(g, ally, dt);
   }
@@ -11540,6 +12153,7 @@ function gameLoop(timestamp) {
     ['updateWetGround', () => updateWetGround(G, dt)],
     ['updateTempleGimmicks', () => updateTempleGimmicks(G, dt)],
     ['updateGamePhases', () => updateGamePhases(G, dt)],
+    ['updateMultiRemote', () => updateMultiplayerRemotePlayers(G, dt)],
     ['updateHUD', () => updateHUD(G)]
   ];
   for (const [name, fn] of updates) {
@@ -11587,9 +12201,11 @@ function startGame(stageNum, mode) {
   // Show game screen
   showScreen('game-screen');
   stopBGM();
-  // Score Attack専用BGM or ステージBGM
+  // BGM選択: Score Attack / マルチプレイ / ソロ
   if (mode === 'score') {
     playBGM('scoreAttack');
+  } else if (mode.startsWith('multi_')) {
+    playBGM('multi' + stageNum);
   } else {
     playBGM('stage' + stageNum);
   }
@@ -11599,6 +12215,9 @@ function startGame(stageNum, mode) {
   if (stageNameEl) {
     if (mode === 'score') {
       stageNameEl.textContent = 'SCORE ATTACK — ' + config.name;
+    } else if (mode.startsWith('multi_')) {
+      const modeLabel = mode.includes('ffa') ? 'FFA' : mode.includes('coop') ? 'CO-OP' : 'TEAM';
+      stageNameEl.textContent = modeLabel + ' — Stage ' + stageNum + ' — ' + config.name;
     } else {
       stageNameEl.textContent = 'Stage ' + stageNum + ' — ' + config.name;
     }
@@ -11609,6 +12228,8 @@ function startGame(stageNum, mode) {
   G._stageNum = stageNum;
   G._gameMode = mode;
   G._isScoreAttack = (mode === 'score');
+  G._isMultiplayer = mode.startsWith('multi_');
+  G._multiMode = G._isMultiplayer ? mode.replace('multi_', '') : null; // ffa | coop | team
   G.gamePhase = 'placement';
   G.gameTimer = G._isScoreAttack ? 0 : config.timeLimit; // Score Attack: カウントアップ
   G.capturedCount = 0;
@@ -11682,6 +12303,7 @@ function startGame(stageNum, mode) {
   }
 
   // Create initial oni — spawn at map edge (findSafeSpawnでビル内回避)
+  // マルチプレイ: 全クライアントでOniを描画するが、AI更新はホストのみ
   for (let i = 0; i < config.initialOni; i++) {
     const angle = Math.random() * Math.PI * 2;
     const dist = config.size / 2 - 3; // マップ端付近
@@ -11700,17 +12322,24 @@ function startGame(stageNum, mode) {
     G.player.position.set(spawnSafe.x, 0, spawnSafe.z);
   }
 
-  // Create CPU allies (Score Attack時はCPU味方なし)
-  const cpuCount = G._isScoreAttack ? 0 : (gameState.storySettings.cpuCount || 0);
-  const cpuLevels = gameState.storySettings.cpuLevels || ['normal', 'normal', 'normal'];
-  const allyNames = ['味方A', '味方B', '味方C'];
-  for (let i = 0; i < cpuCount; i++) {
-    const angle = (i + 1) * Math.PI * 2 / (cpuCount + 1);
-    const spawnCZ = stageNum === 4 ? 5 : -10; // Stage4: 花壇・朝礼台(z:-10~-15)を避けて校庭中央へ
-    const baseX = Math.sin(angle) * 5, baseZ = Math.cos(angle) * 5 + spawnCZ;
-    const safe = findSafeSpawn(G, baseX, baseZ);
-    const ally = createCpuAlly(G, allyNames[i], cpuLevels[i], safe.x, safe.z, i);
-    G.cpuAllies.push(ally);
+  // Create CPU allies / remote players
+  if (G._isMultiplayer) {
+    // マルチプレイ: CPU味方なし → 他プレイヤーの棒人間を後で動的に生成
+    G.cpuAllies = [];
+    initMultiplayerSync(G);
+  } else {
+    // ソロプレイ: CPU味方を生成（Score Attack時はなし）
+    const cpuCount = G._isScoreAttack ? 0 : (gameState.storySettings.cpuCount || 0);
+    const cpuLevels = gameState.storySettings.cpuLevels || ['normal', 'normal', 'normal'];
+    const allyNames = ['味方A', '味方B', '味方C'];
+    for (let i = 0; i < cpuCount; i++) {
+      const angle = (i + 1) * Math.PI * 2 / (cpuCount + 1);
+      const spawnCZ = stageNum === 4 ? 5 : -10;
+      const baseX = Math.sin(angle) * 5, baseZ = Math.cos(angle) * 5 + spawnCZ;
+      const safe = findSafeSpawn(G, baseX, baseZ);
+      const ally = createCpuAlly(G, allyNames[i], cpuLevels[i], safe.x, safe.z, i);
+      G.cpuAllies.push(ally);
+    }
   }
 
   // Show can placement UI
@@ -11725,9 +12354,9 @@ function startGame(stageNum, mode) {
   };
   window.addEventListener('resize', G._resizeHandler);
 
-  // Visibility change (auto-pause)
+  // Visibility change (auto-pause) — マルチプレイ時はポーズしない（仕様書準拠）
   G._visHandler = () => {
-    if (document.hidden && G.gamePhase !== 'result' && !G.paused) {
+    if (document.hidden && G.gamePhase !== 'result' && !G.paused && !G._isMultiplayer) {
       togglePause(G);
     }
   };
@@ -11796,9 +12425,322 @@ function showCanPlacementUI(g) {
   if (confirmBtn) confirmBtn.onclick = () => confirmCanPlacement(g);
 }
 
+// ============================================================
+// SECTION: MULTIPLAYER SYNC (ゲーム中の同期処理)
+// ============================================================
+
+/**
+ * initMultiplayerSync — マルチプレイ開始時にFirebaseリスナーを設定
+ * 呼び出し元: startGame（マルチプレイモード時）
+ */
+function initMultiplayerSync(g) {
+  if (!multiState.active || !multiState.roomId) return;
+  const roomRef = db.ref('rooms/' + multiState.roomId);
+
+  // 他プレイヤーの棒人間を生成
+  const players = multiState.players;
+  const RUNNER_COLORS = [0x4488ff, 0x44ff88, 0xffaa44, 0xff44aa];
+  Object.keys(players).forEach(k => {
+    const idx = parseInt(k);
+    if (idx === multiState.playerIndex) return; // 自分はスキップ
+    const pData = players[idx];
+    const color = RUNNER_COLORS[idx % RUNNER_COLORS.length];
+    const fig = createStickFigure(g, color, false);
+    fig.group.position.set(0, 0, -10 + idx * 3);
+    g.scene.add(fig.group);
+    multiState.remotePlayers[idx] = {
+      fig: fig,
+      username: pData.username,
+      lastPos: { x: 0, y: 0, z: -10 + idx * 3, rotY: 0 },
+      targetPos: { x: 0, y: 0, z: -10 + idx * 3, rotY: 0 },
+      lastUpdate: Date.now(),
+      captured: false
+    };
+  });
+
+  // 自分の位置を定期送信
+  multiState._posSyncTimer = setInterval(() => {
+    if (!g || g.disposed || !multiState.active) {
+      clearInterval(multiState._posSyncTimer);
+      return;
+    }
+    sendPlayerPosition(g);
+  }, POS_SYNC_INTERVAL);
+
+  // 他プレイヤーの位置を受信
+  const posRef = roomRef.child('playerPositions');
+  const onPos = posRef.on('value', (snap) => {
+    const posData = snap.val();
+    if (!posData) return;
+    Object.keys(posData).forEach(k => {
+      const idx = parseInt(k);
+      if (idx === multiState.playerIndex) return;
+      const remote = multiState.remotePlayers[idx];
+      if (remote && posData[idx]) {
+        remote.targetPos = {
+          x: posData[idx].x || 0,
+          y: posData[idx].y || 0,
+          z: posData[idx].z || 0,
+          rotY: posData[idx].rotY || 0
+        };
+        remote.crouching = posData[idx].crouching || false;
+        remote.lastUpdate = Date.now();
+      }
+    });
+  });
+  g._multiListeners = g._multiListeners || [];
+  g._multiListeners.push({ ref: posRef, event: 'value', fn: onPos });
+
+  // ホストのみ: AI鬼の位置を送信、ゲーム状態を管理
+  if (multiState.isHost) {
+    // 鬼の位置を定期送信（200ms間隔）
+    g._oniSyncTimer = setInterval(() => {
+      if (!g || g.disposed || !multiState.active) {
+        clearInterval(g._oniSyncTimer);
+        return;
+      }
+      syncOniPositions(g);
+    }, 200);
+
+    // ゲーム状態（フェーズ遷移、捕獲）をFirebaseに同期
+    g._gameStateSyncTimer = setInterval(() => {
+      if (!g || g.disposed || !multiState.active) {
+        clearInterval(g._gameStateSyncTimer);
+        return;
+      }
+      syncGameState(g);
+    }, 300);
+  } else {
+    // 非ホスト: 鬼の位置を受信
+    const oniRef = roomRef.child('oniPositions');
+    const onOni = oniRef.on('value', (snap) => {
+      const oniData = snap.val();
+      if (!oniData || !g || g.disposed) return;
+      Object.keys(oniData).forEach(k => {
+        const idx = parseInt(k);
+        if (g.onis[idx]) {
+          const data = oniData[idx];
+          g.onis[idx].fig.group.position.set(data.x || 0, data.y || 0, data.z || 0);
+          g.onis[idx].fig.group.rotation.y = data.rotY || 0;
+          g.onis[idx].state = data.state || 'patrol';
+        }
+      });
+    });
+    g._multiListeners.push({ ref: oniRef, event: 'value', fn: onOni });
+
+    // 非ホスト: ゲーム状態を受信
+    const stateRef = roomRef.child('gameState');
+    const onState = stateRef.on('value', (snap) => {
+      const state = snap.val();
+      if (!state || !g || g.disposed) return;
+      if (state.gamePhase) g.gamePhase = state.gamePhase;
+      if (state.gameTimer !== undefined) g.gameTimer = state.gameTimer;
+      if (state.capturedCount !== undefined) g.capturedCount = state.capturedCount;
+      if (state.hideTime !== undefined) g.hideTime = state.hideTime;
+    });
+    g._multiListeners.push({ ref: stateRef, event: 'value', fn: onState });
+
+    // 非ホスト: 捕獲情報を受信
+    const capRef = roomRef.child('capturedPlayers');
+    const onCap = capRef.on('value', (snap) => {
+      const capData = snap.val() || {};
+      // 自分が捕まったか
+      if (capData[multiState.playerIndex] && !g._playerCaptured) {
+        g._playerCaptured = true;
+        showCapturedOverlay(g);
+      } else if (!capData[multiState.playerIndex] && g._playerCaptured) {
+        g._playerCaptured = false;
+        hideCapturedOverlay(g);
+      }
+      // 他プレイヤーの捕獲状態を更新
+      Object.keys(multiState.remotePlayers).forEach(k => {
+        multiState.remotePlayers[k].captured = !!capData[k];
+      });
+    });
+    g._multiListeners.push({ ref: capRef, event: 'value', fn: onCap });
+
+    // 非ホスト: 缶の状態を受信
+    const canRef = roomRef.child('canState');
+    const onCan = canRef.on('value', (snap) => {
+      const canData = snap.val();
+      if (!canData || !g || g.disposed) return;
+      if (canData.position && g.can) {
+        g.can.position.set(canData.position.x || 0, canData.position.y || 0, canData.position.z || 0);
+      }
+    });
+    g._multiListeners.push({ ref: canRef, event: 'value', fn: onCan });
+  }
+}
+
+function sendPlayerPosition(g) {
+  if (!multiState.active || !multiState.roomId || !g || g.disposed) return;
+  const pos = g.player ? g.player.position : null;
+  if (!pos) return;
+  const data = {
+    x: Math.round(pos.x * 100) / 100,
+    y: Math.round(pos.y * 100) / 100,
+    z: Math.round(pos.z * 100) / 100,
+    rotY: Math.round((g.playerFig ? g.playerFig.group.rotation.y : 0) * 100) / 100,
+    crouching: g.player.crouching || false,
+    t: firebase.database.ServerValue.TIMESTAMP
+  };
+
+  // 移動していない場合は送信頻度を下げる
+  if (multiState._lastSentPos) {
+    const dx = Math.abs(data.x - multiState._lastSentPos.x);
+    const dz = Math.abs(data.z - multiState._lastSentPos.z);
+    if (dx < 0.05 && dz < 0.05) {
+      // 最後の送信から500ms未満なら送信しない
+      if (Date.now() - (multiState._lastSentTime || 0) < POS_SYNC_IDLE_INTERVAL) return;
+    }
+  }
+
+  multiState._lastSentPos = data;
+  multiState._lastSentTime = Date.now();
+  db.ref('rooms/' + multiState.roomId + '/playerPositions/' + multiState.playerIndex).set(data);
+}
+
+function syncOniPositions(g) {
+  if (!multiState.isHost || !multiState.active || !multiState.roomId || !g) return;
+  const oniData = {};
+  g.onis.forEach((oni, i) => {
+    oniData[i] = {
+      x: Math.round(oni.fig.group.position.x * 100) / 100,
+      y: Math.round(oni.fig.group.position.y * 100) / 100,
+      z: Math.round(oni.fig.group.position.z * 100) / 100,
+      rotY: Math.round(oni.fig.group.rotation.y * 100) / 100,
+      state: oni.state || 'patrol'
+    };
+  });
+  db.ref('rooms/' + multiState.roomId + '/oniPositions').set(oniData);
+}
+
+function syncGameState(g) {
+  if (!multiState.isHost || !multiState.active || !multiState.roomId || !g) return;
+  db.ref('rooms/' + multiState.roomId + '/gameState').set({
+    gamePhase: g.gamePhase,
+    gameTimer: Math.round(g.gameTimer * 10) / 10,
+    capturedCount: g.capturedCount,
+    hideTime: g.hideTime || 0
+  });
+  // 缶の位置も同期
+  if (g.can) {
+    db.ref('rooms/' + multiState.roomId + '/canState').set({
+      position: {
+        x: Math.round(g.can.position.x * 100) / 100,
+        y: Math.round(g.can.position.y * 100) / 100,
+        z: Math.round(g.can.position.z * 100) / 100
+      },
+      status: g.canStatus || 'placed'
+    });
+  }
+}
+
+/**
+ * updateMultiplayerRemotePlayers — リモートプレイヤーの位置を補間更新
+ * 呼び出し元: gameLoop
+ */
+function updateMultiplayerRemotePlayers(g, dt) {
+  if (!g._isMultiplayer) return;
+  const now = Date.now();
+  Object.keys(multiState.remotePlayers).forEach(k => {
+    const remote = multiState.remotePlayers[k];
+    if (!remote || !remote.fig) return;
+
+    // 位置補間（lerp）
+    const lerpFactor = Math.min(1, dt * 8);
+    const gp = remote.fig.group.position;
+    gp.x += (remote.targetPos.x - gp.x) * lerpFactor;
+    gp.y += (remote.targetPos.y - gp.y) * lerpFactor;
+    gp.z += (remote.targetPos.z - gp.z) * lerpFactor;
+
+    // 回転補間
+    let dRot = remote.targetPos.rotY - remote.fig.group.rotation.y;
+    if (dRot > Math.PI) dRot -= Math.PI * 2;
+    if (dRot < -Math.PI) dRot += Math.PI * 2;
+    remote.fig.group.rotation.y += dRot * lerpFactor;
+
+    // 移動判定でアニメーション更新
+    const dx = remote.targetPos.x - (remote.lastPos.x || 0);
+    const dz = remote.targetPos.z - (remote.lastPos.z || 0);
+    const speed = Math.sqrt(dx * dx + dz * dz);
+    const isMoving = speed > 0.1;
+    if (remote.fig.animate) {
+      remote.fig.animate(now / 1000, isMoving, remote.crouching || false, false);
+    }
+    remote.lastPos = { x: remote.targetPos.x, y: remote.targetPos.y, z: remote.targetPos.z };
+
+    // 捕獲状態: 半透明にする
+    if (remote.captured) {
+      remote.fig.group.traverse(obj => {
+        if (obj.isMesh && obj.material) obj.material.opacity = 0.4;
+      });
+    } else {
+      remote.fig.group.traverse(obj => {
+        if (obj.isMesh && obj.material) obj.material.opacity = 1.0;
+      });
+    }
+
+    // 3秒以上更新なし → 接続不安定表示（将来実装）
+    if (now - remote.lastUpdate > 10000) {
+      // 10秒以上 → 切断扱い
+      remote.fig.group.visible = false;
+    } else {
+      remote.fig.group.visible = true;
+    }
+  });
+}
+
+function showCapturedOverlay(g) {
+  const el = document.getElementById('hud-captured-overlay');
+  if (el) el.style.display = 'flex';
+}
+
+function hideCapturedOverlay(g) {
+  const el = document.getElementById('hud-captured-overlay');
+  if (el) el.style.display = 'none';
+}
+
+function cleanupMultiplayer(g) {
+  // マルチプレイ固有のリスナーとタイマーを解除
+  if (g._multiListeners) {
+    g._multiListeners.forEach(({ ref, event, fn }) => ref.off(event, fn));
+    g._multiListeners = [];
+  }
+  if (multiState._posSyncTimer) {
+    clearInterval(multiState._posSyncTimer);
+    multiState._posSyncTimer = null;
+  }
+  if (g._oniSyncTimer) {
+    clearInterval(g._oniSyncTimer);
+    g._oniSyncTimer = null;
+  }
+  if (g._gameStateSyncTimer) {
+    clearInterval(g._gameStateSyncTimer);
+    g._gameStateSyncTimer = null;
+  }
+  // リモートプレイヤーの3Dオブジェクトを削除
+  Object.values(multiState.remotePlayers).forEach(rp => {
+    if (rp.fig && rp.fig.group) {
+      g.scene.remove(rp.fig.group);
+    }
+  });
+  multiState.remotePlayers = {};
+
+  // Firebaseからプレイヤー位置を削除
+  if (multiState.active && multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/playerPositions/' + multiState.playerIndex).remove().catch(() => {});
+  }
+}
+
 function cleanupGame() {
   if (!G) return;
   G.disposed = true;
+
+  // マルチプレイのクリーンアップ
+  if (G._isMultiplayer) {
+    cleanupMultiplayer(G);
+  }
 
   // Cancel animation
   if (G.animId) cancelAnimationFrame(G.animId);
@@ -11898,6 +12840,9 @@ function init() {
     if (e.target.closest('.modal-box') || e.target.closest('#title-screen') || e.target.closest('#game-hud')) return;
     e.preventDefault();
   }, { passive: false });
+
+  // URL ?room=XXXX チェック
+  checkRoomFromURL();
 
   // Start splash
   startSplashSequence();
