@@ -1111,7 +1111,7 @@ function loadSavedUser() {
 // SECTION: RANKING (Firebase)
 // ============================================================
 
-function saveScoreAttackRanking(survivalTime) {
+function saveScoreAttackRanking(kickCount) {
   if (!gameState.deviceId) return;
   if (gameState.isGuest) return; // ゲスト除外
   var ref = db.ref('rankings/scoreAttack/' + gameState.deviceId);
@@ -1119,13 +1119,13 @@ function saveScoreAttackRanking(survivalTime) {
     if (!current) {
       return {
         username: gameState.username,
-        score: survivalTime,
+        score: kickCount,
         timestamp: Date.now()
       };
     }
     current.username = gameState.username; // 名前変更に追従
-    if (survivalTime > (current.score || 0)) {
-      current.score = survivalTime;
+    if (kickCount > (current.score || 0)) {
+      current.score = kickCount;
     }
     current.timestamp = Date.now();
     return current;
@@ -1174,7 +1174,7 @@ function renderRankingList(entries, listEl, lang) {
     (lang ? '古刹の大屋敷' : 'Ancient Temple Estate') + '</div>';
   html += '<div style="display:flex;justify-content:space-between;padding:4px 8px;font-size:11px;color:var(--text-dim);border-bottom:1px solid rgba(255,51,102,0.2)">';
   html += '<span style="width:30px">#</span><span style="flex:1">' + (lang ? '名前' : 'Name') + '</span>';
-  html += '<span style="width:80px;text-align:right">' + (lang ? '生存時間' : 'Time') + '</span></div>';
+  html += '<span style="width:80px;text-align:right">' + (lang ? 'キック数' : 'Kicks') + '</span></div>';
 
   var currentRank = 1;
   for (var i = 0; i < entries.length; i++) {
@@ -1187,10 +1187,8 @@ function renderRankingList(entries, listEl, lang) {
     else if (currentRank === 2) { rankClass = ' style="color:#c0c0c0"'; rankIcon = '🥈'; }
     else if (currentRank === 3) { rankClass = ' style="color:#cd7f32"'; rankIcon = '🥉'; }
 
-    var score = entries[i].score || 0;
-    var mm = Math.floor(score / 60);
-    var ss = Math.floor(score % 60);
-    var timeStr = mm + ':' + (ss < 10 ? '0' : '') + ss;
+    var kicks = entries[i].score || 0;
+    var kickStr = kicks + (lang ? '回' : '');
 
     var isMe = entries[i].username === gameState.username;
     var bgStyle = isMe ? 'background:rgba(255,51,102,0.1);' : '';
@@ -1198,7 +1196,7 @@ function renderRankingList(entries, listEl, lang) {
     html += '<div style="display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid rgba(255,51,102,0.08);font-size:13px;' + bgStyle + '"' + rankClass + '>';
     html += '<span style="width:30px">' + (rankIcon || currentRank) + '</span>';
     html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHTML(entries[i].username) + '</span>';
-    html += '<span style="width:80px;text-align:right;font-family:Share Tech Mono,monospace">' + timeStr + '</span>';
+    html += '<span style="width:80px;text-align:right;font-family:Share Tech Mono,monospace">' + kickStr + '</span>';
     html += '</div>';
   }
 
@@ -2704,10 +2702,10 @@ const STAGE_CONFIGS = {
       { type:'lantern', x:2, z:-18, radius:15, label:'石灯籠', labelEn:'Stone Lantern', sound:'stone' },
       { type:'lantern', x:-2, z:-24, radius:15, label:'石灯籠', labelEn:'Stone Lantern', sound:'stone' },
       { type:'lantern', x:2, z:-24, radius:15, label:'石灯籠', labelEn:'Stone Lantern', sound:'stone' },
-      // 大岩
-      { type:'rock', x:-5, z:2, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
-      { type:'rock', x:6, z:-3, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
-      { type:'rock', x:3, z:5, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
+      // 大岩（建物から十分離す）
+      { type:'rock', x:-6, z:-5, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
+      { type:'rock', x:7, z:-8, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
+      { type:'rock', x:0, z:-3, radius:12, label:'大岩', labelEn:'Large Rock', sound:'stone' },
       // 建物内部の柱（本堂）
       { type:'pillar', x:-3, z:8, radius:15, label:'本堂の柱', labelEn:'Main Hall Pillar', sound:'thud' },
       { type:'pillar', x:3, z:12, radius:15, label:'本堂の柱', labelEn:'Main Hall Pillar', sound:'thud' },
@@ -7212,8 +7210,8 @@ function buildTempleObjects(g) {
   zenGround.receiveShadow = true;
   g.scene.add(zenGround);
 
-  // 大岩3個
-  const rockPositions = [[-5, 2], [6, -3], [3, 5]];
+  // 大岩3個（建物から十分離した位置）
+  const rockPositions = [[-6, -5], [7, -8], [0, -3]];
   for (const [rx, rz] of rockPositions) {
     const rw = 1 + Math.random() * 0.8;
     const rh = 0.8 + Math.random() * 0.6;
@@ -10351,6 +10349,11 @@ function performCanKick(g, power, kickerName) {
     // Wait for can to land, then go to hide phase
   }
 
+  // Score Attack: 缶キック回数をカウント
+  if (g._isScoreAttack) {
+    g._kickCount = (g._kickCount || 0) + 1;
+  }
+
   // Play kick SE
   SoundManager.playGameSE('kick');
 }
@@ -11163,23 +11166,24 @@ function endGame(g, playerWon) {
 
   if (stats) {
     if (g._isScoreAttack) {
-      // Score Attack: 生存時間をそのまま表示
+      // Score Attack: 缶キック回数をメインスコアとして表示
+      const kicks = g._kickCount || 0;
       const survivalTime = g.gameTimer;
       const mm = Math.floor(survivalTime / 60);
       const ss = Math.floor(survivalTime % 60);
-      const ms = Math.floor((survivalTime % 1) * 100);
       const lang = gameState.language === 'ja';
       let html = `
-        <span style="font-size:24px;color:var(--neon-cyan)">
-          ${lang ? '生存時間' : 'Survival Time'}: ${mm}:${String(ss).padStart(2,'0')}.${String(ms).padStart(2,'0')}
+        <span style="font-size:28px;color:var(--neon-cyan)">
+          🦵 ${lang ? '缶キック' : 'Can Kicks'}: ${kicks}${lang ? '回' : ''}
         </span><br>
-        <span style="font-size:13px;color:var(--text-dim)">
-          ${lang ? '鬼の数' : 'Oni Count'}: ${g.onis.length}${lang ? '体' : ''}
+        <span style="font-size:14px;color:var(--text-dim)">
+          ${lang ? '生存時間' : 'Time'}: ${mm}:${String(ss).padStart(2,'0')}
+          &nbsp;|&nbsp;${lang ? '鬼の数' : 'Oni'}: ${g.onis.length}${lang ? '体' : ''}
         </span>
       `;
       stats.innerHTML = html;
-      // ランキング保存
-      saveScoreAttackRanking(survivalTime);
+      // ランキング保存（缶キック回数）
+      saveScoreAttackRanking(kicks);
     } else {
       const survived = g.config.timeLimit - g.gameTimer;
       const mm = Math.floor(survived / 60);
@@ -11213,11 +11217,12 @@ function updateHUD(g) {
   const timerEl = document.getElementById('hud-timer');
   if (timerEl) {
     if (g._isScoreAttack) {
-      // Score Attack: カウントアップ表示
+      // Score Attack: キック回数 + 経過時間を表示
+      const kicks = g._kickCount || 0;
       const t = Math.max(0, g.gameTimer);
       const mm = Math.floor(t / 60);
       const ss = Math.floor(t % 60);
-      timerEl.textContent = mm + ':' + String(ss).padStart(2, '0');
+      timerEl.innerHTML = '<span style="color:var(--neon-cyan);font-size:1.1em">🦵' + kicks + '</span> <span style="font-size:0.8em;opacity:0.7">' + mm + ':' + String(ss).padStart(2, '0') + '</span>';
       timerEl.classList.remove('warning');
     } else {
       const t = Math.max(0, g.gameTimer);
@@ -11528,6 +11533,7 @@ function startGame(stageNum, mode) {
   G.cpuAllies = [];
   G.onis = [];
   G._stayTimer = 0; // キャンプ防止タイマー
+  G._kickCount = 0; // Score Attack: 缶キック回数
   G._lastPlayerPos = null;
   // 鬼スポーンフラグをリセット
   for (let i = 0; i < (G.config.maxOni || 4); i++) G['_oniSpawned' + i] = false;
