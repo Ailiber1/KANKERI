@@ -9133,7 +9133,10 @@ function updateOni(g, oni, dt) {
     case 'recovery': {
       // 缶回収を最優先 — 缶に向かって走る（通常より速い）
       const canPos = g.can.group.position;
-      moveOni(oni, canPos.x, canPos.z, oni.canTouchSpeed * nightSpeedMult * fatigueMult, dt, g);
+      var recTargetX = canPos.x, recTargetZ = canPos.z;
+      var detour = getStage6Detour(oni, canPos.z, g);
+      if (detour) { recTargetX = detour.x; recTargetZ = detour.z; }
+      moveOni(oni, recTargetX, recTargetZ, oni.canTouchSpeed * nightSpeedMult * fatigueMult, dt, g);
       const dist = Math.sqrt(
         (oni.position.x - canPos.x)**2 + (oni.position.z - canPos.z)**2
       );
@@ -9284,6 +9287,27 @@ function updateOni(g, oni, dt) {
     oni.cone.material.color.setHex(0xff3333);
     oni.cone.material.opacity = 0.15;
   }
+}
+
+// Stage 6: 建物群の迂回ルート計算（本堂+庫裏+離れが連続壁バリアを形成するため）
+function getStage6Detour(oni, targetZ, g) {
+  if (g._stageNum !== 6) return null;
+  // 鬼が建物北側(z>13)にいて、ターゲットが建物南側(z<6)の場合
+  if (oni.position.z > 13 && targetZ < 6) {
+    if (!oni._detourSide) {
+      // 鬼の位置から近い方の通路を選択: 東(x=22) or 西(x=-24)
+      oni._detourSide = oni.position.x >= 0 ? 22 : -24;
+    }
+    var sideX = oni._detourSide;
+    // Phase 1: まだ迂回ポイントのx座標に到達していない → 横移動（z=17付近は壁なし）
+    if ((sideX > 0 && oni.position.x < sideX - 1.5) || (sideX < 0 && oni.position.x > sideX + 1.5)) {
+      return { x: sideX, z: oni.position.z };
+    }
+    // Phase 2: x座標到達 → 南に移動（x=22 or x=-24は建物の外）
+    return { x: sideX, z: 4 };
+  }
+  oni._detourSide = 0;
+  return null;
 }
 
 function moveOni(oni, targetX, targetZ, speed, dt, g) {
@@ -10998,7 +11022,10 @@ function updateGamePhases(g, dt) {
         const hideNightMult = (hideTimeOfDay === 'night' || hideTimeOfDay === 'evening') ? 1.25 : 1.0;
         for (const oni of g.onis) {
           const canPos = g.can.isAtHome ? g.can.homePos : g.can.group.position;
-          moveOni(oni, canPos.x, canPos.z, oni.speed * 0.8 * hideNightMult, dt, g);
+          var hideTargetX = canPos.x, hideTargetZ = canPos.z;
+          var hideDetour = getStage6Detour(oni, canPos.z, g);
+          if (hideDetour) { hideTargetX = hideDetour.x; hideTargetZ = hideDetour.z; }
+          moveOni(oni, hideTargetX, hideTargetZ, oni.speed * 0.8 * hideNightMult, dt, g);
           // Score Attackでは缶に近づくが回収はしない（seekフェーズで回収させる）
           if (!g._isScoreAttack) {
             const crx = oni.position.x - canPos.x, crz = oni.position.z - canPos.z;
