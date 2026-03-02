@@ -678,8 +678,9 @@ html, body {
 .team-assign-grid { display: flex; gap: 8px; }
 .team-column {
   flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(85,153,255,0.15);
-  padding: 8px; min-height: 80px;
+  padding: 8px; min-height: 80px; cursor: pointer;
 }
+.team-column:hover { border-color: rgba(85,153,255,0.4); }
 .team-column-title { font-size: 11px; text-align: center; margin-bottom: 6px; letter-spacing: 1px; }
 .team-column-title.oni { color: #ff4444; }
 .team-column-title.runner { color: #4488ff; }
@@ -1870,12 +1871,27 @@ function updateTeamAssignUI() {
   // ホストのみ: クリックでチーム切替 & ランダムボタン
   if (randomBtn) randomBtn.style.display = multiState.isHost ? 'block' : 'none';
   if (multiState.isHost) {
+    // 鬼チーム列クリック → 鬼に割り当て（既に鬼なら何もしない）
     oniListEl.querySelectorAll('.team-slot').forEach(el => {
-      el.onclick = () => movePlayerToTeam(parseInt(el.dataset.idx), 'runner');
-    });
-    runnerListEl.querySelectorAll('.team-slot').forEach(el => {
       el.onclick = () => movePlayerToTeam(parseInt(el.dataset.idx), 'oni');
     });
+    // ランナーチーム列クリック → ランナーに割り当て（既にランナーなら何もしない）
+    runnerListEl.querySelectorAll('.team-slot').forEach(el => {
+      el.onclick = () => movePlayerToTeam(parseInt(el.dataset.idx), 'runner');
+    });
+    // 列全体をクリック可能に（空欄クリックで最後のプレイヤーを移動）
+    oniListEl.onclick = (e) => {
+      if (e.target.classList.contains('team-slot')) return; // スロット自身は上記で処理
+      // ランナーチームから最後の1人を鬼に移動
+      const rb = getTeamAssignments().teamB;
+      if (rb.length > 0) movePlayerToTeam(rb[rb.length - 1], 'oni');
+    };
+    runnerListEl.onclick = (e) => {
+      if (e.target.classList.contains('team-slot')) return;
+      // 鬼チームから最後の1人をランナーに移動
+      const ra = getTeamAssignments().teamA;
+      if (ra.length > 0) movePlayerToTeam(ra[ra.length - 1], 'runner');
+    };
   }
 }
 
