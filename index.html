@@ -10390,6 +10390,9 @@ function performCanKick(g, power, kickerName) {
     g._kickCount = (g._kickCount || 0) + 1;
   }
 
+  // Kick leg animation (足を振る演出)
+  doKickLegAnim(g.playerFig);
+
   // Play kick SE
   SoundManager.playGameSE('kick');
 }
