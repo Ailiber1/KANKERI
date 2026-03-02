@@ -698,15 +698,6 @@ html, body {
   font-family: 'Share Tech Mono', monospace; text-align: center;
 }
 .team-random-btn:hover { background: rgba(255,51,102,0.3); }
-.lobby-share {
-  text-align: center; margin: 12px 0 0;
-  color: var(--text-dim); font-size: 11px;
-}
-.lobby-share a {
-  color: var(--neon-cyan); text-decoration: none;
-  cursor: pointer;
-}
-.lobby-share a:hover { text-decoration: underline; }
 .lobby-btn-row { display: flex; gap: 10px; margin-top: 14px; }
 .lobby-btn-row .btn { flex: 1; }
 .lobby-chat { margin-top: 12px; max-height: 80px; overflow-y: auto; font-size: 12px; color: var(--text-secondary); }
@@ -1119,8 +1110,6 @@ html, body {
       </div>
       <button class="team-random-btn" id="btn-team-random">🎲 ランダムに分ける</button>
     </div>
-
-    <div class="lobby-share" id="lobby-share-url"></div>
 
     <div class="lobby-btn-row">
       <button class="btn btn-neon" id="btn-lobby-ready">準備完了</button>
@@ -1779,13 +1768,6 @@ function updateLobbyUI() {
     }
   }
 
-  // 共有URL
-  const shareEl = document.getElementById('lobby-share-url');
-  if (shareEl && multiState.roomId) {
-    const shareUrl = window.location.origin + window.location.pathname + '?room=' + multiState.roomId;
-    shareEl.innerHTML = '共有URL: <a onclick="copyShareUrl(\'' + shareUrl + '\')">' + shareUrl + '</a>';
-  }
-
   // 準備完了/開始ボタン
   const readyBtn = document.getElementById('btn-lobby-ready');
   const startBtn = document.getElementById('btn-lobby-start');
@@ -1952,14 +1934,6 @@ function saveTeamAssignment(teamA, teamB) {
     roomRef.child('players/' + idx + '/selectedRole').set('runner');
   });
   updateTeamAssignUI();
-}
-
-function copyShareUrl(url) {
-  navigator.clipboard.writeText(url).then(() => {
-    showNotification('URLをコピーしました');
-  }).catch(() => {
-    showNotification('コピーに失敗しました');
-  });
 }
 
 async function toggleReady() {
