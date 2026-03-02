@@ -8090,6 +8090,7 @@ function updatePlayer(g, dt) {
     ctrl.isDashing = false;
     ctrl.isPeeking = 'none';
     ctrl.position.y = getGroundHeight(g, ctrl.position.x, ctrl.position.z);
+    if (ctrl.isCrouching) ctrl.position.y += 0.20; // しゃがみ時の足めり込み防止
     const fig = g.playerFig;
     fig.group.position.copy(ctrl.position);
     // 毎フレーム灰色を強制（色が戻るバグ防止）
@@ -8230,6 +8231,7 @@ function updatePlayer(g, dt) {
 
   // Get ground height at player position
   ctrl.position.y = getGroundHeight(g, ctrl.position.x, ctrl.position.z);
+  if (ctrl.isCrouching) ctrl.position.y += 0.20; // しゃがみ時の足めり込み防止
 
   // Stage 4: 校舎内の高さオーバーライド（東西両階段室対応）
   if (g._stageNum === 4) {
@@ -9700,6 +9702,7 @@ function moveCpuAlly(ally, targetX, targetZ, speed, dt, g) {
   ally.position.x = newX;
   ally.position.z = newZ;
   ally.position.y = getGroundHeight(g, newX, newZ);
+  if (ally.isCrouching) ally.position.y += 0.20; // しゃがみ時の足めり込み防止
   ally.rotation = Math.atan2(dx, dz);
   ally.moveSpeed = speed;
 
