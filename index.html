@@ -34,6 +34,8 @@
 html, body {
   width: 100%; height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
   background: var(--bg-dark);
   background-image:
     radial-gradient(ellipse at 50% 0%, rgba(20,50,120,0.35) 0%, transparent 55%),
@@ -398,6 +400,7 @@ html, body {
   z-index: 250;
   display: none;
   align-items: center; justify-content: center;
+  overscroll-behavior: contain;
 }
 .modal-overlay.active { display: flex; }
 .modal-box {
@@ -407,7 +410,8 @@ html, body {
   padding: 30px;
   max-width: 500px; width: 90%;
   position: relative;
-  max-height: 80vh; overflow-y: auto;
+  max-height: 85vh; overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .modal-box > .corner-bl,
 .modal-box > .corner-br { display: none; }
@@ -590,8 +594,17 @@ html, body {
   .ui-panel { padding: 18px 16px; }
   .btn { padding: 11px 14px; font-size: 13px; }
   .setting-btn { padding: 7px 10px; font-size: 12px; }
-  .modal-box { padding: 20px; }
+  .modal-box { padding: 16px; max-height: 90vh; }
+  .modal-title { font-size: 18px !important; margin-bottom: 8px; }
   #title-logo h1 { letter-spacing: 3px; }
+  #multi-modal .mode-cards { gap: 6px; margin: 8px 0; }
+  .mode-card { padding: 8px 10px; }
+  .mode-card-title { font-size: 13px; margin-bottom: 2px; }
+  .mode-card-desc { font-size: 11px; line-height: 1.3; }
+  .setting-label { font-size: 12px; margin-bottom: 4px; }
+  .setting-note { font-size: 10px; }
+  .room-input-row { margin: 8px 0; }
+  .room-input-row .neon-input { font-size: 16px; padding: 8px; }
 }
 @media (hover: hover) and (pointer: fine) {
   .mobile-only { display: none !important; }
@@ -3357,6 +3370,13 @@ function initButtonHandlers() {
         overlay.classList.remove('active');
       }
     });
+    // モバイル: モーダル外のタッチでページスクロールを防止
+    overlay.addEventListener('touchmove', (e) => {
+      const box = overlay.querySelector('.modal-box');
+      if (box && !box.contains(e.target)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
   });
 
   // Resume audio on first interaction
