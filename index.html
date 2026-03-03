@@ -776,14 +776,14 @@ html, body {
 #oni-fatigue-track { width: 120px; height: 8px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,68,68,0.3); border-radius: 4px; }
 #oni-fatigue-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff6666, #ff2222); border-radius: 3px; transition: width 0.3s; }
 #oni-can-touch-btn, #oni-pickup-btn {
-  position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
   font-family: 'Share Tech Mono', monospace; font-size: 18px; color: #fff;
   background: rgba(255,34,34,0.8); border: 2px solid #ff4444; padding: 10px 24px;
   border-radius: 8px; pointer-events: auto; cursor: pointer;
   animation: promptPulse 1.5s ease-in-out infinite;
 }
 #oni-lockon-btn {
-  position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+  position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%);
   font-family: 'Noto Sans JP', sans-serif; font-size: 16px; font-weight: bold;
   color: #fff; background: rgba(255,34,34,0.7); border: 2px solid #ff4444;
   padding: 14px 18px; border-radius: 50%; pointer-events: auto; cursor: pointer;
@@ -828,10 +828,10 @@ html, body {
 #result-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .result-panel { max-width: 400px; width: 90%; padding: 30px; }
 /* Mobile game controls */
-#mobile-joystick { position: absolute; bottom: 30px; left: 30px; width: 130px; height: 130px; border-radius: 50%; border: 2px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.25); touch-action: none; }
+#mobile-joystick { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); left: calc(30px + env(safe-area-inset-left, 0px)); width: 130px; height: 130px; border-radius: 50%; border: 2px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.25); touch-action: none; }
 #joystick-knob { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: radial-gradient(circle at 40% 38%, rgba(120,180,255,0.6), rgba(85,153,255,0.25)); border: 2px solid rgba(85,153,255,0.7); box-shadow: 0 0 10px rgba(85,153,255,0.3); pointer-events: none; transition: box-shadow 0.15s; }
 #joystick-knob.active { box-shadow: 0 0 18px rgba(85,153,255,0.6); border-color: rgba(120,200,255,0.9); }
-#mobile-buttons { position: absolute; bottom: 30px; right: 12px; display: flex; flex-direction: column; gap: 10px; }
+#mobile-buttons { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; }
 #mobile-buttons button { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #fff; background: rgba(0,0,0,0.45); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 50%; width: 60px; height: 60px; padding: 0; display: flex; align-items: center; justify-content: center; touch-action: none; }
 #mobile-buttons button:active { background: rgba(85,153,255,0.3); border-color: rgba(120,200,255,0.8); box-shadow: 0 0 12px rgba(85,153,255,0.4); }
 
@@ -12202,6 +12202,13 @@ function checkOniSpawn(g) {
         attempts++;
       } while (Math.sqrt((spawnX - canPos.x) ** 2 + (spawnZ - canPos.z) ** 2) < 15 && attempts < 10);
       const oni = createOni(g, spawnX, spawnZ);
+      // モバイル調整適用
+      if (g._mobileOniNerf) {
+        oni.speed *= g._mobileOniNerf;
+        oni.chaseSpeed *= g._mobileOniNerf;
+        oni.canTouchSpeed *= g._mobileOniNerf;
+        oni.viewDist *= g._mobileOniNerf;
+      }
       g.onis.push(oni);
       showCenterAlert('⚠ 新たな鬼が現れた！', '鬼が' + g.onis.length + '体になった', 3000);
     }
@@ -12884,6 +12891,17 @@ function startGame(stageNum, mode) {
     const oni = createOni(G, safe.x, safe.z);
     oni.state = 'patrol'; // Will walk to can during hide phase
     G.onis.push(oni);
+  }
+
+  // モバイル難易度調整: 鬼AIの速度を10%低下、視界距離を10%縮小
+  if ('ontouchstart' in window) {
+    for (const oni of G.onis) {
+      oni.speed *= 0.9;
+      oni.chaseSpeed *= 0.9;
+      oni.canTouchSpeed *= 0.9;
+      oni.viewDist *= 0.9;
+    }
+    G._mobileOniNerf = 0.9; // checkOniSpawnで生成される鬼にも適用
   }
 
   // Score Attack: プレイヤーを山門付近にスポーン
