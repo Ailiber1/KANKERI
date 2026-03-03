@@ -725,8 +725,8 @@ html, body {
   #kick-gauge-title { font-size: 18px; margin-bottom: 10px; }
   #kick-gauge-track { height: 20px; }
   #kick-gauge-hint { font-size: 12px; }
-  #hud-captured-text { font-size: 26px; }
-  #hud-captured-sub { font-size: 13px; }
+  #hud-captured-text { font-size: 16px; }
+  #hud-captured-sub { font-size: 11px; }
 }
 
 /* ============================================================
@@ -795,10 +795,10 @@ html, body {
   font-size: 60px; color: #ff0000; opacity: 0; transition: opacity 0.3s;
 }
 #oni-lockon-failed.show { opacity: 1; }
-#hud-captured-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 40; background: rgba(0,0,0,0.3); }
-#hud-captured-text { font-family: 'Share Tech Mono', monospace; font-size: 36px; color: #ff4444; text-shadow: 0 0 20px rgba(255,68,68,0.8); letter-spacing: 4px; animation: capturedPulse 2s ease-in-out infinite; }
-#hud-captured-sub { font-family: 'Noto Sans JP', sans-serif; font-size: 16px; color: #ffaa44; margin-top: 12px; text-shadow: 0 0 10px rgba(255,170,68,0.5); }
-@keyframes capturedPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+#hud-captured-overlay { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: auto; max-width: 90%; pointer-events: none; display: flex; flex-direction: row; align-items: center; gap: 12px; z-index: 40; background: rgba(0,0,0,0.75); border: 1px solid rgba(255,68,68,0.5); border-radius: 8px; padding: 10px 20px; }
+#hud-captured-text { font-family: 'Share Tech Mono', monospace; font-size: 20px; color: #ff4444; text-shadow: 0 0 10px rgba(255,68,68,0.6); letter-spacing: 2px; animation: capturedPulse 2s ease-in-out infinite; white-space: nowrap; }
+#hud-captured-sub { font-family: 'Noto Sans JP', sans-serif; font-size: 13px; color: #ffaa44; text-shadow: 0 0 8px rgba(255,170,68,0.4); white-space: nowrap; }
+@keyframes capturedPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 #hud-minimap { position: absolute; bottom: 12px; right: 12px; width: 150px; height: 150px; border: 1px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden; }
 #minimap-canvas { width: 100%; height: 100%; }
 #danger-vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-shadow: inset 0 0 80px rgba(255,0,64,0); transition: box-shadow 0.3s; }
@@ -1193,9 +1193,9 @@ html, body {
     <!-- Mobile controls -->
     <div id="mobile-joystick" class="mobile-only" style="display:none;"><div id="joystick-knob"></div></div>
     <div id="mobile-buttons" class="mobile-only" style="display:none;">
-      <button id="mob-map">MAP</button>
-      <button id="mob-dash">DASH</button>
-      <button id="mob-crouch">CROUCH</button>
+      <button id="mob-map" data-i18n="MOB_MAP">マップ</button>
+      <button id="mob-dash" data-i18n="MOB_DASH">ダッシュ</button>
+      <button id="mob-crouch" data-i18n="MOB_CROUCH">しゃがむ</button>
       <button id="mob-action" style="display:none;">KICK</button>
     </div>
   </div>
@@ -1331,8 +1331,8 @@ const gameState = {
 const MAX_PLAYERS = 4;
 const ROOM_TIMEOUT_EMPTY = 5 * 60 * 1000; // 空ルーム5分で自動削除
 const ROOM_TIMEOUT_GAME = 30 * 60 * 1000; // ゲーム中30分で強制終了
-const POS_SYNC_INTERVAL = 100; // ms
-const POS_SYNC_IDLE_INTERVAL = 500; // 移動していない時
+const POS_SYNC_INTERVAL = 50; // ms（ラグ軽減のため高頻度送信）
+const POS_SYNC_IDLE_INTERVAL = 300; // 移動していない時
 
 const multiState = {
   active: false,
@@ -2980,6 +2980,9 @@ const I18N = {
     NOTIFY_GUEST: 'ゲストモードで開始',
     ERROR_NAME: '名前を入力してください（1〜16文字）',
     NOTIFY_STAGE_LOCKED: 'このステージはまだ解放されていません',
+    MOB_MAP: 'マップ',
+    MOB_DASH: 'ダッシュ',
+    MOB_CROUCH: 'しゃがむ',
   },
   en: {
     USER_NAME: 'USER NAME',
@@ -3046,6 +3049,9 @@ const I18N = {
     NOTIFY_GUEST: 'Playing as Guest',
     ERROR_NAME: 'Please enter a name (1-16 characters)',
     NOTIFY_STAGE_LOCKED: 'This stage is not yet unlocked',
+    MOB_MAP: 'MAP',
+    MOB_DASH: 'DASH',
+    MOB_CROUCH: 'CROUCH',
   }
 };
 
@@ -9068,7 +9074,7 @@ function updatePlayer(g, dt) {
   let mx = 0, mz = 0;
   if (ctrl.isMobile && ctrl.joystickMag > 0.1) {
     mx = Math.sin(ctrl.joystickAngle + ctrl.cameraYaw) * ctrl.joystickMag;
-    mz = Math.cos(ctrl.joystickAngle + ctrl.cameraYaw) * ctrl.joystickMag;
+    mz = -Math.cos(ctrl.joystickAngle + ctrl.cameraYaw) * ctrl.joystickMag;
   } else {
     if (keys['KeyW'] || keys['ArrowUp']) mz -= 1;
     if (keys['KeyS'] || keys['ArrowDown']) mz += 1;
@@ -13893,14 +13899,14 @@ function initMultiplayerSync(g) {
 
   // ホストのみ: AI鬼の位置を送信、ゲーム状態を管理
   if (multiState.isHost) {
-    // 鬼の位置を定期送信（200ms間隔）
+    // 鬼の位置を定期送信（100ms間隔 — ラグ軽減）
     g._oniSyncTimer = setInterval(() => {
       if (!g || g.disposed || !multiState.active) {
         clearInterval(g._oniSyncTimer);
         return;
       }
       syncOniPositions(g);
-    }, 200);
+    }, 100);
 
     // ゲーム状態（フェーズ遷移、捕獲）をFirebaseに同期
     g._gameStateSyncTimer = setInterval(() => {
@@ -13954,8 +13960,11 @@ function initMultiplayerSync(g) {
         const idx = parseInt(k);
         if (g.onis[idx]) {
           const data = oniData[idx];
-          g.onis[idx].fig.group.position.set(data.x || 0, data.y || 0, data.z || 0);
-          g.onis[idx].fig.group.rotation.y = data.rotY || 0;
+          // 補間ターゲットを保存（gameLoopで滑らかに補間）
+          g.onis[idx]._remoteTarget = {
+            x: data.x || 0, y: data.y || 0, z: data.z || 0,
+            rotY: data.rotY || 0
+          };
           g.onis[idx].state = data.state || 'patrol';
         }
       });
@@ -14150,8 +14159,8 @@ function updateMultiplayerRemotePlayers(g, dt) {
     const remote = multiState.remotePlayers[k];
     if (!remote || !remote.fig) return;
 
-    // 位置補間（lerp）
-    const lerpFactor = Math.min(1, dt * 8);
+    // 位置補間（lerp）— 高い係数でラグを軽減
+    const lerpFactor = Math.min(1, dt * 15);
     const gp = remote.fig.group.position;
     gp.x += (remote.targetPos.x - gp.x) * lerpFactor;
     gp.y += (remote.targetPos.y - gp.y) * lerpFactor;
@@ -14192,6 +14201,23 @@ function updateMultiplayerRemotePlayers(g, dt) {
       remote.fig.group.visible = true;
     }
   });
+
+  // 非ホスト: AI鬼の位置を補間（カクつき防止）
+  if (!multiState.isHost && g.onis) {
+    const oniLerp = Math.min(1, dt * 15);
+    for (const oni of g.onis) {
+      if (!oni._remoteTarget) continue;
+      const gp = oni.fig.group.position;
+      gp.x += (oni._remoteTarget.x - gp.x) * oniLerp;
+      gp.y += (oni._remoteTarget.y - gp.y) * oniLerp;
+      gp.z += (oni._remoteTarget.z - gp.z) * oniLerp;
+      let dRot = oni._remoteTarget.rotY - oni.fig.group.rotation.y;
+      if (dRot > Math.PI) dRot -= Math.PI * 2;
+      if (dRot < -Math.PI) dRot += Math.PI * 2;
+      oni.fig.group.rotation.y += dRot * oniLerp;
+      oni.position.copy(gp);
+    }
+  }
 }
 
 /**
