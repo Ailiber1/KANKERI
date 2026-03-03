@@ -299,6 +299,8 @@ html, body {
   font-size: 11px; color: var(--neon-red);
   min-height: 16px; margin-top: 4px;
 }
+@keyframes error-shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+.error-shake { animation: error-shake 0.4s ease; }
 
 /* Buttons */
 .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
@@ -3206,23 +3208,34 @@ function initButtonHandlers() {
   document.getElementById('btn-multi').addEventListener('click', async () => {
     resumeAudioContext();
     if (!gameState.username) {
-      // 入力欄に名前があればその場で登録してマルチへ直行
       const input = document.getElementById('username-input');
       const name = input ? input.value.trim() : '';
-      if (name && name.length <= 16) {
-        try {
-          await registerUser(name);
-          showNotification(t('NOTIFY_REGISTERED'));
-        } catch (e) {
-          gameState.username = name;
-          gameState.isGuest = true;
+      if (!name) {
+        // 名前が空 → エラー表示 + シェイクで入力を促す
+        const errorEl = document.getElementById('username-error');
+        errorEl.textContent = gameState.language === 'ja'
+          ? 'マルチプレイにはユーザー名の登録が必要です'
+          : 'Username registration is required for Multiplayer';
+        if (input) {
+          input.classList.add('error-shake');
+          input.focus();
+          setTimeout(() => input.classList.remove('error-shake'), 400);
         }
-      } else {
-        // 名前が空 → ゲストとして自動登録
-        gameState.username = 'Guest_' + Math.floor(Math.random() * 9999);
-        gameState.isGuest = true;
-        showNotification(t('NOTIFY_GUEST'));
+        return;
       }
+      if (name.length > 16) {
+        document.getElementById('username-error').textContent = t('ERROR_NAME');
+        return;
+      }
+      // 名前あり → その場で登録してマルチへ直行
+      try {
+        await registerUser(name);
+        showNotification(t('NOTIFY_REGISTERED'));
+      } catch (e) {
+        gameState.username = name;
+        gameState.isGuest = true;
+      }
+      document.getElementById('username-error').textContent = '';
     }
     openModal('multi-modal');
   });
