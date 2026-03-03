@@ -1540,31 +1540,51 @@ async function joinOrCreateRoom(roomId, mode) {
   const roomData = snapshot.val();
 
   if (roomData) {
-    // 既存ルームに参加
-    if (roomData.status !== 'waiting') {
-      showRoomError('このルームはゲーム進行中です');
-      return;
-    }
     const players = roomData.players || {};
     const playerCount = Object.keys(players).length;
-    if (playerCount >= MAX_PLAYERS) {
-      showRoomError('ルームが満員です（最大' + MAX_PLAYERS + '人）');
+
+    // ゴーストルーム判定: プレイヤー0人 → 古いデータを削除して新規作成扱い
+    if (playerCount === 0) {
+      await roomRef.remove();
+      // 新規作成として続行（下のelseブロックと同じ処理）
+      multiState.playerIndex = 0;
+      multiState.isHost = true;
+      multiState.roomId = roomId;
+      multiState.gameMode = mode;
+      multiState.stage = 1;
+      await roomRef.set({
+        status: 'waiting',
+        gameMode: mode,
+        currentStage: 1,
+        host: 0,
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        players: {}
+      });
+    } else if (roomData.status !== 'waiting') {
+      // 既存ルームがゲーム中 & プレイヤーがいる → 参加不可
+      showRoomError('このルームはゲーム進行中です');
       return;
+    } else {
+      // 既存ルーム（waiting状態）に参加
+      if (playerCount >= MAX_PLAYERS) {
+        showRoomError('ルームが満員です（最大' + MAX_PLAYERS + '人）');
+        return;
+      }
+      // 空きスロットを探す
+      let slotIndex = -1;
+      for (let i = 0; i < MAX_PLAYERS; i++) {
+        if (!players[i]) { slotIndex = i; break; }
+      }
+      if (slotIndex === -1) {
+        showRoomError('ルームが満員です');
+        return;
+      }
+      multiState.playerIndex = slotIndex;
+      multiState.isHost = false;
+      multiState.roomId = roomId;
+      multiState.gameMode = roomData.gameMode || 'ffa';
+      multiState.stage = roomData.currentStage || 1;
     }
-    // 空きスロットを探す
-    let slotIndex = -1;
-    for (let i = 0; i < MAX_PLAYERS; i++) {
-      if (!players[i]) { slotIndex = i; break; }
-    }
-    if (slotIndex === -1) {
-      showRoomError('ルームが満員です');
-      return;
-    }
-    multiState.playerIndex = slotIndex;
-    multiState.isHost = false;
-    multiState.roomId = roomId;
-    multiState.gameMode = roomData.gameMode || 'ffa';
-    multiState.stage = roomData.currentStage || 1;
   } else {
     // 新規ルーム作成
     multiState.playerIndex = 0;
