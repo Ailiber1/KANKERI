@@ -3203,11 +3203,26 @@ function initButtonHandlers() {
   });
 
   // Multiplayer button
-  document.getElementById('btn-multi').addEventListener('click', () => {
+  document.getElementById('btn-multi').addEventListener('click', async () => {
     resumeAudioContext();
     if (!gameState.username) {
-      showNotification('先にユーザー名を登録してください');
-      return;
+      // 入力欄に名前があればその場で登録してマルチへ直行
+      const input = document.getElementById('username-input');
+      const name = input ? input.value.trim() : '';
+      if (name && name.length <= 16) {
+        try {
+          await registerUser(name);
+          showNotification(t('NOTIFY_REGISTERED'));
+        } catch (e) {
+          gameState.username = name;
+          gameState.isGuest = true;
+        }
+      } else {
+        // 名前が空 → ゲストとして自動登録
+        gameState.username = 'Guest_' + Math.floor(Math.random() * 9999);
+        gameState.isGuest = true;
+        showNotification(t('NOTIFY_GUEST'));
+      }
     }
     openModal('multi-modal');
   });
