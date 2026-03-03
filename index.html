@@ -12082,9 +12082,14 @@ function updateGamePhases(g, dt) {
     case 'placement':
       g.placementTimer -= dt;
       const ptEl = document.getElementById('placement-timer');
-      if (ptEl) ptEl.textContent = Math.ceil(g.placementTimer);
+      if (ptEl) ptEl.textContent = Math.ceil(Math.max(0, g.placementTimer));
       if (g.placementTimer <= 0) {
-        confirmCanPlacement(g);
+        // マルチプレイ非ホスト: ホストの決定を待つ（自分では確定しない）
+        if (g._isMultiplayer && !multiState.isHost) {
+          g.placementTimer = 0; // タイマー停止
+        } else {
+          confirmCanPlacement(g);
+        }
       }
       break;
 
@@ -12305,6 +12310,14 @@ function confirmCanPlacement(g) {
 
   const wrap = document.getElementById('can-placement-wrap');
   if (wrap) wrap.style.display = 'none';
+
+  // マルチプレイ（ホスト）: 缶の位置とフェーズを即座に同期
+  if (g._isMultiplayer && multiState.isHost && multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/canState').set({
+      position: { x: Math.round(pos.x * 100) / 100, y: Math.round(canY * 100) / 100, z: Math.round(pos.z * 100) / 100 }
+    });
+    syncGameState(g);
+  }
 
   // Move to kick phase — 缶のすぐ近くにスポーン（8方向を近い順に試す）
   g.gamePhase = 'kick';
@@ -13119,7 +13132,20 @@ function startGame(stageNum, mode) {
 function showCanPlacementUI(g) {
   const wrap = document.getElementById('can-placement-wrap');
   const opts = document.getElementById('placement-options');
+  const confirmBtn = document.getElementById('placement-confirm');
   if (!wrap || !opts) return;
+
+  // Set overhead camera for placement
+  g.camera.position.set(0, 20, 10);
+  g.camera.lookAt(0, 0, 0);
+
+  // マルチプレイ非ホスト: 選択UIではなく待機メッセージを表示
+  if (g._isMultiplayer && !multiState.isHost) {
+    opts.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:16px;font-size:14px;">ホストが缶の配置を選んでいます…</div>';
+    if (confirmBtn) confirmBtn.style.display = 'none';
+    wrap.style.display = 'block';
+    return;
+  }
 
   opts.innerHTML = '';
   g.config.canPositions.forEach((pos, i) => {
@@ -13138,14 +13164,11 @@ function showCanPlacementUI(g) {
     opts.appendChild(div);
   });
 
-  // Set overhead camera for placement
-  g.camera.position.set(0, 20, 10);
-  g.camera.lookAt(0, 0, 0);
-
   wrap.style.display = 'block';
-
-  const confirmBtn = document.getElementById('placement-confirm');
-  if (confirmBtn) confirmBtn.onclick = () => confirmCanPlacement(g);
+  if (confirmBtn) {
+    confirmBtn.style.display = 'block';
+    confirmBtn.onclick = () => confirmCanPlacement(g);
+  }
 }
 
 // ============================================================
@@ -14016,10 +14039,31 @@ function initMultiplayerSync(g) {
     const onState = stateRef.on('value', (snap) => {
       const state = snap.val();
       if (!state || !g || g.disposed) return;
+      const prevPhase = g.gamePhase;
       if (state.gamePhase) g.gamePhase = state.gamePhase;
       if (state.gameTimer !== undefined) g.gameTimer = state.gameTimer;
       if (state.capturedCount !== undefined) g.capturedCount = state.capturedCount;
       if (state.hideTime !== undefined) g.hideTime = state.hideTime;
+
+      // フェーズ変更時: UIを自動更新（非ホスト）
+      if (state.gamePhase && state.gamePhase !== prevPhase) {
+        // placement → kick: 配置UIを非表示
+        if (prevPhase === 'placement' && state.gamePhase !== 'placement') {
+          const canWrap = document.getElementById('can-placement-wrap');
+          if (canWrap) canWrap.style.display = 'none';
+        }
+        // kick → hide: キックゲージを非表示、かくれんぼカウントダウンを表示
+        if (state.gamePhase === 'hide') {
+          const kickWrap = document.getElementById('kick-gauge-wrap');
+          if (kickWrap) kickWrap.style.display = 'none';
+          if (state.hideTime) g.hideTime = state.hideTime;
+          showHideCountdown(g, true);
+        }
+        // hide → seek: かくれんぼカウントダウンを非表示
+        if (state.gamePhase === 'seek') {
+          showHideCountdown(g, false);
+        }
+      }
     });
     g._multiListeners.push({ ref: stateRef, event: 'value', fn: onState });
 
