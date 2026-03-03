@@ -2094,7 +2094,8 @@ function playBGM(key) {
 
   currentBGM = new Audio(src);
   currentBGM.loop = true;
-  currentBGM.volume = gameState.bgmEnabled ? BGM_VOLUME : 0;
+  currentBGM.volume = BGM_VOLUME;
+  currentBGM.muted = !gameState.bgmEnabled; // iOS対応: volumeではなくmutedで制御
 
   currentBGM.play().catch(() => {});
 }
@@ -2121,6 +2122,7 @@ function toggleBGM() {
     btn.textContent = '🔊 BGM';
     btn.className = 'bgm-btn bgm-on';
     if (currentBGM) {
+      currentBGM.muted = false; // iOS対応: mutedで制御
       let vol = 0;
       currentBGM.volume = 0;
       bgmFadeInterval = setInterval(() => {
@@ -2132,7 +2134,10 @@ function toggleBGM() {
   } else {
     btn.textContent = '🔇 BGM';
     btn.className = 'bgm-btn bgm-off';
-    if (currentBGM) currentBGM.volume = 0;
+    if (currentBGM) {
+      currentBGM.muted = true; // iOS対応: mutedで制御
+      currentBGM.volume = 0;
+    }
   }
 }
 
