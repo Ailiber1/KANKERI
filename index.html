@@ -12320,16 +12320,16 @@ function confirmCanPlacement(g) {
   const wrap = document.getElementById('can-placement-wrap');
   if (wrap) wrap.style.display = 'none';
 
-  // マルチプレイ（ホスト）: 缶の位置とフェーズを即座に同期
+  // Move to kick phase — 缶のすぐ近くにスポーン（8方向を近い順に試す）
+  g.gamePhase = 'kick';
+
+  // マルチプレイ（ホスト）: 缶の位置とフェーズを即座に同期（フェーズ変更後に呼ぶ）
   if (g._isMultiplayer && multiState.isHost && multiState.roomId) {
     db.ref('rooms/' + multiState.roomId + '/canState').set({
       position: { x: Math.round(pos.x * 100) / 100, y: Math.round(canY * 100) / 100, z: Math.round(pos.z * 100) / 100 }
     });
     syncGameState(g);
   }
-
-  // Move to kick phase — 缶のすぐ近くにスポーン（8方向を近い順に試す）
-  g.gamePhase = 'kick';
   const spawnDirs = [
     [0, 1.5], [1.1, 1.1], [1.5, 0], [1.1, -1.1],
     [0, -1.5], [-1.1, -1.1], [-1.5, 0], [-1.1, 1.1]
@@ -14065,7 +14065,10 @@ function initMultiplayerSync(g) {
         if (state.gamePhase === 'hide') {
           const kickWrap = document.getElementById('kick-gauge-wrap');
           if (kickWrap) kickWrap.style.display = 'none';
-          if (state.hideTime) g.hideTime = state.hideTime;
+          if (state.hideTime) {
+            g.hideTime = state.hideTime;
+            g.phaseTimer = state.hideTime; // 非ホスト: phaseTimerも設定
+          }
           showHideCountdown(g, true);
         }
         // hide → seek: かくれんぼカウントダウンを非表示
@@ -14101,7 +14104,7 @@ function initMultiplayerSync(g) {
       const canData = snap.val();
       if (!canData || !g || g.disposed) return;
       if (canData.position && g.can) {
-        g.can.position.set(canData.position.x || 0, canData.position.y || 0, canData.position.z || 0);
+        g.can.group.position.set(canData.position.x || 0, canData.position.y || 0, canData.position.z || 0);
       }
     });
     g._multiListeners.push({ ref: canRef, event: 'value', fn: onCan });
@@ -14232,9 +14235,9 @@ function syncGameState(g) {
   if (g.can) {
     db.ref('rooms/' + multiState.roomId + '/canState').set({
       position: {
-        x: Math.round(g.can.position.x * 100) / 100,
-        y: Math.round(g.can.position.y * 100) / 100,
-        z: Math.round(g.can.position.z * 100) / 100
+        x: Math.round(g.can.group.position.x * 100) / 100,
+        y: Math.round(g.can.group.position.y * 100) / 100,
+        z: Math.round(g.can.group.position.z * 100) / 100
       },
       status: g.canStatus || 'placed'
     });
