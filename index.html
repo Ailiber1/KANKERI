@@ -728,7 +728,7 @@ html, body {
   #hud-stamina-wrap { top: 44px; left: 6px; width: 130px; }
   #hud-stamina-label { font-size: 9px; }
   #hud-stamina-bar { height: 6px; }
-  #hud-info-bar { bottom: 80px; left: 6px; }
+  #hud-info-bar { bottom: 175px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
   #hud-minimap { width: 100px; height: 100px; bottom: 8px; right: 8px; }
@@ -1163,7 +1163,6 @@ html, body {
     <div id="hud-info-bar">
       <div id="hud-capture">捕獲: 0/0</div>
       <div id="hud-can-dir"></div>
-      <div id="hud-debug-pos" style="font-size:12px;color:#88ff88;opacity:0.9;"></div>
     </div>
     <div id="hud-action-prompt" style="display:none;"></div>
     <div id="hud-peek-prompt" style="display:none;"></div>
@@ -12601,19 +12600,6 @@ function updateHUD(g) {
     capEl.textContent = '捕獲: ' + g.capturedCount + '/' + total;
   }
 
-  // Debug position display
-  const dbgEl = document.getElementById('hud-debug-pos');
-  if (dbgEl) {
-    let dbg = 'P X:' + g.player.position.x.toFixed(1) + ' Z:' + g.player.position.z.toFixed(1);
-    if (g.onis) {
-      for (let i = 0; i < g.onis.length; i++) {
-        const o = g.onis[i];
-        dbg += ' | 鬼' + i + ' X:' + o.position.x.toFixed(1) + ' Y:' + o.position.y.toFixed(1) + ' Z:' + o.position.z.toFixed(1) + ' ' + o.state;
-      }
-    }
-    dbgEl.textContent = dbg;
-  }
-
   // Can direction
   const canDirEl = document.getElementById('hud-can-dir');
   if (canDirEl && g.can) {
@@ -14074,6 +14060,13 @@ function initMultiplayerSync(g) {
         // hide → seek: かくれんぼカウントダウンを非表示
         if (state.gamePhase === 'seek') {
           showHideCountdown(g, false);
+        }
+        // 非ホスト: resultフェーズ → リザルト画面を表示
+        if (state.gamePhase === 'result' && prevPhase !== 'result') {
+          roomRef.child('result').once('value').then(snap => {
+            const r = snap.val();
+            endGame(g, r ? r.playerWon : false);
+          });
         }
       }
     });
