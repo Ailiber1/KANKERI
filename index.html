@@ -1559,8 +1559,10 @@ async function joinOrCreateRoom(roomId, mode) {
     const players = roomData.players || {};
     const playerCount = Object.keys(players).length;
 
-    // ゴーストルーム判定: プレイヤー0人 → 古いデータを削除して新規作成扱い
-    if (playerCount === 0) {
+    // ゴーストルーム判定: プレイヤー0人 or 作成から30分超過ゲーム中 → 削除して新規作成
+    const roomAge = roomData.createdAt ? (Date.now() - roomData.createdAt) : 0;
+    const isStaleGame = roomData.status !== 'waiting' && roomAge > ROOM_TIMEOUT_GAME;
+    if (playerCount === 0 || isStaleGame) {
       await roomRef.remove();
       // 新規作成として続行（下のelseブロックと同じ処理）
       multiState.playerIndex = 0;
@@ -1584,6 +1586,14 @@ async function joinOrCreateRoom(roomId, mode) {
       // 既存ルーム（waiting状態）に参加
       if (playerCount >= MAX_PLAYERS) {
         showRoomError('ルームが満員です（最大' + MAX_PLAYERS + '人）');
+        return;
+      }
+      // 同じdeviceIdの重複参加チェック
+      var alreadyIn = Object.values(players).some(function(p) {
+        return p && p.deviceId === gameState.deviceId;
+      });
+      if (alreadyIn) {
+        showRoomError('既にこのルームに参加しています');
         return;
       }
       // 空きスロットを探す
@@ -14042,10 +14052,14 @@ function initMultiplayerSync(g) {
 
       // フェーズ変更時: UIを自動更新（非ホスト）
       if (state.gamePhase && state.gamePhase !== prevPhase) {
-        // placement → kick: 配置UIを非表示
+        // placement → kick: 配置UIを非表示、キック待機メッセージ表示
         if (prevPhase === 'placement' && state.gamePhase !== 'placement') {
           const canWrap = document.getElementById('can-placement-wrap');
           if (canWrap) canWrap.style.display = 'none';
+        }
+        // 非ホスト: kickフェーズ → 待機メッセージを表示
+        if (state.gamePhase === 'kick') {
+          showCenterAlert('🦵 ホストが缶を蹴っています…', 'しばらくお待ちください', 5000);
         }
         // kick → hide: キックゲージを非表示、かくれんぼカウントダウンを表示
         if (state.gamePhase === 'hide') {
@@ -14091,13 +14105,17 @@ function initMultiplayerSync(g) {
     });
     g._multiListeners.push({ ref: capRef, event: 'value', fn: onCap });
 
-    // 非ホスト: 缶の状態を受信
+    // 非ホスト: 缶の状態を受信（位置 + isAtHome + isFlying）
     const canRef = roomRef.child('canState');
     const onCan = canRef.on('value', (snap) => {
       const canData = snap.val();
       if (!canData || !g || g.disposed) return;
       if (canData.position && g.can) {
         g.can.group.position.set(canData.position.x || 0, canData.position.y || 0, canData.position.z || 0);
+      }
+      if (g.can) {
+        if (canData.isAtHome !== undefined) g.can.isAtHome = canData.isAtHome;
+        if (canData.isFlying !== undefined) g.can.isFlying = canData.isFlying;
       }
     });
     g._multiListeners.push({ ref: canRef, event: 'value', fn: onCan });
@@ -14171,6 +14189,81 @@ function initMultiplayerSync(g) {
       g._multiListeners.push({ ref: roundRef, event: 'value', fn: onRound });
     }
   }
+
+  // ============================================
+  // ゲーム中のプレイヤー離脱監視（ホスト/非ホスト共通）
+  // MAZE-HUNTパターン: プレイヤー離脱→3D除去+ホスト引継ぎ
+  // ============================================
+  const gamePlRef = roomRef.child('players');
+  const onGamePlayers = gamePlRef.on('value', (snap) => {
+    if (!g || g.disposed) return;
+    const currentPlayers = snap.val() || {};
+    const currentKeys = Object.keys(currentPlayers).map(Number);
+
+    // 自分がいなくなった場合（キックされた等）
+    if (!currentPlayers[multiState.playerIndex]) {
+      if (g.gamePhase !== 'result') {
+        showNotification('ルームから退出されました');
+        endGame(g, false);
+      }
+      return;
+    }
+
+    // 離脱プレイヤーを検出して3Dオブジェクト除去
+    Object.keys(multiState.remotePlayers).forEach(function(k) {
+      var idx = parseInt(k);
+      if (!currentPlayers[idx]) {
+        var remote = multiState.remotePlayers[idx];
+        var name = remote ? (remote.username || 'Player ' + idx) : 'Player ' + idx;
+        showNotification(name + 'さんが退席しました');
+        // 3Dオブジェクト除去
+        if (remote && remote.fig && remote.fig.group) {
+          g.scene.remove(remote.fig.group);
+        }
+        delete multiState.remotePlayers[idx];
+      }
+    });
+
+    // ホスト離脱検出 → 新ホスト自動割当
+    roomRef.child('host').once('value', function(hostSnap) {
+      var currentHostIdx = hostSnap.val();
+      if (currentHostIdx !== null && !currentPlayers[currentHostIdx]) {
+        var remainingIndices = currentKeys.filter(function(i) { return currentPlayers[i]; }).sort(function(a,b) { return a - b; });
+        if (remainingIndices.length === 0) return;
+        var newHostIdx = remainingIndices[0];
+        if (newHostIdx === multiState.playerIndex) {
+          // 自分が新ホストになる
+          multiState.isHost = true;
+          roomRef.child('host').set(newHostIdx);
+          showNotification('あなたが新しいホストになりました');
+          // ゲーム管理を引き継ぐ（鬼AI同期 + ゲーム状態同期）
+          if (!g._oniSyncTimer) {
+            g._oniSyncTimer = setInterval(function() {
+              if (!g || g.disposed || !multiState.active) { clearInterval(g._oniSyncTimer); return; }
+              syncOniPositions(g);
+            }, 100);
+          }
+          if (!g._gameStateSyncTimer) {
+            g._gameStateSyncTimer = setInterval(function() {
+              if (!g || g.disposed || !multiState.active) { clearInterval(g._gameStateSyncTimer); return; }
+              syncGameState(g);
+            }, 300);
+          }
+        }
+      }
+    });
+
+    // 残り1人 → 自動勝利
+    if (currentKeys.length === 1 && currentKeys[0] === multiState.playerIndex) {
+      if (g.gamePhase !== 'result') {
+        showNotification('他の全プレイヤーが退席しました');
+        endGame(g, true);
+      }
+    }
+
+    multiState.players = currentPlayers;
+  });
+  g._multiListeners.push({ ref: gamePlRef, event: 'value', fn: onGamePlayers });
 }
 
 function sendPlayerPosition(g) {
@@ -14224,7 +14317,7 @@ function syncGameState(g) {
     capturedCount: g.capturedCount,
     hideTime: g.hideTime || 0
   });
-  // 缶の位置も同期
+  // 缶の位置も同期（isAtHomeも含む）
   if (g.can) {
     db.ref('rooms/' + multiState.roomId + '/canState').set({
       position: {
@@ -14232,6 +14325,8 @@ function syncGameState(g) {
         y: Math.round(g.can.group.position.y * 100) / 100,
         z: Math.round(g.can.group.position.z * 100) / 100
       },
+      isAtHome: !!g.can.isAtHome,
+      isFlying: !!g.can.isFlying,
       status: g.canStatus || 'placed'
     });
   }
@@ -14411,7 +14506,23 @@ function cleanupMultiplayer(g) {
 
   // Firebaseからプレイヤー位置を削除
   if (multiState.active && multiState.roomId) {
-    db.ref('rooms/' + multiState.roomId + '/playerPositions/' + multiState.playerIndex).remove().catch(() => {});
+    db.ref('rooms/' + multiState.roomId + '/playerPositions/' + multiState.playerIndex).remove().catch(function(){});
+    // ゲーム中にタイトルに戻る場合: プレイヤーデータも削除
+    if (multiState.playerIndex >= 0) {
+      var roomRef = db.ref('rooms/' + multiState.roomId);
+      roomRef.child('players/' + multiState.playerIndex).remove().catch(function(){});
+      roomRef.child('players/' + multiState.playerIndex).onDisconnect().cancel();
+      // 残りプレイヤーチェック（非同期だが待たない）
+      roomRef.child('players').once('value').then(function(snap) {
+        var remaining = snap.val();
+        if (!remaining || Object.keys(remaining).length === 0) {
+          roomRef.remove().catch(function(){});
+        } else if (multiState.isHost) {
+          var newHost = Math.min.apply(null, Object.keys(remaining).map(Number));
+          roomRef.child('host').set(newHost).catch(function(){});
+        }
+      });
+    }
   }
 }
 
