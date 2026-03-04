@@ -1531,7 +1531,11 @@ function renderRankingList(entries, listEl, lang) {
  * joinOrCreateRoom — ルームに参加（存在しなければ新規作成）
  * 呼び出し元: btn-join-room クリックイベント
  */
+var _joiningRoom = false;
 async function joinOrCreateRoom(roomId, mode) {
+  if (_joiningRoom) return; // 二重タップ防止
+  _joiningRoom = true;
+  try {
   if (!roomId || roomId.trim().length === 0) {
     showRoomError('ルームIDを入力してください');
     return;
@@ -1638,6 +1642,9 @@ async function joinOrCreateRoom(roomId, mode) {
   showScreen('lobby-screen');
   initLobbyListeners();
   updateLobbyUI();
+  } finally {
+    _joiningRoom = false;
+  }
 }
 
 function showRoomError(msg) {
@@ -3288,11 +3295,13 @@ function initButtonHandlers() {
   });
 
   // Multi modal: join room button
-  document.getElementById('btn-join-room').addEventListener('click', () => {
+  document.getElementById('btn-join-room').addEventListener('click', function() {
+    if (this.disabled) return;
+    this.disabled = true; // 二重タップ防止
     const roomId = document.getElementById('room-id-input').value;
     const selectedMode = document.querySelector('.mode-card.selected');
     const mode = selectedMode ? selectedMode.dataset.mode : 'ffa';
-    joinOrCreateRoom(roomId, mode);
+    joinOrCreateRoom(roomId, mode).finally(() => { this.disabled = false; });
   });
 
   // Lobby: ready button
