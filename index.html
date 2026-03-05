@@ -12723,12 +12723,14 @@ var _rematchTimer = null;
 var _rematchReadyRef = null;
 var _rematchPlayersRef = null;
 var _rematchResolved = false;
+var _cachedReadyData = null;
 
 function startRematchCountdown(g) {
   var COUNTDOWN_SEC = 20;
   var secondsLeft = COUNTDOWN_SEC;
   var myChoice = null; // null=未選択, 'retry', 'exit'
   _rematchResolved = false;
+  _cachedReadyData = null;
 
   if (!multiState.roomId) return;
   var roomRef = db.ref('rooms/' + multiState.roomId);
@@ -12812,6 +12814,7 @@ function startRematchCountdown(g) {
         var ready = rSnap.val();
         var readyCount = ready ? Object.keys(ready).length : 0;
         if (readyCount >= 2 && readyCount >= currentTotal) {
+          _cachedReadyData = ready; // ★レースコンディション防止: データをキャッシュ
           clearInterval(_rematchTimer); _rematchTimer = null;
           resolveRematch();
         }
@@ -12838,12 +12841,16 @@ function startRematchCountdown(g) {
     renderUI();
     if (secondsLeft <= 0) {
       clearInterval(_rematchTimer); _rematchTimer = null;
-      resolveRematch();
+      // ★タイマー満了時もデータをキャッシュしてからresolve
+      roomRef.child('readyPlayers').once('value', function(tSnap) {
+        _cachedReadyData = tSnap.val();
+        resolveRematch();
+      });
     }
   }, 1000);
 }
 
-// ★FALL-DODGEパターン準拠: once('value')で読み直して判定
+// ★レースコンディション修正版: キャッシュデータを使用し、Firebase書き込みはホストのみ
 function resolveRematch() {
   if (_rematchResolved) return; // 二重実行防止
   _rematchResolved = true;
@@ -12851,13 +12858,15 @@ function resolveRematch() {
   cleanupRematchCountdown();
   if (!multiState.roomId) return;
   var roomRef = db.ref('rooms/' + multiState.roomId);
-  roomRef.child('readyPlayers').once('value', function(snap) {
-    var ready = snap.val();
-    var readyCount = ready ? Object.keys(ready).length : 0;
-    var myReady = ready && ready[multiState.playerIndex];
 
-    if (readyCount >= 2 && myReady) {
-      // ★FALL-DODGEパターン: readyPlayersクリア
+  // ★キャッシュ済みデータを使用（once('value')再読み込みによるレースコンディションを防止）
+  var ready = _cachedReadyData;
+  var readyCount = ready ? Object.keys(ready).length : 0;
+  var myReady = ready && ready[multiState.playerIndex];
+
+  if (readyCount >= 2 && myReady) {
+    // ★ホストのみFirebaseクリーンアップを実行（両クライアントが同時実行する競合を防止）
+    if (multiState.isHost) {
       roomRef.child('readyPlayers').remove();
       // 前ゲームデータクリア
       roomRef.child('capturedPlayers').remove();
@@ -12872,28 +12881,30 @@ function resolveRematch() {
           roomRef.child('players/' + idx).remove();
         }
       });
-      // ★FALL-DODGEパターン: 再戦プレイヤーの中で最小indexを新ホストに設定
+      // 再戦プレイヤーの中で最小indexを新ホストに設定
       var readyIndices = Object.keys(ready).map(Number).sort(function(a, b) { return a - b; });
       var newHostIdx = readyIndices[0];
       roomRef.child('host').set(newHostIdx);
-      multiState.isHost = (multiState.playerIndex === newHostIdx);
-      // ★FALL-DODGEパターン: 各プレイヤーのready状態をリセット（既存データのみ更新）
-      roomRef.child('players/' + multiState.playerIndex + '/ready').set(false);
-      multiState.ready = false;
       roomRef.update({ status: 'waiting' });
-      cleanupGame();
-      showScreen('lobby-screen');
-      initLobbyListeners();
-      updateLobbyUI();
-    } else {
-      // 人数不足 → タイトルに戻る
-      if (myReady) {
-        showNotification('リトライ人数が不足のため終了します（2人以上必要）');
-      }
-      cleanupGame();
-      leaveLobby();
     }
-  });
+    // ★全プレイヤー共通: ローカル状態の更新とロビー遷移
+    var allReadyIndices = Object.keys(ready).map(Number).sort(function(a, b) { return a - b; });
+    multiState.isHost = (multiState.playerIndex === allReadyIndices[0]);
+    roomRef.child('players/' + multiState.playerIndex + '/ready').set(false);
+    multiState.ready = false;
+    cleanupGame();
+    showScreen('lobby-screen');
+    initLobbyListeners();
+    updateLobbyUI();
+  } else {
+    // 人数不足 → タイトルに戻る
+    if (myReady) {
+      showNotification('リトライ人数が不足のため終了します（2人以上必要）');
+    }
+    cleanupGame();
+    leaveLobby();
+  }
+  _cachedReadyData = null; // キャッシュクリア
 }
 
 function cleanupRematchCountdown() {
