@@ -1264,9 +1264,18 @@ html, body {
       <div class="corner-bl"></div><div class="corner-br"></div>
       <h2 id="result-title" style="font-family:'Cinzel Decorative',serif;text-align:center;margin-bottom:16px;font-size:28px;"></h2>
       <div id="result-stats" style="font-family:'Share Tech Mono',monospace;color:#ccc;line-height:2;"></div>
-      <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
+      <div id="result-buttons-solo" style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
         <button id="btn-retry" class="btn btn-neon" data-i18n="BTN_RETRY" style="width:100%;">もう一度</button>
         <button id="btn-to-title" class="btn btn-neon" data-i18n="BTN_TITLE" style="width:100%;">タイトルへ</button>
+      </div>
+      <div id="result-buttons-multi" style="display:none;margin-top:20px;text-align:center;">
+        <div id="rematch-countdown" style="font-size:20px;color:#ffd700;font-weight:bold;text-shadow:0 0 8px rgba(255,204,0,0.5);margin-bottom:10px;"></div>
+        <div id="rematch-status" style="font-size:12px;color:#888;margin-bottom:10px;"></div>
+        <div id="rematch-buttons" style="display:flex;flex-direction:column;gap:10px;">
+          <button id="btn-rematch-yes" class="btn btn-neon" style="width:100%;font-size:16px;padding:14px;">🔄 再戦</button>
+          <button id="btn-rematch-no" class="btn btn-neon" style="width:100%;font-size:14px;opacity:0.7;">退出する</button>
+        </div>
+        <div id="rematch-waiting" style="display:none;color:#00ff41;font-size:14px;font-weight:bold;">✔ 再戦待機中...</div>
       </div>
     </div>
   </div>
@@ -12618,7 +12627,185 @@ function endGame(g, playerWon, reason) {
     }
   }
 
+  // マルチプレイFFA/Team: 再戦投票UIを表示
+  var soloButtons = document.getElementById('result-buttons-solo');
+  var multiButtons = document.getElementById('result-buttons-multi');
+  if (g._isMultiplayer && g._multiMode !== 'coop') {
+    if (soloButtons) soloButtons.style.display = 'none';
+    if (multiButtons) multiButtons.style.display = 'block';
+    startRematchCountdown(g);
+  } else {
+    if (soloButtons) soloButtons.style.display = 'flex';
+    if (multiButtons) multiButtons.style.display = 'none';
+  }
+
   if (overlay) overlay.style.display = 'flex';
+}
+
+// --- REMATCH VOTING SYSTEM (FALL-DODGEパターン) ---
+var _rematchTimer = null;
+var _rematchReadyRef = null;
+var _rematchPlayersRef = null;
+var _rematchMyChoice = null;
+
+function startRematchCountdown(g) {
+  var COUNTDOWN_SEC = 20;
+  var secondsLeft = COUNTDOWN_SEC;
+  _rematchMyChoice = null;
+
+  var countdownEl = document.getElementById('rematch-countdown');
+  var statusEl = document.getElementById('rematch-status');
+  var buttonsEl = document.getElementById('rematch-buttons');
+  var waitingEl = document.getElementById('rematch-waiting');
+  var yesBtn = document.getElementById('btn-rematch-yes');
+  var noBtn = document.getElementById('btn-rematch-no');
+
+  if (buttonsEl) buttonsEl.style.display = 'flex';
+  if (waitingEl) waitingEl.style.display = 'none';
+
+  function renderCountdown() {
+    if (countdownEl) {
+      countdownEl.textContent = '⏱ ' + secondsLeft + 's';
+      if (secondsLeft <= 5) {
+        countdownEl.style.color = '#ff0040';
+        countdownEl.style.textShadow = '0 0 12px rgba(255,0,0,0.8)';
+      } else {
+        countdownEl.style.color = '#ffd700';
+        countdownEl.style.textShadow = '0 0 8px rgba(255,204,0,0.5)';
+      }
+    }
+  }
+  renderCountdown();
+
+  if (!multiState.roomId) return;
+  var roomRef = db.ref('rooms/' + multiState.roomId);
+
+  // 「再戦」ボタン
+  if (yesBtn) yesBtn.onclick = function() {
+    _rematchMyChoice = 'retry';
+    roomRef.child('readyPlayers/' + multiState.playerIndex).set(true);
+    if (buttonsEl) buttonsEl.style.display = 'none';
+    if (waitingEl) waitingEl.style.display = 'block';
+  };
+
+  // 「退出する」ボタン
+  if (noBtn) noBtn.onclick = function() {
+    _rematchMyChoice = 'exit';
+    cleanupRematchCountdown();
+    cleanupGame();
+    leaveLobby();
+  };
+
+  // 投票状態の表示更新
+  function updateReadyDisplay(readyPlayers) {
+    if (!statusEl) return;
+    var readyCount = readyPlayers ? Object.keys(readyPlayers).length : 0;
+    var totalCount = multiState.players ? Object.keys(multiState.players).filter(function(k) { return multiState.players[k]; }).length : 0;
+    var html = '';
+    if (readyCount > 0) {
+      var names = [];
+      Object.keys(readyPlayers).forEach(function(idx) {
+        var p = multiState.players[idx];
+        if (p) names.push(p.username || 'Player' + idx);
+      });
+      html = '<span style="color:#00ff41">✔ ' + names.join(', ') + '</span>';
+      html += ' (' + readyCount + '/' + totalCount + ')';
+    }
+    statusEl.innerHTML = html;
+  }
+
+  // 全員準備完了チェック
+  function checkAllReady() {
+    roomRef.child('players').once('value', function(pSnap) {
+      var currentPlayers = pSnap.val();
+      var currentTotal = currentPlayers ? Object.keys(currentPlayers).filter(function(k) { return currentPlayers[k]; }).length : 0;
+      if (currentPlayers) multiState.players = currentPlayers;
+      roomRef.child('readyPlayers').once('value', function(rSnap) {
+        var ready = rSnap.val();
+        var readyCount = ready ? Object.keys(ready).length : 0;
+        if (readyCount >= 2 && readyCount >= currentTotal) {
+          clearInterval(_rematchTimer);
+          _rematchTimer = null;
+          resolveRematch();
+        }
+      });
+    });
+  }
+
+  // Firebase投票監視
+  _rematchReadyRef = roomRef.child('readyPlayers');
+  _rematchReadyRef.on('value', function(snap) {
+    updateReadyDisplay(snap.val());
+    checkAllReady();
+  });
+  _rematchPlayersRef = roomRef.child('players');
+  _rematchPlayersRef.on('value', function(snap) {
+    var currentPlayers = snap.val();
+    if (currentPlayers) multiState.players = currentPlayers;
+    checkAllReady();
+  });
+
+  // カウントダウンタイマー
+  _rematchTimer = setInterval(function() {
+    secondsLeft--;
+    renderCountdown();
+    if (secondsLeft <= 0) {
+      clearInterval(_rematchTimer);
+      _rematchTimer = null;
+      resolveRematch();
+    }
+  }, 1000);
+}
+
+function resolveRematch() {
+  if (!multiState.roomId) return;
+  var roomRef = db.ref('rooms/' + multiState.roomId);
+  roomRef.child('readyPlayers').once('value', function(snap) {
+    var ready = snap.val();
+    var readyCount = ready ? Object.keys(ready).length : 0;
+    var myReady = ready && ready[multiState.playerIndex];
+    cleanupRematchCountdown();
+
+    if (readyCount >= 2 && myReady) {
+      // 再戦: 前ゲームデータクリア→ロビーに戻る
+      roomRef.child('readyPlayers').remove();
+      roomRef.child('capturedPlayers').remove();
+      roomRef.child('oniPositions').remove();
+      roomRef.child('gameState').remove();
+      roomRef.child('canState').remove();
+      roomRef.child('playerPositions').remove();
+      roomRef.child('result').remove();
+      // 非再戦プレイヤーを削除
+      Object.keys(multiState.players).forEach(function(idx) {
+        if (multiState.players[idx] && !(ready && ready[idx])) {
+          roomRef.child('players/' + idx).remove();
+        }
+      });
+      // ready状態リセット
+      var resetData = {};
+      Object.keys(ready).forEach(function(idx) { resetData[idx + '/ready'] = false; });
+      roomRef.child('players').update(resetData);
+      multiState.ready = false;
+      roomRef.update({ status: 'waiting' });
+      cleanupGame();
+      showScreen('lobby-screen');
+      initLobbyListeners();
+      updateLobbyUI();
+    } else {
+      // 人数不足 → タイトルに戻る
+      if (myReady) {
+        showNotification('リトライ人数が不足のため終了します（2人以上必要）');
+      }
+      cleanupGame();
+      leaveLobby();
+    }
+  });
+}
+
+function cleanupRematchCountdown() {
+  if (_rematchTimer) { clearInterval(_rematchTimer); _rematchTimer = null; }
+  if (_rematchReadyRef) { _rematchReadyRef.off(); _rematchReadyRef = null; }
+  if (_rematchPlayersRef) { _rematchPlayersRef.off(); _rematchPlayersRef = null; }
 }
 
 // --- HUD UPDATES ---
@@ -13153,8 +13340,8 @@ function startGame(stageNum, mode) {
       // Co-op: 同ステージやり直し（ホストがFirebase経由で全員に通知）
       coopRetryStage(G);
     } else if (mode.startsWith('multi_')) {
-      // FFA/Team: 即再戦（前ゲームデータクリア→同じ設定で再開始）
-      rematchMulti(stageNum, mode);
+      // FFA/Team: 投票UI経由で再戦（endGameで表示される）
+      return; // result-buttons-multiが表示されているため、このボタンは非表示
     } else {
       cleanupGame(); startGame(stageNum, mode);
     }
@@ -14580,37 +14767,6 @@ function cleanupMultiplayer(g) {
 }
 
 // FFA/Team即再戦: 前ゲームデータクリア→同じ設定で即ゲーム再開始
-function rematchMulti(stageNum, mode) {
-  if (!multiState.roomId) return;
-  var roomRef = db.ref('rooms/' + multiState.roomId);
-  // 前ゲームの状態を完全クリア
-  roomRef.child('capturedPlayers').remove();
-  roomRef.child('oniPositions').remove();
-  roomRef.child('gameState').remove();
-  roomRef.child('canState').remove();
-  roomRef.child('playerPositions').remove();
-  roomRef.child('result').remove();
-  // ゲームクリーンアップ
-  cleanupGame();
-  if (multiState.isHost) {
-    // ホスト: status → rematch に設定してゲーム再開始
-    roomRef.update({ status: 'rematch' }).then(function() {
-      // 少し待ってから再開始（非ホストがrematchを受信する時間）
-      setTimeout(function() {
-        roomRef.update({ status: 'playing' });
-        startGame(stageNum, mode);
-      }, 500);
-    });
-  } else {
-    // 非ホスト: status監視でplayingになったら自動開始（既存リスナーで対応）
-    // ロビーに戻して待機
-    showScreen('lobby-screen');
-    initLobbyListeners();
-    updateLobbyUI();
-    showNotification('ホストの再戦開始を待っています...');
-  }
-}
-
 function cleanupGame() {
   if (!G) return;
   G.disposed = true;
