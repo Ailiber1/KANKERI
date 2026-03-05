@@ -868,6 +868,22 @@ html, body {
   #btn-retry, #btn-to-title { font-size: 12px !important; padding: 8px !important; }
   #result-buttons-solo { margin-top: 8px !important; gap: 6px !important; }
 }
+/* 横向きスマホ: ロビー画面のスクロール対応 */
+@media (orientation: landscape) and (max-height: 500px) {
+  #lobby-screen { align-items: flex-start !important; justify-content: flex-start !important; padding: 8px 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
+  .lobby-panel { padding: 10px 14px !important; max-height: calc(100vh - 16px); overflow-y: auto; }
+  .lobby-room-id { font-size: 22px !important; margin-bottom: 2px !important; }
+  .lobby-mode { font-size: 11px !important; margin-bottom: 8px !important; }
+  .lobby-player { padding: 6px 10px !important; }
+  .lobby-player-name { font-size: 12px !important; }
+  .lobby-stage-label { font-size: 11px !important; }
+  .lobby-stage-select .neon-select { font-size: 13px !important; padding: 6px 8px !important; }
+  .lobby-btn-row { margin-top: 8px !important; }
+  .lobby-btn-row .btn { padding: 8px 10px !important; font-size: 12px !important; }
+  .team-assign-section { margin: 6px 0 !important; }
+  .team-assign-grid { gap: 4px !important; }
+  .team-column { padding: 4px !important; min-height: 50px !important; }
+}
 /* 横向きスマホ: ミニマップをステージ名の隣（中央上部）に配置 */
 @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
   #hud-minimap { width: 60px !important; height: 60px !important; top: 4px !important; left: 50% !important; transform: translateX(-50%); bottom: auto !important; right: auto !important; }
@@ -5646,6 +5662,15 @@ function buildAlleyObjects(g) {
     g.streetLights = g.streetLights || [];
     g.streetLights.push({ spot: sLight, fixture: fix, fixMat });
   }
+
+  // === 裏路地用 追加環境光（暗すぎ防止） ===
+  const alleyAmbient = new THREE.AmbientLight(0x1a1a2e, 0.45);
+  g.scene.add(alleyAmbient);
+  // 月明かり（微弱な上方向光）
+  const alleyMoonLight = new THREE.DirectionalLight(0x4455aa, 0.35);
+  alleyMoonLight.position.set(10, 40, 10);
+  alleyMoonLight.castShadow = false;
+  g.scene.add(alleyMoonLight);
 
   // === ドラム缶 — 金属PBRテクスチャ ===
   const barrelDefs = [
@@ -12141,7 +12166,7 @@ function createDayNightCycle(g) {
       { name: 'morning', skyColor: 0xffd0a0, sunColor: 0xffe0b0, sunIntensity: 0.6, hemiSky: 0xffd0a0, hemiGround: 0x806040 },
       { name: 'day', skyColor: 0x87ceeb, sunColor: 0xffffff, sunIntensity: 1.0, hemiSky: 0x87ceeb, hemiGround: 0x404020 },
       { name: 'evening', skyColor: 0xff8844, sunColor: 0xff8844, sunIntensity: 0.6, hemiSky: 0xff6644, hemiGround: 0x803010 },
-      { name: 'night', skyColor: 0x112244, sunColor: 0x4466aa, sunIntensity: 0.2, hemiSky: 0x112244, hemiGround: 0x101020 }
+      { name: 'night', skyColor: 0x112244, sunColor: 0x4466aa, sunIntensity: 0.3, hemiSky: 0x182244, hemiGround: 0x151525 }
     ]
   };
 }
