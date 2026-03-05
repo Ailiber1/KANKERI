@@ -4091,7 +4091,7 @@ function createGameScene(stageConfig) {
   // ★夜ステージ: 黒オーバーレイで明→暗フラッシュを隠す
   var fadeOverlay = document.getElementById('game-fade-overlay');
   if (fadeOverlay) fadeOverlay.remove();
-  if (stageNum === 3 || stageNum === 4) {
+  if (stageConfig.startPhase === 3) {
     fadeOverlay = document.createElement('div');
     fadeOverlay.id = 'game-fade-overlay';
     fadeOverlay.style.opacity = '1';
