@@ -758,7 +758,6 @@ html, body {
    ============================================================ */
 #game-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; background: #000; }
 #game-container { width: 100%; height: 100%; position: relative; flex: 1 1 100%; overflow: hidden; }
-#game-fade-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 50; pointer-events: none; transition: opacity 0.5s ease; }
 #game-container canvas { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 #game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
 #game-hud > * { pointer-events: auto; }
@@ -4088,31 +4087,26 @@ function createGameScene(stageConfig) {
   container.innerHTML = '';
   container.appendChild(g.renderer.domElement);
 
-  // ★夜ステージ: 黒オーバーレイで明→暗フラッシュを隠す
-  var fadeOverlay = document.getElementById('game-fade-overlay');
-  if (fadeOverlay) fadeOverlay.remove();
-  if (stageConfig.startPhase === 3) {
-    fadeOverlay = document.createElement('div');
-    fadeOverlay.id = 'game-fade-overlay';
-    fadeOverlay.style.opacity = '1';
-    container.appendChild(fadeOverlay);
-    g._fadeOverlay = fadeOverlay;
-  }
-
-  // Scene
+  // Scene — 夜ステージ(startPhase===3)は最初から夜の背景色・fog色を設定
   g.scene = new THREE.Scene();
-  g.scene.background = new THREE.Color(0x87ceeb);
-  g.scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
+  var _nightPhaseColors = { bg: 0x112244, fog: 0x112244 };
+  var _isNightStart = (stageConfig.startPhase === 3);
+  g.scene.background = new THREE.Color(_isNightStart ? _nightPhaseColors.bg : 0x87ceeb);
+  g.scene.fog = new THREE.FogExp2(_isNightStart ? _nightPhaseColors.fog : 0x87ceeb, 0.012);
 
   // Camera (TPS)
   g.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
   g.camera.position.set(0, 3, 8);
 
-  // Lights
-  g.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x404020, 0.6);
+  // Lights — 夜ステージは最初から暗い照明値
+  g.hemiLight = new THREE.HemisphereLight(
+    _isNightStart ? 0x182244 : 0x87ceeb,
+    _isNightStart ? 0x151525 : 0x404020, 0.6);
   g.scene.add(g.hemiLight);
 
-  g.sunLight = new THREE.DirectionalLight(0xfff0d8, 0.9);
+  g.sunLight = new THREE.DirectionalLight(
+    _isNightStart ? 0x4466aa : 0xfff0d8,
+    _isNightStart ? 0.3 : 0.9);
   g.sunLight.position.set(18, 35, 12);
   g.sunLight.castShadow = true;
   g.sunLight.shadow.mapSize.width = 2048;
@@ -5706,6 +5700,8 @@ function buildAlleyObjects(g) {
   alleyMoonLight.position.set(10, 40, 10);
   alleyMoonLight.castShadow = false;
   g.scene.add(alleyMoonLight);
+  // Stage 3: フォグ密度を軽減（夜色fog + 高密度 = 真っ暗防止）
+  g.scene.fog.density = 0.005;
 
   // === ドラム缶 — 金属PBRテクスチャ ===
   const barrelDefs = [
@@ -12259,11 +12255,6 @@ function updateDayNight(g, dt) {
   for (const sl of g.streetLights) {
     sl.spot.intensity = lightOn ? 1.5 : 0;
     sl.fixMat.emissiveIntensity = lightOn ? 1.0 : 0.1;
-  }
-  // ★夜ステージ: 照明適用後にフェードオーバーレイを消す
-  if (g._fadeOverlay) {
-    g._fadeOverlay.style.opacity = '0';
-    setTimeout(function() { if (g._fadeOverlay) { g._fadeOverlay.remove(); g._fadeOverlay = null; } }, 600);
   }
 }
 
