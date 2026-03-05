@@ -870,19 +870,26 @@ html, body {
 }
 /* 横向きスマホ: ロビー画面のスクロール対応 */
 @media (orientation: landscape) and (max-height: 500px) {
-  #lobby-screen { align-items: flex-start !important; justify-content: flex-start !important; padding: 8px 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
-  .lobby-panel { padding: 10px 14px !important; max-height: calc(100vh - 16px); overflow-y: auto; }
-  .lobby-room-id { font-size: 22px !important; margin-bottom: 2px !important; }
-  .lobby-mode { font-size: 11px !important; margin-bottom: 8px !important; }
-  .lobby-player { padding: 6px 10px !important; }
-  .lobby-player-name { font-size: 12px !important; }
-  .lobby-stage-label { font-size: 11px !important; }
-  .lobby-stage-select .neon-select { font-size: 13px !important; padding: 6px 8px !important; }
-  .lobby-btn-row { margin-top: 8px !important; }
-  .lobby-btn-row .btn { padding: 8px 10px !important; font-size: 12px !important; }
-  .team-assign-section { margin: 6px 0 !important; }
-  .team-assign-grid { gap: 4px !important; }
-  .team-column { padding: 4px !important; min-height: 50px !important; }
+  #lobby-screen { align-items: flex-start !important; justify-content: flex-start !important; padding: 4px 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
+  #lobby-screen .lobby-panel { padding: 8px 12px !important; max-height: calc(100vh - 8px) !important; max-height: calc(100dvh - 8px) !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; width: min(420px, 88vw) !important; }
+  #lobby-screen .lobby-room-id { font-size: 18px !important; margin-bottom: 0 !important; letter-spacing: 3px !important; }
+  #lobby-screen .lobby-mode { font-size: 10px !important; margin-bottom: 4px !important; }
+  #lobby-screen .lobby-stage-select { margin: 4px 0 !important; }
+  #lobby-screen .lobby-stage-label { font-size: 10px !important; margin-bottom: 2px !important; }
+  #lobby-screen .neon-select { font-size: 12px !important; padding: 4px 6px !important; }
+  #lobby-screen .lobby-player-list { margin: 0 0 4px !important; }
+  #lobby-screen .lobby-player { padding: 4px 8px !important; }
+  #lobby-screen .lobby-player-name { font-size: 11px !important; }
+  #lobby-screen .lobby-player-status { font-size: 10px !important; }
+  #lobby-screen .lobby-btn-row { margin-top: 6px !important; }
+  #lobby-screen .lobby-btn-row .btn { padding: 6px 8px !important; font-size: 11px !important; }
+  #lobby-screen .lobby-chat { max-height: 40px !important; margin-top: 4px !important; }
+  #lobby-screen .team-assign-section { margin: 4px 0 !important; }
+  #lobby-screen .team-assign-grid { gap: 4px !important; }
+  #lobby-screen .team-column { padding: 4px !important; min-height: 40px !important; }
+  #lobby-screen .lobby-room-label { font-size: 9px !important; margin-bottom: 0 !important; }
+  #lobby-screen .lobby-slot-empty { padding: 3px 8px !important; font-size: 10px !important; }
+  #lobby-screen .corner-bl, #lobby-screen .corner-br { display: none !important; }
 }
 /* 横向きスマホ: ミニマップをステージ名の隣（中央上部）に配置 */
 @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
@@ -1145,7 +1152,7 @@ html, body {
   <div class="lobby-panel">
     <div class="corner-bl"></div>
     <div class="corner-br"></div>
-    <div style="text-align:center;color:var(--text-dim);font-size:11px;margin-bottom:4px;">ROOM</div>
+    <div class="lobby-room-label" style="text-align:center;color:var(--text-dim);font-size:11px;margin-bottom:4px;">ROOM</div>
     <div class="lobby-room-id" id="lobby-room-id">----</div>
     <div class="lobby-mode" id="lobby-mode">個人戦（Free For All）</div>
 
