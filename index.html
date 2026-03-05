@@ -611,7 +611,7 @@ html, body {
 }
 @media (hover: none) and (pointer: coarse) {
   .pc-only { display: none !important; }
-  #hud-info-bar { top: 62px !important; }
+  #hud-info-bar { top: 70px !important; }
 }
 
 /* ============================================================
@@ -735,7 +735,7 @@ html, body {
   #hud-stamina-wrap { top: 44px; left: 6px; width: 130px; }
   #hud-stamina-label { font-size: 9px; }
   #hud-stamina-bar { height: 6px; }
-  #hud-info-bar { top: 62px; left: 6px; }
+  #hud-info-bar { top: 70px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
   #hud-minimap { width: 100px; height: 100px; bottom: 8px; right: 8px; }
@@ -12653,11 +12653,13 @@ var _rematchTimer = null;
 var _rematchReadyRef = null;
 var _rematchPlayersRef = null;
 var _rematchMyChoice = null;
+var _rematchResolved = false; // 二重実行防止フラグ
 
 function startRematchCountdown(g) {
   var COUNTDOWN_SEC = 20;
   var secondsLeft = COUNTDOWN_SEC;
   _rematchMyChoice = null;
+  _rematchResolved = false;
 
   var countdownEl = document.getElementById('rematch-countdown');
   var statusEl = document.getElementById('rematch-status');
@@ -12762,6 +12764,8 @@ function startRematchCountdown(g) {
 }
 
 function resolveRematch(readyData) {
+  if (_rematchResolved) return; // 二重実行防止
+  _rematchResolved = true;
   if (!multiState.roomId) return;
   var roomRef = db.ref('rooms/' + multiState.roomId);
   var ready = readyData || {};
@@ -12778,16 +12782,18 @@ function resolveRematch(readyData) {
     roomRef.child('canState').remove();
     roomRef.child('playerPositions').remove();
     roomRef.child('result').remove();
+    // 再戦プレイヤーのready状態のみリセット（ゴーストエントリ防止）
+    Object.keys(ready).forEach(function(idx) {
+      if (multiState.players[idx]) {
+        roomRef.child('players/' + idx + '/ready').set(false);
+      }
+    });
     // 非再戦プレイヤーを削除
     Object.keys(multiState.players).forEach(function(idx) {
       if (multiState.players[idx] && !(ready[idx])) {
         roomRef.child('players/' + idx).remove();
       }
     });
-    // ready状態リセット
-    var resetData = {};
-    Object.keys(ready).forEach(function(idx) { resetData[idx + '/ready'] = false; });
-    roomRef.child('players').update(resetData);
     multiState.ready = false;
     roomRef.update({ status: 'waiting' });
     cleanupGame();
