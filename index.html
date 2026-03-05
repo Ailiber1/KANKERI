@@ -1689,16 +1689,17 @@ function initLobbyListeners() {
   const onStatus = statusRef.on('value', (snap) => {
     const status = snap.val();
     if (status === 'playing' || status === 'kickPhase') {
-      // ゲーム開始された
-      if (multiState.active && multiState.currentScreen !== 'game-screen') {
+      // ゲーム開始された（ロビーからの開始 or 再戦）
+      if (multiState.active && gameState.currentScreen !== 'game') {
         startMultiplayerGame();
       }
     }
-    if (status === 'waiting' && gameState.currentScreen === 'game') {
-      // ホストが再戦を押した → 非ホストもロビーに戻る
-      cleanupGame();
-      showScreen('lobby-screen');
-      updateLobbyUI();
+    if (status === 'rematch') {
+      // ホストが再戦を開始 → 非ホストはゲームをクリーンアップして待機
+      if (!multiState.isHost && gameState.currentScreen === 'game') {
+        cleanupGame();
+        showNotification('再戦準備中...');
+      }
     }
     if (status === null) {
       // ルームが削除された
@@ -12591,25 +12592,29 @@ function endGame(g, playerWon, reason) {
     }
   }
 
-  // Co-op: リトライボタンのラベルを動的変更
+  // マルチプレイ: リトライボタンのラベルを動的変更
   const retryBtnEl = document.getElementById('btn-retry');
-  if (retryBtnEl && g._isMultiplayer && g._multiMode === 'coop') {
-    if (playerWon && g._stageNum >= 5) {
-      retryBtnEl.textContent = 'ロビーへ戻る';
-      // 全クリア時はロビーに戻す
-      retryBtnEl.onclick = () => {
-        cleanupGame();
-        if (multiState.roomId) {
-          multiState.ready = false;
-          db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
-          db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
-          showScreen('lobby-screen');
-          initLobbyListeners();
-          updateLobbyUI();
-        }
-      };
+  if (retryBtnEl && g._isMultiplayer) {
+    if (g._multiMode === 'coop') {
+      if (playerWon && g._stageNum >= 5) {
+        retryBtnEl.textContent = 'ロビーへ戻る';
+        retryBtnEl.onclick = () => {
+          cleanupGame();
+          if (multiState.roomId) {
+            multiState.ready = false;
+            db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
+            db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
+            showScreen('lobby-screen');
+            initLobbyListeners();
+            updateLobbyUI();
+          }
+        };
+      } else {
+        retryBtnEl.textContent = '🔄 同じステージをリトライ';
+      }
     } else {
-      retryBtnEl.textContent = '🔄 同じステージをリトライ';
+      // FFA/Team: 「再戦」ボタン表示
+      retryBtnEl.textContent = '🔄 再戦';
     }
   }
 
@@ -13148,29 +13153,8 @@ function startGame(stageNum, mode) {
       // Co-op: 同ステージやり直し（ホストがFirebase経由で全員に通知）
       coopRetryStage(G);
     } else if (mode.startsWith('multi_')) {
-      // FFA/Team: ロビーに戻る（MAZE-HUNTパターン: 前ゲームデータ完全クリア）
-      cleanupGame();
-      if (multiState.roomId) {
-        var roomRef = db.ref('rooms/' + multiState.roomId);
-        // 前ゲームの状態を完全クリア
-        roomRef.child('capturedPlayers').remove();
-        roomRef.child('oniPositions').remove();
-        roomRef.child('gameState').remove();
-        roomRef.child('canState').remove();
-        roomRef.child('playerPositions').remove();
-        roomRef.child('result').remove();
-        // 全プレイヤーのready状態をリセット
-        var playerResetData = {};
-        Object.keys(multiState.players).forEach(function(idx) {
-          playerResetData[idx + '/ready'] = false;
-        });
-        roomRef.child('players').update(playerResetData);
-        multiState.ready = false;
-        roomRef.update({ status: 'waiting' });
-        showScreen('lobby-screen');
-        initLobbyListeners();
-        updateLobbyUI();
-      }
+      // FFA/Team: 即再戦（前ゲームデータクリア→同じ設定で再開始）
+      rematchMulti(stageNum, mode);
     } else {
       cleanupGame(); startGame(stageNum, mode);
     }
@@ -14592,6 +14576,38 @@ function cleanupMultiplayer(g) {
         }
       });
     }
+  }
+}
+
+// FFA/Team即再戦: 前ゲームデータクリア→同じ設定で即ゲーム再開始
+function rematchMulti(stageNum, mode) {
+  if (!multiState.roomId) return;
+  var roomRef = db.ref('rooms/' + multiState.roomId);
+  // 前ゲームの状態を完全クリア
+  roomRef.child('capturedPlayers').remove();
+  roomRef.child('oniPositions').remove();
+  roomRef.child('gameState').remove();
+  roomRef.child('canState').remove();
+  roomRef.child('playerPositions').remove();
+  roomRef.child('result').remove();
+  // ゲームクリーンアップ
+  cleanupGame();
+  if (multiState.isHost) {
+    // ホスト: status → rematch に設定してゲーム再開始
+    roomRef.update({ status: 'rematch' }).then(function() {
+      // 少し待ってから再開始（非ホストがrematchを受信する時間）
+      setTimeout(function() {
+        roomRef.update({ status: 'playing' });
+        startGame(stageNum, mode);
+      }, 500);
+    });
+  } else {
+    // 非ホスト: status監視でplayingになったら自動開始（既存リスナーで対応）
+    // ロビーに戻して待機
+    showScreen('lobby-screen');
+    initLobbyListeners();
+    updateLobbyUI();
+    showNotification('ホストの再戦開始を待っています...');
   }
 }
 
