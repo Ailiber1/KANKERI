@@ -758,6 +758,7 @@ html, body {
    ============================================================ */
 #game-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; background: #000; }
 #game-container { width: 100%; height: 100%; position: relative; flex: 1 1 100%; overflow: hidden; }
+#game-fade-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 50; pointer-events: none; transition: opacity 0.5s ease; }
 #game-container canvas { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 #game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
 #game-hud > * { pointer-events: auto; }
@@ -4087,26 +4088,31 @@ function createGameScene(stageConfig) {
   container.innerHTML = '';
   container.appendChild(g.renderer.domElement);
 
-  // Scene — 夜ステージは最初から暗い背景にして明るい→暗いフラッシュを防止
+  // ★夜ステージ: 黒オーバーレイで明→暗フラッシュを隠す
+  var fadeOverlay = document.getElementById('game-fade-overlay');
+  if (fadeOverlay) fadeOverlay.remove();
+  if (stageNum === 3 || stageNum === 4) {
+    fadeOverlay = document.createElement('div');
+    fadeOverlay.id = 'game-fade-overlay';
+    fadeOverlay.style.opacity = '1';
+    container.appendChild(fadeOverlay);
+    g._fadeOverlay = fadeOverlay;
+  }
+
+  // Scene
   g.scene = new THREE.Scene();
-  var isNightStage = (stageNum === 3 || stageNum === 4);
-  var initBgColor = isNightStage ? 0x0a0a1a : 0x87ceeb;
-  g.scene.background = new THREE.Color(initBgColor);
-  g.scene.fog = new THREE.FogExp2(initBgColor, isNightStage ? 0.004 : 0.012);
+  g.scene.background = new THREE.Color(0x87ceeb);
+  g.scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
 
   // Camera (TPS)
   g.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
   g.camera.position.set(0, 3, 8);
 
-  // Lights — 夜ステージは最初から暗い照明
-  var initHemiSky = (stageNum === 3 || stageNum === 4) ? 0x182244 : 0x87ceeb;
-  var initHemiGround = (stageNum === 3 || stageNum === 4) ? 0x151525 : 0x404020;
-  g.hemiLight = new THREE.HemisphereLight(initHemiSky, initHemiGround, 0.6);
+  // Lights
+  g.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x404020, 0.6);
   g.scene.add(g.hemiLight);
 
-  var initSunColor = (stageNum === 3 || stageNum === 4) ? 0x4466aa : 0xfff0d8;
-  var initSunIntensity = (stageNum === 3 || stageNum === 4) ? 0.3 : 0.9;
-  g.sunLight = new THREE.DirectionalLight(initSunColor, initSunIntensity);
+  g.sunLight = new THREE.DirectionalLight(0xfff0d8, 0.9);
   g.sunLight.position.set(18, 35, 12);
   g.sunLight.castShadow = true;
   g.sunLight.shadow.mapSize.width = 2048;
@@ -12253,6 +12259,11 @@ function updateDayNight(g, dt) {
   for (const sl of g.streetLights) {
     sl.spot.intensity = lightOn ? 1.5 : 0;
     sl.fixMat.emissiveIntensity = lightOn ? 1.0 : 0.1;
+  }
+  // ★夜ステージ: 照明適用後にフェードオーバーレイを消す
+  if (g._fadeOverlay) {
+    g._fadeOverlay.style.opacity = '0';
+    setTimeout(function() { if (g._fadeOverlay) { g._fadeOverlay.remove(); g._fadeOverlay = null; } }, 600);
   }
 }
 
