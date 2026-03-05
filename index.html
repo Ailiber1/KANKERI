@@ -1694,6 +1694,12 @@ function initLobbyListeners() {
         startMultiplayerGame();
       }
     }
+    if (status === 'waiting' && gameState.currentScreen === 'game') {
+      // ホストが再戦を押した → 非ホストもロビーに戻る
+      cleanupGame();
+      showScreen('lobby-screen');
+      updateLobbyUI();
+    }
     if (status === null) {
       // ルームが削除された
       if (multiState.active) {
@@ -13142,12 +13148,25 @@ function startGame(stageNum, mode) {
       // Co-op: 同ステージやり直し（ホストがFirebase経由で全員に通知）
       coopRetryStage(G);
     } else if (mode.startsWith('multi_')) {
-      // FFA/Team: ロビーに戻る
+      // FFA/Team: ロビーに戻る（MAZE-HUNTパターン: 前ゲームデータ完全クリア）
       cleanupGame();
       if (multiState.roomId) {
+        var roomRef = db.ref('rooms/' + multiState.roomId);
+        // 前ゲームの状態を完全クリア
+        roomRef.child('capturedPlayers').remove();
+        roomRef.child('oniPositions').remove();
+        roomRef.child('gameState').remove();
+        roomRef.child('canState').remove();
+        roomRef.child('playerPositions').remove();
+        roomRef.child('result').remove();
+        // 全プレイヤーのready状態をリセット
+        var playerResetData = {};
+        Object.keys(multiState.players).forEach(function(idx) {
+          playerResetData[idx + '/ready'] = false;
+        });
+        roomRef.child('players').update(playerResetData);
         multiState.ready = false;
-        db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
-        db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
+        roomRef.update({ status: 'waiting' });
         showScreen('lobby-screen');
         initLobbyListeners();
         updateLobbyUI();
@@ -14001,6 +14020,8 @@ function initMultiplayerSync(g) {
           rotY: posData[idx].rotY || 0
         };
         remote.crouching = posData[idx].crouching || false;
+        remote.moveSpeed = posData[idx].moveSpeed || 0;
+        remote.isDashing = posData[idx].isDashing || false;
         remote.lastUpdate = Date.now();
       }
     });
@@ -14325,6 +14346,8 @@ function sendPlayerPosition(g) {
     z: Math.round(pos.z * 100) / 100,
     rotY: Math.round((g.playerFig ? g.playerFig.group.rotation.y : 0) * 100) / 100,
     crouching: g.player.crouching || false,
+    moveSpeed: Math.round((g.player.moveSpeed || 0) * 100) / 100,
+    isDashing: g.player.isDashing || false,
     t: firebase.database.ServerValue.TIMESTAMP
   };
 
@@ -14405,14 +14428,11 @@ function updateMultiplayerRemotePlayers(g, dt) {
     if (dRot < -Math.PI) dRot += Math.PI * 2;
     remote.fig.group.rotation.y += dRot * lerpFactor;
 
-    // 移動判定でアニメーション更新
-    const dx = remote.targetPos.x - (remote.lastPos.x || 0);
-    const dz = remote.targetPos.z - (remote.lastPos.z || 0);
-    const speed = Math.sqrt(dx * dx + dz * dz);
-    const isMoving = speed > 0.1;
-    if (remote.fig.animate) {
-      remote.fig.animate(now / 1000, isMoving, remote.crouching || false, false);
-    }
+    // Firebase同期のmoveSpeedでアニメーション更新
+    var rmSpeed = remote.moveSpeed || 0;
+    var rmCrouching = remote.crouching || false;
+    var rmDashing = remote.isDashing || false;
+    updateStickAnimation(remote.fig, dt, rmSpeed, rmCrouching, rmDashing);
     remote.lastPos = { x: remote.targetPos.x, y: remote.targetPos.y, z: remote.targetPos.z };
 
     // 捕獲状態: 半透明にする
