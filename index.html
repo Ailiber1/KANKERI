@@ -611,7 +611,7 @@ html, body {
 }
 @media (hover: none) and (pointer: coarse) {
   .pc-only { display: none !important; }
-  #hud-info-bar { top: 70px !important; }
+  #hud-info-bar { top: 78px !important; }
 }
 
 /* ============================================================
@@ -735,7 +735,7 @@ html, body {
   #hud-stamina-wrap { top: 44px; left: 6px; width: 130px; }
   #hud-stamina-label { font-size: 9px; }
   #hud-stamina-bar { height: 6px; }
-  #hud-info-bar { top: 70px; left: 6px; }
+  #hud-info-bar { top: 78px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
   #hud-minimap { width: 100px; height: 100px; bottom: 8px; right: 8px; }
@@ -767,7 +767,7 @@ html, body {
 #hud-stamina-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,229,255,0.3); border-radius: 4px; overflow: hidden; }
 #hud-stamina-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #00e5ff, #00b8d4); transition: width 0.15s; border-radius: 4px; }
 #hud-stamina-fill.low { background: linear-gradient(90deg, #ff4444, #ff8800); }
-#hud-info-bar { position: absolute; top: 88px; left: 12px; display: flex; gap: 16px; align-items: center; }
+#hud-info-bar { position: absolute; top: 96px; left: 12px; display: flex; gap: 16px; align-items: center; }
 #hud-capture { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ff3366; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
 #hud-can-dir { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #00e5ff; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
 #hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
@@ -12491,6 +12491,27 @@ function endGame(g, playerWon, reason) {
           title.style.color = '#ff4444';
           title.style.textShadow = '0 0 20px rgba(255,68,68,0.5)';
         }
+      } else if (g._isMultiplayer && g._multiMode === 'ffa') {
+        // FFA: 勝者名を表示
+        var winnerName = '';
+        if (myWon) {
+          winnerName = gameState.username || 'あなた';
+        } else {
+          // 生存しているリモートプレイヤーを探す
+          Object.keys(multiState.remotePlayers).forEach(function(k) {
+            var rp = multiState.remotePlayers[parseInt(k)];
+            if (rp && !rp.captured) {
+              var p = multiState.players[k];
+              if (p && p.username) winnerName = p.username;
+            }
+          });
+          if (!winnerName) winnerName = '不明';
+        }
+        title.textContent = myWon ? '🏆 勝利！' : '🏆 ' + winnerName + ' の勝利！';
+        title.style.color = myWon ? '#00ff41' : '#ffd700';
+        title.style.textShadow = myWon
+          ? '0 0 20px rgba(0,255,65,0.5)'
+          : '0 0 20px rgba(255,215,0,0.5)';
       } else {
         title.textContent = myWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
         title.style.color = myWon ? '#00ff41' : '#ff4444';
@@ -12657,11 +12678,13 @@ function endGame(g, playerWon, reason) {
 var _rematchTimer = null;
 var _rematchReadyRef = null;
 var _rematchPlayersRef = null;
+var _rematchResolved = false;
 
 function startRematchCountdown(g) {
   var COUNTDOWN_SEC = 20;
   var secondsLeft = COUNTDOWN_SEC;
   var myChoice = null; // null=未選択, 'retry', 'exit'
+  _rematchResolved = false;
 
   if (!multiState.roomId) return;
   var roomRef = db.ref('rooms/' + multiState.roomId);
@@ -12776,15 +12799,18 @@ function startRematchCountdown(g) {
   }, 1000);
 }
 
-// ★FALL-DODGEパターン準拠: once('value')で読み直して判定（キャッシュ不使用）
+// ★FALL-DODGEパターン準拠: once('value')で読み直して判定
 function resolveRematch() {
+  if (_rematchResolved) return; // 二重実行防止
+  _rematchResolved = true;
+  // ★先にリスナーを停止して後続イベントを防ぐ
+  cleanupRematchCountdown();
   if (!multiState.roomId) return;
   var roomRef = db.ref('rooms/' + multiState.roomId);
   roomRef.child('readyPlayers').once('value', function(snap) {
     var ready = snap.val();
     var readyCount = ready ? Object.keys(ready).length : 0;
     var myReady = ready && ready[multiState.playerIndex];
-    cleanupRematchCountdown();
 
     if (readyCount >= 2 && myReady) {
       // ★FALL-DODGEパターン: readyPlayersクリア
