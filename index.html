@@ -868,6 +868,22 @@ html, body {
   #btn-retry, #btn-to-title { font-size: 12px !important; padding: 8px !important; }
   #result-buttons-solo { margin-top: 8px !important; gap: 6px !important; }
 }
+/* 横向きスマホ: モーダル全般のコンパクト化 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .modal-overlay { align-items: flex-start !important; padding: 4px 0 !important; }
+  .modal-box { padding: 10px 14px !important; max-height: calc(100vh - 8px) !important; max-height: calc(100dvh - 8px) !important; max-width: 400px !important; }
+  .modal-title { font-size: 16px !important; margin-bottom: 4px !important; }
+  .setting-label { font-size: 11px !important; margin-bottom: 4px !important; margin-top: 6px !important; }
+  .setting-note { font-size: 9px !important; margin-top: 2px !important; }
+  .mode-cards { gap: 4px !important; }
+  .mode-card { padding: 5px 8px !important; }
+  .mode-card-title { font-size: 11px !important; margin-bottom: 1px !important; }
+  .mode-card-desc { font-size: 9px !important; line-height: 1.2 !important; }
+  .neon-input { font-size: 13px !important; padding: 5px 8px !important; }
+  .btn-group { margin-top: 8px !important; }
+  .btn-group .btn { padding: 7px 10px !important; font-size: 12px !important; }
+  .room-input-row { margin-top: 4px !important; }
+}
 /* 横向きスマホ: ロビー画面のスクロール対応 */
 @media (orientation: landscape) and (max-height: 500px) {
   #lobby-screen { align-items: flex-start !important; justify-content: flex-start !important; padding: 4px 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
