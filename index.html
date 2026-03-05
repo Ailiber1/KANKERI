@@ -611,7 +611,7 @@ html, body {
 }
 @media (hover: none) and (pointer: coarse) {
   .pc-only { display: none !important; }
-  #hud-info-bar { top: 120px !important; }
+  #hud-info-bar { top: 80px !important; }
 }
 
 /* ============================================================
@@ -735,7 +735,7 @@ html, body {
   #hud-stamina-wrap { top: 44px; left: 6px; width: 130px; }
   #hud-stamina-label { font-size: 9px; }
   #hud-stamina-bar { height: 6px; }
-  #hud-info-bar { top: 120px; left: 6px; }
+  #hud-info-bar { top: 80px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
   #hud-minimap { width: 100px; height: 100px; bottom: 8px; right: 8px; }
@@ -871,7 +871,7 @@ html, body {
 #mobile-buttons { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; }
 #mobile-buttons button { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #fff; background: rgba(0,0,0,0.45); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 50%; width: 60px; height: 60px; padding: 0; display: flex; align-items: center; justify-content: center; touch-action: none; }
 #mobile-buttons button:active { background: rgba(85,153,255,0.3); border-color: rgba(120,200,255,0.8); box-shadow: 0 0 12px rgba(85,153,255,0.4); }
-#mob-action { background: rgba(255,51,102,0.3) !important; border-color: rgba(255,51,102,0.7) !important; color: #ff3366 !important; font-weight: bold; font-size: 14px !important; animation: promptPulse 1s infinite; }
+#mob-action { position: absolute; bottom: calc(170px + env(safe-area-inset-bottom, 0px)); left: calc(170px + env(safe-area-inset-left, 0px)); width: 64px; height: 64px; border-radius: 50%; background: rgba(255,51,102,0.35) !important; border: 2px solid rgba(255,51,102,0.7) !important; color: #ff3366 !important; font-weight: bold; font-size: 14px !important; display: flex; align-items: center; justify-content: center; touch-action: none; font-family: 'Share Tech Mono', monospace; }
 
 /* Scrollbar for modals */
 .modal-box::-webkit-scrollbar { width: 4px; }
@@ -1231,8 +1231,8 @@ html, body {
       <button id="mob-map" data-i18n="MOB_MAP">マップ</button>
       <button id="mob-dash" data-i18n="MOB_DASH">ダッシュ</button>
       <button id="mob-crouch" data-i18n="MOB_CROUCH">しゃがむ</button>
-      <button id="mob-action" style="display:none;">KICK</button>
     </div>
+    <button id="mob-action" class="mobile-only" style="display:none;">蹴る</button>
   </div>
   <div id="pause-overlay" style="display:none;">
     <div class="pause-panel ui-panel">
@@ -9046,6 +9046,8 @@ function createPlayerController(g) {
     const bEl = document.getElementById('mobile-buttons');
     if (jEl) jEl.style.display = 'block';
     if (bEl) bEl.style.display = 'flex';
+    const mobActionEl = document.getElementById('mob-action');
+    if (mobActionEl) mobActionEl.style.display = 'flex';
 
     let jTouch = null;
     const jRect = { cx: 0, cy: 0 };
@@ -12970,23 +12972,10 @@ function updateHUD(g) {
     }
   }
 
-  // スマホKICKボタン表示制御（缶/インタラクタブルの近くで表示）
-  if (g.player.isMobile && !g._isOniPlayer) {
-    const mobAction = document.getElementById('mob-action');
-    if (mobAction) {
-      const showKick = (g.player.canKick || g.player.canHit) &&
-        (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive;
-      mobAction.style.display = showKick ? 'flex' : 'none';
-      if (showKick) {
-        mobAction.textContent = g.player.canKick ? '蹴る' : '蹴る';
-      }
-    }
-  }
-
   // Peek prompt (Q/E near walls)
   const peekEl = document.getElementById('hud-peek-prompt');
   if (peekEl) {
-    if (g.player.nearWall && !g.player.isDashing && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
+    if (!g.player.isMobile && g.player.nearWall && !g.player.isDashing && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
       if (g.player.isPeeking !== 'none') {
         const arrow = g.player.isPeeking === 'left' ? '◀' : '▶';
         peekEl.textContent = arrow + ' 覗き中...';
