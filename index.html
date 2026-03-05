@@ -14329,7 +14329,7 @@ function sendPlayerPosition(g) {
     y: Math.round(pos.y * 100) / 100,
     z: Math.round(pos.z * 100) / 100,
     rotY: Math.round((g.playerFig ? g.playerFig.group.rotation.y : 0) * 100) / 100,
-    crouching: g.player.crouching || false,
+    crouching: g.player.isCrouching || false,
     moveSpeed: Math.round((g.player.moveSpeed || 0) * 100) / 100,
     isDashing: g.player.isDashing || false,
     t: firebase.database.ServerValue.TIMESTAMP
