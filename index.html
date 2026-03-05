@@ -611,7 +611,8 @@ html, body {
 }
 @media (hover: none) and (pointer: coarse) {
   .pc-only { display: none !important; }
-  #hud-info-bar { top: 78px !important; }
+  #hud-info-bar { top: 86px !important; }
+  #hud-minimap { width: 70px !important; height: 70px !important; top: auto !important; left: auto !important; bottom: calc(210px + env(safe-area-inset-bottom, 0px)) !important; right: calc(12px + env(safe-area-inset-right, 0px)) !important; }
 }
 
 /* ============================================================
@@ -735,18 +736,21 @@ html, body {
   #hud-stamina-wrap { top: 44px; left: 6px; width: 130px; }
   #hud-stamina-label { font-size: 9px; }
   #hud-stamina-bar { height: 6px; }
-  #hud-info-bar { top: 78px; left: 6px; }
+  #hud-info-bar { top: 86px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
-  #hud-minimap { width: 100px; height: 100px; bottom: 8px; right: 8px; }
+  #hud-minimap { width: 70px; height: 70px; top: auto; left: auto; bottom: calc(210px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); }
   #hud-action-prompt { font-size: 13px; padding: 6px 14px; bottom: 90px; }
   #hud-peek-prompt { font-size: 12px; padding: 4px 12px; bottom: 130px; }
   #kick-gauge-wrap { min-width: 240px; padding: 14px 18px; }
   #kick-gauge-title { font-size: 18px; margin-bottom: 10px; }
   #kick-gauge-track { height: 20px; }
   #kick-gauge-hint { font-size: 12px; }
-  #hud-captured-text { font-size: 16px; }
-  #hud-captured-sub { font-size: 11px; }
+  #hud-captured-overlay { padding: 6px 12px; gap: 8px; }
+  #hud-captured-text { font-size: 14px; }
+  #hud-captured-sub { font-size: 10px; }
+  .center-alert { font-size: 16px !important; padding: 12px 20px !important; max-width: 80vw; box-shadow: 0 0 20px rgba(255,51,102,0.4), inset 0 0 10px rgba(255,51,102,0.1) !important; }
+  .center-alert .sub-text { font-size: 11px !important; }
 }
 
 /* ============================================================
@@ -847,15 +851,41 @@ html, body {
 #controls-table td:nth-child(2), #controls-table-mobile td:nth-child(2) { color: #ffcc00; text-align: right; }
 #controls-rules { font-family: 'Noto Sans JP', sans-serif; font-size: 13px; color: #aaa; padding-left: 18px; line-height: 1.8; }
 #controls-rules li { margin-bottom: 2px; }
-#result-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 50; }
+#result-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 50; overflow-y: auto; }
 .result-panel { max-width: 400px; width: 90%; padding: 30px; }
+/* 横向きスマホ: リザルトモーダルをスクロール可能にしてコンパクトに */
+@media (orientation: landscape) and (max-height: 500px) {
+  #result-overlay { align-items: flex-start; padding: 8px 0; }
+  .result-panel { padding: 12px 16px; max-width: 340px; margin-top: 4px; }
+  .result-panel h2 { font-size: 16px !important; margin-bottom: 6px !important; }
+  #result-stats { font-size: 11px !important; line-height: 1.4 !important; }
+  #rematch-countdown { font-size: 14px !important; margin-bottom: 4px !important; }
+  #rematch-status { font-size: 10px !important; margin-bottom: 4px !important; }
+  #result-buttons-multi { margin-top: 8px !important; }
+  #rematch-buttons { gap: 6px !important; }
+  #btn-rematch-yes { font-size: 13px !important; padding: 8px !important; }
+  #btn-rematch-no { font-size: 11px !important; padding: 6px !important; }
+  #btn-retry, #btn-to-title { font-size: 12px !important; padding: 8px !important; }
+  #result-buttons-solo { margin-top: 8px !important; gap: 6px !important; }
+}
+/* 横向きスマホ: ミニマップをステージ名の隣（中央上部）に配置 */
+@media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+  #hud-minimap { width: 60px !important; height: 60px !important; top: 4px !important; left: 50% !important; transform: translateX(-50%); bottom: auto !important; right: auto !important; }
+}
 /* Mobile game controls */
 #mobile-joystick { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); left: calc(30px + env(safe-area-inset-left, 0px)); width: 130px; height: 130px; border-radius: 50%; border: 2px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.25); touch-action: none; }
 #joystick-knob { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: radial-gradient(circle at 40% 38%, rgba(120,180,255,0.6), rgba(85,153,255,0.25)); border: 2px solid rgba(85,153,255,0.7); box-shadow: 0 0 10px rgba(85,153,255,0.3); pointer-events: none; transition: box-shadow 0.15s; }
 #joystick-knob.active { box-shadow: 0 0 18px rgba(85,153,255,0.6); border-color: rgba(120,200,255,0.9); }
-#mobile-buttons { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; }
-#mobile-buttons button { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #fff; background: rgba(0,0,0,0.45); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 50%; width: 60px; height: 60px; padding: 0; display: flex; align-items: center; justify-content: center; touch-action: none; }
+/* マップボタン: 右上に独立配置 */
+#mob-map { position: absolute; top: 58px; right: calc(12px + env(safe-area-inset-right, 0px)); font-family: 'Share Tech Mono', monospace; font-size: 11px; color: #fff; background: rgba(0,0,0,0.5); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 6px; width: auto; height: auto; padding: 4px 10px; touch-action: none; }
+#mob-map:active { background: rgba(85,153,255,0.3); border-color: rgba(120,200,255,0.8); }
+/* ダッシュ/しゃがむ: 右下に横並び */
+#mobile-buttons { position: absolute; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: row; gap: 10px; }
+#mobile-buttons button { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #fff; background: rgba(0,0,0,0.45); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 50%; width: 58px; height: 58px; padding: 0; display: flex; align-items: center; justify-content: center; touch-action: none; }
 #mobile-buttons button:active { background: rgba(85,153,255,0.3); border-color: rgba(120,200,255,0.8); box-shadow: 0 0 12px rgba(85,153,255,0.4); }
+/* 蹴るボタン: 右下のダッシュ/しゃがむの下に中央配置、緑色 */
+#mob-action { position: absolute; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); right: calc(42px + env(safe-area-inset-right, 0px)); width: 62px; height: 62px; border-radius: 50%; background: rgba(0,200,65,0.3); border: 2px solid rgba(0,255,65,0.7); color: #00ff41; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; touch-action: none; font-family: 'Share Tech Mono', monospace; box-shadow: 0 0 12px rgba(0,255,65,0.3); }
+#mob-action:active { background: rgba(0,255,65,0.4); box-shadow: 0 0 20px rgba(0,255,65,0.6); }
 
 /* Scrollbar for modals */
 .modal-box::-webkit-scrollbar { width: 4px; }
@@ -1182,7 +1212,7 @@ html, body {
     <div id="kick-gauge-wrap" style="display:none;">
       <div id="kick-gauge-title">缶を蹴れ！</div>
       <div id="kick-gauge-track"><div id="kick-gauge-fill"></div><div id="kick-gauge-marker">▲</div></div>
-      <div id="kick-gauge-hint">F / タップ</div>
+      <div id="kick-gauge-hint"><span class="pc-only">F / Space</span><span class="mobile-only">タップ</span></div>
     </div>
     <!-- 鬼プレイヤー専用HUD（チーム戦） -->
     <div id="oni-player-hud" style="display:none;">
@@ -1211,12 +1241,12 @@ html, body {
     </div>
     <!-- Mobile controls -->
     <div id="mobile-joystick" class="mobile-only" style="display:none;"><div id="joystick-knob"></div></div>
+    <button id="mob-map" class="mobile-only" style="display:none;">全体を見る</button>
     <div id="mobile-buttons" class="mobile-only" style="display:none;">
-      <button id="mob-map" data-i18n="MOB_MAP">マップ</button>
       <button id="mob-dash" data-i18n="MOB_DASH">ダッシュ</button>
       <button id="mob-crouch" data-i18n="MOB_CROUCH">しゃがむ</button>
-      <button id="mob-action" style="display:none;">KICK</button>
     </div>
+    <button id="mob-action" class="mobile-only" style="display:none;">蹴る</button>
   </div>
   <div id="pause-overlay" style="display:none;">
     <div class="pause-panel ui-panel">
@@ -9030,6 +9060,10 @@ function createPlayerController(g) {
     const bEl = document.getElementById('mobile-buttons');
     if (jEl) jEl.style.display = 'block';
     if (bEl) bEl.style.display = 'flex';
+    const mobActionEl = document.getElementById('mob-action');
+    if (mobActionEl) mobActionEl.style.display = 'flex';
+    const mobMapEl = document.getElementById('mob-map');
+    if (mobMapEl) mobMapEl.style.display = 'block';
 
     let jTouch = null;
     const jRect = { cx: 0, cy: 0 };
@@ -9114,6 +9148,16 @@ function createPlayerController(g) {
     const mapBtn = document.getElementById('mob-map');
     if (mapBtn) {
       mapBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (G) G.overheadView = !G.overheadView; });
+    }
+    // KICKボタン: 缶を蹴る・物を蹴る
+    const actionBtn = document.getElementById('mob-action');
+    if (actionBtn) {
+      actionBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        // F/Space相当の入力をシミュレート
+        ctrl.keys['KeyF'] = true;
+        setTimeout(() => { ctrl.keys['KeyF'] = false; }, 100);
+      });
     }
   }
 
@@ -12429,7 +12473,7 @@ function confirmCanPlacement(g) {
   g.player.rotation = Math.atan2(pos.x - spX, pos.z - spZ);
   g.playerFig.group.rotation.y = g.player.rotation;
 
-  showNotification('缶を蹴れ！ (F)');
+  showNotification(g.player.isMobile ? '缶を蹴れ！ (KICKボタン)' : '缶を蹴れ！ (F)');
   startKickGauge(g);
 }
 
@@ -12922,23 +12966,23 @@ function updateHUD(g) {
       const canPos = g.can ? g.can.group.position : null;
       const nearCan = canPos && g.player.position.distanceTo(canPos) < 2.5;
       if (nearCan && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
-        actionEl.textContent = 'Space: 缶タッチ！（捕獲）';
+        actionEl.textContent = g.player.isMobile ? '缶タッチ！（捕獲）' : 'Space: 缶タッチ！（捕獲）';
         actionEl.style.display = 'block';
       } else if (nearCan && !g.can.isAtHome && !op.canCarrying) {
-        actionEl.textContent = 'Space: 缶を拾う';
+        actionEl.textContent = g.player.isMobile ? '缶を拾う' : 'Space: 缶を拾う';
         actionEl.style.display = 'block';
       } else if (op._reticleTarget >= 0 && op.lockedTarget < 0 && op.lockCooldown <= 0) {
-        actionEl.textContent = 'Space: ロックオン';
+        actionEl.textContent = g.player.isMobile ? 'ロックオン' : 'Space: ロックオン';
         actionEl.style.display = 'block';
       } else {
         actionEl.style.display = 'none';
       }
     } else if (g.player.canKick && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
-      actionEl.textContent = 'F: 缶を蹴る！';
-      actionEl.style.display = 'block';
+      actionEl.textContent = g.player.isMobile ? 'KICKボタン: 缶を蹴る！' : 'F: 缶を蹴る！';
+      actionEl.style.display = g.player.isMobile ? 'none' : 'block';
     } else if (g.player.canHit && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g._hitCooldown) {
-      actionEl.textContent = 'F: ' + g.player.canHit.label;
-      actionEl.style.display = 'block';
+      actionEl.textContent = g.player.isMobile ? 'KICKボタン: ' + g.player.canHit.label : 'F: ' + g.player.canHit.label;
+      actionEl.style.display = g.player.isMobile ? 'none' : 'block';
     } else {
       actionEl.style.display = 'none';
     }
@@ -12947,7 +12991,7 @@ function updateHUD(g) {
   // Peek prompt (Q/E near walls)
   const peekEl = document.getElementById('hud-peek-prompt');
   if (peekEl) {
-    if (g.player.nearWall && !g.player.isDashing && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
+    if (!g.player.isMobile && g.player.nearWall && !g.player.isDashing && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
       if (g.player.isPeeking !== 'none') {
         const arrow = g.player.isPeeking === 'left' ? '◀' : '▶';
         peekEl.textContent = arrow + ' 覗き中...';
