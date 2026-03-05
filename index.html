@@ -1682,6 +1682,9 @@ function showRoomError(msg) {
 }
 
 function initLobbyListeners() {
+  // ★リスナー重複防止: 既存リスナーをクリーンアップしてから再登録
+  removeLobbyListeners();
+
   const roomRef = db.ref('rooms/' + multiState.roomId);
 
   // プレイヤー変更監視
@@ -12650,18 +12653,21 @@ function endGame(g, playerWon, reason) {
   if (overlay) overlay.style.display = 'flex';
 }
 
-// --- REMATCH VOTING SYSTEM (FALL-DODGEパターン) ---
+// --- REMATCH VOTING SYSTEM (FALL-DODGE実績パターン準拠) ---
 var _rematchTimer = null;
 var _rematchReadyRef = null;
 var _rematchPlayersRef = null;
-var _rematchMyChoice = null;
-var _rematchResolved = false; // 二重実行防止フラグ
 
 function startRematchCountdown(g) {
   var COUNTDOWN_SEC = 20;
   var secondsLeft = COUNTDOWN_SEC;
-  _rematchMyChoice = null;
-  _rematchResolved = false;
+  var myChoice = null; // null=未選択, 'retry', 'exit'
+
+  if (!multiState.roomId) return;
+  var roomRef = db.ref('rooms/' + multiState.roomId);
+
+  // ★FALL-DODGEパターン: カウントダウン開始時にreadyPlayersを必ずクリア
+  roomRef.child('readyPlayers').remove();
 
   var countdownEl = document.getElementById('rematch-countdown');
   var statusEl = document.getElementById('rematch-status');
@@ -12670,10 +12676,8 @@ function startRematchCountdown(g) {
   var yesBtn = document.getElementById('btn-rematch-yes');
   var noBtn = document.getElementById('btn-rematch-no');
 
-  if (buttonsEl) buttonsEl.style.display = 'flex';
-  if (waitingEl) waitingEl.style.display = 'none';
-
-  function renderCountdown() {
+  // UIレンダリング関数（FALL-DODGEのrenderFooterパターン）
+  function renderUI() {
     if (countdownEl) {
       countdownEl.textContent = '⏱ ' + secondsLeft + 's';
       if (secondsLeft <= 5) {
@@ -12684,23 +12688,26 @@ function startRematchCountdown(g) {
         countdownEl.style.textShadow = '0 0 8px rgba(255,204,0,0.5)';
       }
     }
+    if (myChoice === 'retry') {
+      if (buttonsEl) buttonsEl.style.display = 'none';
+      if (waitingEl) waitingEl.style.display = 'block';
+    } else {
+      if (buttonsEl) buttonsEl.style.display = 'flex';
+      if (waitingEl) waitingEl.style.display = 'none';
+    }
   }
-  renderCountdown();
-
-  if (!multiState.roomId) return;
-  var roomRef = db.ref('rooms/' + multiState.roomId);
+  renderUI();
 
   // 「再戦」ボタン
   if (yesBtn) yesBtn.onclick = function() {
-    _rematchMyChoice = 'retry';
+    myChoice = 'retry';
     roomRef.child('readyPlayers/' + multiState.playerIndex).set(true);
-    if (buttonsEl) buttonsEl.style.display = 'none';
-    if (waitingEl) waitingEl.style.display = 'block';
+    renderUI();
   };
 
   // 「退出する」ボタン
   if (noBtn) noBtn.onclick = function() {
-    _rematchMyChoice = 'exit';
+    myChoice = 'exit';
     cleanupRematchCountdown();
     cleanupGame();
     leaveLobby();
@@ -12710,13 +12717,15 @@ function startRematchCountdown(g) {
   function updateReadyDisplay(readyPlayers) {
     if (!statusEl) return;
     var readyCount = readyPlayers ? Object.keys(readyPlayers).length : 0;
-    var totalCount = multiState.players ? Object.keys(multiState.players).filter(function(k) { return multiState.players[k]; }).length : 0;
+    var totalCount = multiState.players ? Object.keys(multiState.players).filter(function(k) {
+      return multiState.players[k] && multiState.players[k].username;
+    }).length : 0;
     var html = '';
     if (readyCount > 0) {
       var names = [];
       Object.keys(readyPlayers).forEach(function(idx) {
         var p = multiState.players[idx];
-        if (p) names.push(p.username || 'Player' + idx);
+        if (p && p.username) names.push(p.username);
       });
       html = '<span style="color:#00ff41">✔ ' + names.join(', ') + '</span>';
       html += ' (' + readyCount + '/' + totalCount + ')';
@@ -12724,26 +12733,29 @@ function startRematchCountdown(g) {
     statusEl.innerHTML = html;
   }
 
-  // 最新のreadyデータをキャッシュ
-  var _latestReady = null;
-
-  // 全員準備完了チェック
+  // ★FALL-DODGEパターン: checkAllReadyはonce('value')で最新データを取得
   function checkAllReady() {
-    if (!_latestReady) return;
-    var readyCount = Object.keys(_latestReady).length;
-    var currentTotal = multiState.players ? Object.keys(multiState.players).filter(function(k) { return multiState.players[k]; }).length : 0;
-    if (readyCount >= 2 && readyCount >= currentTotal) {
-      clearInterval(_rematchTimer);
-      _rematchTimer = null;
-      resolveRematch(_latestReady);
-    }
+    roomRef.child('players').once('value', function(pSnap) {
+      var currentPlayers = pSnap.val();
+      var currentTotal = currentPlayers ? Object.keys(currentPlayers).filter(function(k) {
+        return currentPlayers[k] && currentPlayers[k].username;
+      }).length : 0;
+      if (currentPlayers) multiState.players = currentPlayers;
+      roomRef.child('readyPlayers').once('value', function(rSnap) {
+        var ready = rSnap.val();
+        var readyCount = ready ? Object.keys(ready).length : 0;
+        if (readyCount >= 2 && readyCount >= currentTotal) {
+          clearInterval(_rematchTimer); _rematchTimer = null;
+          resolveRematch();
+        }
+      });
+    });
   }
 
   // Firebase投票監視
   _rematchReadyRef = roomRef.child('readyPlayers');
   _rematchReadyRef.on('value', function(snap) {
-    _latestReady = snap.val() || {};
-    updateReadyDisplay(_latestReady);
+    updateReadyDisplay(snap.val());
     checkAllReady();
   });
   _rematchPlayersRef = roomRef.child('players');
@@ -12756,60 +12768,62 @@ function startRematchCountdown(g) {
   // カウントダウンタイマー
   _rematchTimer = setInterval(function() {
     secondsLeft--;
-    renderCountdown();
+    renderUI();
     if (secondsLeft <= 0) {
-      clearInterval(_rematchTimer);
-      _rematchTimer = null;
-      resolveRematch(_latestReady || {});
+      clearInterval(_rematchTimer); _rematchTimer = null;
+      resolveRematch();
     }
   }, 1000);
 }
 
-function resolveRematch(readyData) {
-  if (_rematchResolved) return; // 二重実行防止
-  _rematchResolved = true;
+// ★FALL-DODGEパターン準拠: once('value')で読み直して判定（キャッシュ不使用）
+function resolveRematch() {
   if (!multiState.roomId) return;
   var roomRef = db.ref('rooms/' + multiState.roomId);
-  var ready = readyData || {};
-  var readyCount = Object.keys(ready).length;
-  var myReady = ready[multiState.playerIndex];
-  cleanupRematchCountdown();
+  roomRef.child('readyPlayers').once('value', function(snap) {
+    var ready = snap.val();
+    var readyCount = ready ? Object.keys(ready).length : 0;
+    var myReady = ready && ready[multiState.playerIndex];
+    cleanupRematchCountdown();
 
-  if (readyCount >= 2 && myReady) {
-    // 再戦: 前ゲームデータクリア→ロビーに戻る
-    roomRef.child('readyPlayers').remove();
-    roomRef.child('capturedPlayers').remove();
-    roomRef.child('oniPositions').remove();
-    roomRef.child('gameState').remove();
-    roomRef.child('canState').remove();
-    roomRef.child('playerPositions').remove();
-    roomRef.child('result').remove();
-    // 再戦プレイヤーのready状態のみリセット（ゴーストエントリ防止）
-    Object.keys(ready).forEach(function(idx) {
-      if (multiState.players[idx]) {
-        roomRef.child('players/' + idx + '/ready').set(false);
+    if (readyCount >= 2 && myReady) {
+      // ★FALL-DODGEパターン: readyPlayersクリア
+      roomRef.child('readyPlayers').remove();
+      // 前ゲームデータクリア
+      roomRef.child('capturedPlayers').remove();
+      roomRef.child('oniPositions').remove();
+      roomRef.child('gameState').remove();
+      roomRef.child('canState').remove();
+      roomRef.child('playerPositions').remove();
+      roomRef.child('result').remove();
+      // 非再戦プレイヤーを削除
+      Object.keys(multiState.players).forEach(function(idx) {
+        if (multiState.players[idx] && multiState.players[idx].username && !(ready && ready[idx])) {
+          roomRef.child('players/' + idx).remove();
+        }
+      });
+      // ★FALL-DODGEパターン: 再戦プレイヤーの中で最小indexを新ホストに設定
+      var readyIndices = Object.keys(ready).map(Number).sort(function(a, b) { return a - b; });
+      var newHostIdx = readyIndices[0];
+      roomRef.child('host').set(newHostIdx);
+      multiState.isHost = (multiState.playerIndex === newHostIdx);
+      // ★FALL-DODGEパターン: 各プレイヤーのready状態をリセット（既存データのみ更新）
+      roomRef.child('players/' + multiState.playerIndex + '/ready').set(false);
+      multiState.ready = false;
+      roomRef.update({ status: 'waiting' });
+      cleanupGame();
+      showScreen('lobby-screen');
+      initLobbyListeners();
+      updateLobbyUI();
+    } else {
+      // 人数不足 → タイトルに戻る
+      if (myReady) {
+        showNotification('リトライ人数が不足のため終了します（2人以上必要）');
       }
-    });
-    // 非再戦プレイヤーを削除
-    Object.keys(multiState.players).forEach(function(idx) {
-      if (multiState.players[idx] && !(ready[idx])) {
-        roomRef.child('players/' + idx).remove();
-      }
-    });
-    multiState.ready = false;
-    roomRef.update({ status: 'waiting' });
-    cleanupGame();
-    showScreen('lobby-screen');
-    initLobbyListeners();
-    updateLobbyUI();
-  } else {
-    // 人数不足 → タイトルに戻る
-    if (myReady) {
-      showNotification('リトライ人数が不足のため終了します（2人以上必要）');
+      cleanupGame();
+      leaveLobby();
     }
-    cleanupGame();
-    leaveLobby();
-  }
+  });
 }
 
 function cleanupRematchCountdown() {
