@@ -1687,15 +1687,7 @@ function initLobbyListeners() {
   // プレイヤー変更監視
   const playersRef = roomRef.child('players');
   const onPlayers = playersRef.on('value', (snap) => {
-    var rawPlayers = snap.val() || {};
-    // ゴーストエントリ自動クリーンアップ（usernameがないエントリを削除）
-    Object.keys(rawPlayers).forEach(function(k) {
-      if (rawPlayers[k] && !rawPlayers[k].username) {
-        playersRef.child(k).remove();
-        delete rawPlayers[k];
-      }
-    });
-    multiState.players = rawPlayers;
+    multiState.players = snap.val() || {};
     updateLobbyUI();
 
     // 自分のスロットが消えている場合（キックされた等）
