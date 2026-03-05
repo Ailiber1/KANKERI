@@ -4087,20 +4087,25 @@ function createGameScene(stageConfig) {
   container.innerHTML = '';
   container.appendChild(g.renderer.domElement);
 
-  // Scene
+  // Scene — 夜ステージは最初から暗い背景にして明るい→暗いフラッシュを防止
   g.scene = new THREE.Scene();
-  g.scene.background = new THREE.Color(0x87ceeb);
-  g.scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
+  var initBgColor = (stageNum === 3 || stageNum === 4) ? 0x112244 : 0x87ceeb;
+  g.scene.background = new THREE.Color(initBgColor);
+  g.scene.fog = new THREE.FogExp2(initBgColor, 0.012);
 
   // Camera (TPS)
   g.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
   g.camera.position.set(0, 3, 8);
 
-  // Lights
-  g.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x404020, 0.6);
+  // Lights — 夜ステージは最初から暗い照明
+  var initHemiSky = (stageNum === 3 || stageNum === 4) ? 0x182244 : 0x87ceeb;
+  var initHemiGround = (stageNum === 3 || stageNum === 4) ? 0x151525 : 0x404020;
+  g.hemiLight = new THREE.HemisphereLight(initHemiSky, initHemiGround, 0.6);
   g.scene.add(g.hemiLight);
 
-  g.sunLight = new THREE.DirectionalLight(0xfff0d8, 0.9);
+  var initSunColor = (stageNum === 3 || stageNum === 4) ? 0x4466aa : 0xfff0d8;
+  var initSunIntensity = (stageNum === 3 || stageNum === 4) ? 0.3 : 0.9;
+  g.sunLight = new THREE.DirectionalLight(initSunColor, initSunIntensity);
   g.sunLight.position.set(18, 35, 12);
   g.sunLight.castShadow = true;
   g.sunLight.shadow.mapSize.width = 2048;
