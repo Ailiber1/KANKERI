@@ -4089,9 +4089,10 @@ function createGameScene(stageConfig) {
 
   // Scene — 夜ステージは最初から暗い背景にして明るい→暗いフラッシュを防止
   g.scene = new THREE.Scene();
-  var initBgColor = (stageNum === 3 || stageNum === 4) ? 0x112244 : 0x87ceeb;
+  var isNightStage = (stageNum === 3 || stageNum === 4);
+  var initBgColor = isNightStage ? 0x0a0a1a : 0x87ceeb;
   g.scene.background = new THREE.Color(initBgColor);
-  g.scene.fog = new THREE.FogExp2(initBgColor, 0.012);
+  g.scene.fog = new THREE.FogExp2(initBgColor, isNightStage ? 0.004 : 0.012);
 
   // Camera (TPS)
   g.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
