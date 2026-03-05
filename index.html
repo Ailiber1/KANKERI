@@ -1687,7 +1687,15 @@ function initLobbyListeners() {
   // プレイヤー変更監視
   const playersRef = roomRef.child('players');
   const onPlayers = playersRef.on('value', (snap) => {
-    multiState.players = snap.val() || {};
+    var rawPlayers = snap.val() || {};
+    // ゴーストエントリ自動クリーンアップ（usernameがないエントリを削除）
+    Object.keys(rawPlayers).forEach(function(k) {
+      if (rawPlayers[k] && !rawPlayers[k].username) {
+        playersRef.child(k).remove();
+        delete rawPlayers[k];
+      }
+    });
+    multiState.players = rawPlayers;
     updateLobbyUI();
 
     // 自分のスロットが消えている場合（キックされた等）
@@ -1812,7 +1820,7 @@ function updateLobbyUI() {
     let html = '';
     const players = multiState.players;
     for (let i = 0; i < MAX_PLAYERS; i++) {
-      if (players[i]) {
+      if (players[i] && players[i].username) {
         const p = players[i];
         const isMe = (i === multiState.playerIndex);
         const isHost = (i === 0) || multiState.isHost && i === multiState.playerIndex;
@@ -1866,8 +1874,10 @@ function updateLobbyUI() {
 }
 
 function findHostIndex() {
-  // ルーム内の最小playerIndex（ホスト移行時に使用）
-  const pKeys = Object.keys(multiState.players).map(Number).sort((a, b) => a - b);
+  // ルーム内の最小playerIndex（ホスト移行時に使用）— usernameがある有効プレイヤーのみ
+  const pKeys = Object.keys(multiState.players).filter(function(k) {
+    return multiState.players[k] && multiState.players[k].username;
+  }).map(Number).sort((a, b) => a - b);
   return pKeys.length > 0 ? pKeys[0] : 0;
 }
 
