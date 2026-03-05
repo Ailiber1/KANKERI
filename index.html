@@ -611,7 +611,7 @@ html, body {
 }
 @media (hover: none) and (pointer: coarse) {
   .pc-only { display: none !important; }
-  #hud-info-bar { top: 80px !important; }
+  #hud-info-bar { top: 86px !important; }
 }
 
 /* ============================================================
@@ -735,18 +735,19 @@ html, body {
   #hud-stamina-wrap { top: 44px; left: 6px; width: 130px; }
   #hud-stamina-label { font-size: 9px; }
   #hud-stamina-bar { height: 6px; }
-  #hud-info-bar { top: 80px; left: 6px; }
+  #hud-info-bar { top: 86px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
-  #hud-minimap { width: 100px; height: 100px; bottom: 8px; right: 8px; }
+  #hud-minimap { width: 90px; height: 90px; bottom: 170px; left: 6px; right: auto; }
   #hud-action-prompt { font-size: 13px; padding: 6px 14px; bottom: 90px; }
   #hud-peek-prompt { font-size: 12px; padding: 4px 12px; bottom: 130px; }
   #kick-gauge-wrap { min-width: 240px; padding: 14px 18px; }
   #kick-gauge-title { font-size: 18px; margin-bottom: 10px; }
   #kick-gauge-track { height: 20px; }
   #kick-gauge-hint { font-size: 12px; }
-  #hud-captured-text { font-size: 16px; }
-  #hud-captured-sub { font-size: 11px; }
+  #hud-captured-overlay { padding: 6px 12px; gap: 8px; }
+  #hud-captured-text { font-size: 14px; }
+  #hud-captured-sub { font-size: 10px; }
 }
 
 /* ============================================================
@@ -868,10 +869,16 @@ html, body {
 #mobile-joystick { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); left: calc(30px + env(safe-area-inset-left, 0px)); width: 130px; height: 130px; border-radius: 50%; border: 2px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.25); touch-action: none; }
 #joystick-knob { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: radial-gradient(circle at 40% 38%, rgba(120,180,255,0.6), rgba(85,153,255,0.25)); border: 2px solid rgba(85,153,255,0.7); box-shadow: 0 0 10px rgba(85,153,255,0.3); pointer-events: none; transition: box-shadow 0.15s; }
 #joystick-knob.active { box-shadow: 0 0 18px rgba(85,153,255,0.6); border-color: rgba(120,200,255,0.9); }
-#mobile-buttons { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; }
-#mobile-buttons button { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #fff; background: rgba(0,0,0,0.45); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 50%; width: 60px; height: 60px; padding: 0; display: flex; align-items: center; justify-content: center; touch-action: none; }
+/* マップボタン: 右上に独立配置 */
+#mob-map { position: absolute; top: 46px; right: calc(12px + env(safe-area-inset-right, 0px)); font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #fff; background: rgba(0,0,0,0.45); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 8px; width: auto; height: auto; padding: 6px 14px; touch-action: none; }
+#mob-map:active { background: rgba(85,153,255,0.3); border-color: rgba(120,200,255,0.8); }
+/* ダッシュ/しゃがむ: 右下に横並び */
+#mobile-buttons { position: absolute; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: row; gap: 10px; }
+#mobile-buttons button { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #fff; background: rgba(0,0,0,0.45); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 50%; width: 58px; height: 58px; padding: 0; display: flex; align-items: center; justify-content: center; touch-action: none; }
 #mobile-buttons button:active { background: rgba(85,153,255,0.3); border-color: rgba(120,200,255,0.8); box-shadow: 0 0 12px rgba(85,153,255,0.4); }
-#mob-action { position: absolute; bottom: calc(170px + env(safe-area-inset-bottom, 0px)); left: calc(170px + env(safe-area-inset-left, 0px)); width: 64px; height: 64px; border-radius: 50%; background: rgba(255,51,102,0.35) !important; border: 2px solid rgba(255,51,102,0.7) !important; color: #ff3366 !important; font-weight: bold; font-size: 14px !important; display: flex; align-items: center; justify-content: center; touch-action: none; font-family: 'Share Tech Mono', monospace; }
+/* 蹴るボタン: 右下のダッシュ/しゃがむの下に中央配置、緑色 */
+#mob-action { position: absolute; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); right: calc(42px + env(safe-area-inset-right, 0px)); width: 62px; height: 62px; border-radius: 50%; background: rgba(0,200,65,0.3); border: 2px solid rgba(0,255,65,0.7); color: #00ff41; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; touch-action: none; font-family: 'Share Tech Mono', monospace; box-shadow: 0 0 12px rgba(0,255,65,0.3); }
+#mob-action:active { background: rgba(0,255,65,0.4); box-shadow: 0 0 20px rgba(0,255,65,0.6); }
 
 /* Scrollbar for modals */
 .modal-box::-webkit-scrollbar { width: 4px; }
@@ -1227,8 +1234,8 @@ html, body {
     </div>
     <!-- Mobile controls -->
     <div id="mobile-joystick" class="mobile-only" style="display:none;"><div id="joystick-knob"></div></div>
+    <button id="mob-map" class="mobile-only" data-i18n="MOB_MAP" style="display:none;">マップ</button>
     <div id="mobile-buttons" class="mobile-only" style="display:none;">
-      <button id="mob-map" data-i18n="MOB_MAP">マップ</button>
       <button id="mob-dash" data-i18n="MOB_DASH">ダッシュ</button>
       <button id="mob-crouch" data-i18n="MOB_CROUCH">しゃがむ</button>
     </div>
@@ -9048,6 +9055,8 @@ function createPlayerController(g) {
     if (bEl) bEl.style.display = 'flex';
     const mobActionEl = document.getElementById('mob-action');
     if (mobActionEl) mobActionEl.style.display = 'flex';
+    const mobMapEl = document.getElementById('mob-map');
+    if (mobMapEl) mobMapEl.style.display = 'block';
 
     let jTouch = null;
     const jRect = { cx: 0, cy: 0 };
