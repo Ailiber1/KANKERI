@@ -611,7 +611,7 @@ html, body {
 }
 @media (hover: none) and (pointer: coarse) {
   .pc-only { display: none !important; }
-  #hud-info-bar { bottom: 220px !important; }
+  #hud-info-bar { top: 62px !important; }
 }
 
 /* ============================================================
@@ -735,7 +735,7 @@ html, body {
   #hud-stamina-wrap { top: 44px; left: 6px; width: 130px; }
   #hud-stamina-label { font-size: 9px; }
   #hud-stamina-bar { height: 6px; }
-  #hud-info-bar { bottom: 175px; left: 6px; }
+  #hud-info-bar { top: 62px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
   #hud-minimap { width: 100px; height: 100px; bottom: 8px; right: 8px; }
@@ -767,7 +767,7 @@ html, body {
 #hud-stamina-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,229,255,0.3); border-radius: 4px; overflow: hidden; }
 #hud-stamina-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #00e5ff, #00b8d4); transition: width 0.15s; border-radius: 4px; }
 #hud-stamina-fill.low { background: linear-gradient(90deg, #ff4444, #ff8800); }
-#hud-info-bar { position: absolute; bottom: 60px; left: 12px; display: flex; gap: 16px; align-items: center; }
+#hud-info-bar { position: absolute; top: 88px; left: 12px; display: flex; gap: 16px; align-items: center; }
 #hud-capture { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ff3366; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
 #hud-can-dir { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #00e5ff; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
 #hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
@@ -12720,28 +12720,26 @@ function startRematchCountdown(g) {
     statusEl.innerHTML = html;
   }
 
+  // 最新のreadyデータをキャッシュ
+  var _latestReady = null;
+
   // 全員準備完了チェック
   function checkAllReady() {
-    roomRef.child('players').once('value', function(pSnap) {
-      var currentPlayers = pSnap.val();
-      var currentTotal = currentPlayers ? Object.keys(currentPlayers).filter(function(k) { return currentPlayers[k]; }).length : 0;
-      if (currentPlayers) multiState.players = currentPlayers;
-      roomRef.child('readyPlayers').once('value', function(rSnap) {
-        var ready = rSnap.val();
-        var readyCount = ready ? Object.keys(ready).length : 0;
-        if (readyCount >= 2 && readyCount >= currentTotal) {
-          clearInterval(_rematchTimer);
-          _rematchTimer = null;
-          resolveRematch();
-        }
-      });
-    });
+    if (!_latestReady) return;
+    var readyCount = Object.keys(_latestReady).length;
+    var currentTotal = multiState.players ? Object.keys(multiState.players).filter(function(k) { return multiState.players[k]; }).length : 0;
+    if (readyCount >= 2 && readyCount >= currentTotal) {
+      clearInterval(_rematchTimer);
+      _rematchTimer = null;
+      resolveRematch(_latestReady);
+    }
   }
 
   // Firebase投票監視
   _rematchReadyRef = roomRef.child('readyPlayers');
   _rematchReadyRef.on('value', function(snap) {
-    updateReadyDisplay(snap.val());
+    _latestReady = snap.val() || {};
+    updateReadyDisplay(_latestReady);
     checkAllReady();
   });
   _rematchPlayersRef = roomRef.child('players');
@@ -12758,54 +12756,52 @@ function startRematchCountdown(g) {
     if (secondsLeft <= 0) {
       clearInterval(_rematchTimer);
       _rematchTimer = null;
-      resolveRematch();
+      resolveRematch(_latestReady || {});
     }
   }, 1000);
 }
 
-function resolveRematch() {
+function resolveRematch(readyData) {
   if (!multiState.roomId) return;
   var roomRef = db.ref('rooms/' + multiState.roomId);
-  roomRef.child('readyPlayers').once('value', function(snap) {
-    var ready = snap.val();
-    var readyCount = ready ? Object.keys(ready).length : 0;
-    var myReady = ready && ready[multiState.playerIndex];
-    cleanupRematchCountdown();
+  var ready = readyData || {};
+  var readyCount = Object.keys(ready).length;
+  var myReady = ready[multiState.playerIndex];
+  cleanupRematchCountdown();
 
-    if (readyCount >= 2 && myReady) {
-      // 再戦: 前ゲームデータクリア→ロビーに戻る
-      roomRef.child('readyPlayers').remove();
-      roomRef.child('capturedPlayers').remove();
-      roomRef.child('oniPositions').remove();
-      roomRef.child('gameState').remove();
-      roomRef.child('canState').remove();
-      roomRef.child('playerPositions').remove();
-      roomRef.child('result').remove();
-      // 非再戦プレイヤーを削除
-      Object.keys(multiState.players).forEach(function(idx) {
-        if (multiState.players[idx] && !(ready && ready[idx])) {
-          roomRef.child('players/' + idx).remove();
-        }
-      });
-      // ready状態リセット
-      var resetData = {};
-      Object.keys(ready).forEach(function(idx) { resetData[idx + '/ready'] = false; });
-      roomRef.child('players').update(resetData);
-      multiState.ready = false;
-      roomRef.update({ status: 'waiting' });
-      cleanupGame();
-      showScreen('lobby-screen');
-      initLobbyListeners();
-      updateLobbyUI();
-    } else {
-      // 人数不足 → タイトルに戻る
-      if (myReady) {
-        showNotification('リトライ人数が不足のため終了します（2人以上必要）');
+  if (readyCount >= 2 && myReady) {
+    // 再戦: 前ゲームデータクリア→ロビーに戻る
+    roomRef.child('readyPlayers').remove();
+    roomRef.child('capturedPlayers').remove();
+    roomRef.child('oniPositions').remove();
+    roomRef.child('gameState').remove();
+    roomRef.child('canState').remove();
+    roomRef.child('playerPositions').remove();
+    roomRef.child('result').remove();
+    // 非再戦プレイヤーを削除
+    Object.keys(multiState.players).forEach(function(idx) {
+      if (multiState.players[idx] && !(ready[idx])) {
+        roomRef.child('players/' + idx).remove();
       }
-      cleanupGame();
-      leaveLobby();
+    });
+    // ready状態リセット
+    var resetData = {};
+    Object.keys(ready).forEach(function(idx) { resetData[idx + '/ready'] = false; });
+    roomRef.child('players').update(resetData);
+    multiState.ready = false;
+    roomRef.update({ status: 'waiting' });
+    cleanupGame();
+    showScreen('lobby-screen');
+    initLobbyListeners();
+    updateLobbyUI();
+  } else {
+    // 人数不足 → タイトルに戻る
+    if (myReady) {
+      showNotification('リトライ人数が不足のため終了します（2人以上必要）');
     }
-  });
+    cleanupGame();
+    leaveLobby();
+  }
 }
 
 function cleanupRematchCountdown() {
