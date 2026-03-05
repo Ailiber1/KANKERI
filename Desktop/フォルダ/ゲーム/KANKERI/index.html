@@ -611,6 +611,7 @@ html, body {
 }
 @media (hover: none) and (pointer: coarse) {
   .pc-only { display: none !important; }
+  #hud-info-bar { bottom: 220px !important; }
 }
 
 /* ============================================================
@@ -11370,6 +11371,9 @@ function capturePlayer(g, oni) {
   const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false); // Oni wins
+  } else if (g._isMultiplayer && g._multiMode === 'ffa') {
+    // FFA: 自分が捕まった → 自分は敗北（他に生存者がいれば彼らが勝利）
+    checkFFALastSurvivor(g);
   }
 }
 
@@ -11388,6 +11392,9 @@ function captureRemotePlayer(g, remoteIndex) {
   const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false);
+  } else if (g._multiMode === 'ffa') {
+    // FFA: リモートプレイヤー捕獲後、生存者が残り1人なら勝利判定
+    checkFFALastSurvivor(g);
   }
 }
 
@@ -11416,6 +11423,34 @@ function captureAlly(g, ally) {
   const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false); // Oni wins
+  }
+}
+
+// FFA: 生存者が残り1人になったら即勝利判定
+function checkFFALastSurvivor(g) {
+  if (!g._isMultiplayer || g._multiMode !== 'ffa' || g.gamePhase === 'result') return;
+  // 全プレイヤーの生存状態をチェック
+  var survivors = [];
+  // 自分
+  if (!g.player.captured) {
+    survivors.push({ index: multiState.playerIndex, isMe: true });
+  }
+  // リモートプレイヤー
+  Object.keys(multiState.remotePlayers).forEach(function(k) {
+    var rp = multiState.remotePlayers[parseInt(k)];
+    if (rp && !rp.captured) {
+      survivors.push({ index: parseInt(k), isMe: false });
+    }
+  });
+  // 生存者が1人だけ → その人が勝利
+  if (survivors.length === 1) {
+    if (survivors[0].isMe) {
+      // 自分が最後の生存者 → 勝利
+      endGame(g, true);
+    } else {
+      // 自分は捕まっている → 敗北
+      endGame(g, false);
+    }
   }
 }
 
@@ -14121,6 +14156,12 @@ function initMultiplayerSync(g) {
       Object.keys(multiState.remotePlayers).forEach(k => {
         multiState.remotePlayers[k].captured = !!capData[k];
       });
+      // 自分の捕獲状態も同期
+      g.player.captured = !!capData[multiState.playerIndex];
+      // FFA: 生存者が残り1人なら即勝利/敗北判定
+      if (g._multiMode === 'ffa') {
+        checkFFALastSurvivor(g);
+      }
     });
     g._multiListeners.push({ ref: capRef, event: 'value', fn: onCap });
 
