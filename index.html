@@ -909,7 +909,7 @@ html, body {
 }
 /* 横向きスマホ: ミニマップをステージ名の隣（中央上部）に配置 */
 @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
-  #hud-minimap { width: 60px !important; height: 60px !important; top: 4px !important; left: 50% !important; transform: translateX(-50%); bottom: auto !important; right: auto !important; }
+  #hud-minimap { width: 55px !important; height: 55px !important; top: 32px !important; left: auto !important; right: calc(12px + env(safe-area-inset-right, 0px)) !important; transform: none !important; bottom: auto !important; }
 }
 /* Mobile game controls */
 #mobile-joystick { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); left: calc(30px + env(safe-area-inset-left, 0px)); width: 130px; height: 130px; border-radius: 50%; border: 2px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.25); touch-action: none; }
@@ -12192,6 +12192,16 @@ function createDayNightCycle(g) {
       { name: 'night', skyColor: 0x112244, sunColor: 0x4466aa, sunIntensity: 0.3, hemiSky: 0x182244, hemiGround: 0x151525 }
     ]
   };
+  // ★初期フレーム遅延防止: 開始フェーズの照明を即座に適用
+  var initPhase = g.dayNight.phases[g.config.startPhase || 0];
+  if (initPhase && g.sunLight && g.hemiLight) {
+    g.sunLight.color.set(initPhase.sunColor);
+    g.sunLight.intensity = initPhase.sunIntensity;
+    g.hemiLight.color.set(initPhase.hemiSky);
+    g.hemiLight.groundColor.set(initPhase.hemiGround);
+    g.scene.background = new THREE.Color(initPhase.skyColor);
+    if (g.scene.fog) g.scene.fog.color.set(initPhase.skyColor);
+  }
 }
 
 function updateDayNight(g, dt) {
