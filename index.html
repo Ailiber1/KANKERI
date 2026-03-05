@@ -611,6 +611,7 @@ html, body {
 }
 @media (hover: none) and (pointer: coarse) {
   .pc-only { display: none !important; }
+  #hud-info-bar { top: 78px !important; }
 }
 
 /* ============================================================
@@ -618,14 +619,20 @@ html, body {
    ============================================================ */
 #multi-modal .mode-cards { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 .mode-card {
-  background: rgba(20, 30, 60, 0.6);
-  border: 1px solid rgba(85, 153, 255, 0.2);
+  background: transparent;
+  border: 1px solid rgba(85, 153, 255, 0.08);
   padding: 12px 14px;
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
+  opacity: 0.45;
 }
-.mode-card:hover, .mode-card.selected {
+.mode-card:hover {
+  opacity: 0.7;
+  border-color: rgba(85, 153, 255, 0.3);
+}
+.mode-card.selected {
+  opacity: 1;
   border-color: var(--neon-cyan);
   background: rgba(0, 229, 255, 0.08);
 }
@@ -728,7 +735,7 @@ html, body {
   #hud-stamina-wrap { top: 44px; left: 6px; width: 130px; }
   #hud-stamina-label { font-size: 9px; }
   #hud-stamina-bar { height: 6px; }
-  #hud-info-bar { bottom: 175px; left: 6px; }
+  #hud-info-bar { top: 78px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
   #hud-minimap { width: 100px; height: 100px; bottom: 8px; right: 8px; }
@@ -760,7 +767,7 @@ html, body {
 #hud-stamina-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,229,255,0.3); border-radius: 4px; overflow: hidden; }
 #hud-stamina-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #00e5ff, #00b8d4); transition: width 0.15s; border-radius: 4px; }
 #hud-stamina-fill.low { background: linear-gradient(90deg, #ff4444, #ff8800); }
-#hud-info-bar { position: absolute; bottom: 60px; left: 12px; display: flex; gap: 16px; align-items: center; }
+#hud-info-bar { position: absolute; top: 96px; left: 12px; display: flex; gap: 16px; align-items: center; }
 #hud-capture { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ff3366; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
 #hud-can-dir { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #00e5ff; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
 #hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
@@ -1263,9 +1270,18 @@ html, body {
       <div class="corner-bl"></div><div class="corner-br"></div>
       <h2 id="result-title" style="font-family:'Cinzel Decorative',serif;text-align:center;margin-bottom:16px;font-size:28px;"></h2>
       <div id="result-stats" style="font-family:'Share Tech Mono',monospace;color:#ccc;line-height:2;"></div>
-      <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
+      <div id="result-buttons-solo" style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
         <button id="btn-retry" class="btn btn-neon" data-i18n="BTN_RETRY" style="width:100%;">もう一度</button>
         <button id="btn-to-title" class="btn btn-neon" data-i18n="BTN_TITLE" style="width:100%;">タイトルへ</button>
+      </div>
+      <div id="result-buttons-multi" style="display:none;margin-top:20px;text-align:center;">
+        <div id="rematch-countdown" style="font-size:20px;color:#ffd700;font-weight:bold;text-shadow:0 0 8px rgba(255,204,0,0.5);margin-bottom:10px;"></div>
+        <div id="rematch-status" style="font-size:12px;color:#888;margin-bottom:10px;"></div>
+        <div id="rematch-buttons" style="display:flex;flex-direction:column;gap:10px;">
+          <button id="btn-rematch-yes" class="btn btn-neon" style="width:100%;font-size:16px;padding:14px;">🔄 再戦</button>
+          <button id="btn-rematch-no" class="btn btn-neon" style="width:100%;font-size:14px;opacity:0.7;">退出する</button>
+        </div>
+        <div id="rematch-waiting" style="display:none;color:#00ff41;font-size:14px;font-weight:bold;">✔ 再戦待機中...</div>
       </div>
     </div>
   </div>
@@ -1666,6 +1682,9 @@ function showRoomError(msg) {
 }
 
 function initLobbyListeners() {
+  // ★リスナー重複防止: 既存リスナーをクリーンアップしてから再登録
+  removeLobbyListeners();
+
   const roomRef = db.ref('rooms/' + multiState.roomId);
 
   // プレイヤー変更監視
@@ -1688,9 +1707,16 @@ function initLobbyListeners() {
   const onStatus = statusRef.on('value', (snap) => {
     const status = snap.val();
     if (status === 'playing' || status === 'kickPhase') {
-      // ゲーム開始された
-      if (multiState.active && multiState.currentScreen !== 'game-screen') {
+      // ゲーム開始された（ロビーからの開始 or 再戦）
+      if (multiState.active && gameState.currentScreen !== 'game') {
         startMultiplayerGame();
+      }
+    }
+    if (status === 'rematch') {
+      // ホストが再戦を開始 → 非ホストはゲームをクリーンアップして待機
+      if (!multiState.isHost && gameState.currentScreen === 'game') {
+        cleanupGame();
+        showNotification('再戦準備中...');
       }
     }
     if (status === null) {
@@ -1789,7 +1815,7 @@ function updateLobbyUI() {
     let html = '';
     const players = multiState.players;
     for (let i = 0; i < MAX_PLAYERS; i++) {
-      if (players[i]) {
+      if (players[i] && players[i].username) {
         const p = players[i];
         const isMe = (i === multiState.playerIndex);
         const isHost = (i === 0) || multiState.isHost && i === multiState.playerIndex;
@@ -1843,8 +1869,10 @@ function updateLobbyUI() {
 }
 
 function findHostIndex() {
-  // ルーム内の最小playerIndex（ホスト移行時に使用）
-  const pKeys = Object.keys(multiState.players).map(Number).sort((a, b) => a - b);
+  // ルーム内の最小playerIndex（ホスト移行時に使用）— usernameがある有効プレイヤーのみ
+  const pKeys = Object.keys(multiState.players).filter(function(k) {
+    return multiState.players[k] && multiState.players[k].username;
+  }).map(Number).sort((a, b) => a - b);
   return pKeys.length > 0 ? pKeys[0] : 0;
 }
 
@@ -11370,6 +11398,9 @@ function capturePlayer(g, oni) {
   const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false); // Oni wins
+  } else if (g._isMultiplayer && g._multiMode === 'ffa') {
+    // FFA: 自分が捕まった → 生存者チェック
+    checkFFALastSurvivor(g);
   }
 }
 
@@ -11388,6 +11419,9 @@ function captureRemotePlayer(g, remoteIndex) {
   const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false);
+  } else if (g._multiMode === 'ffa') {
+    // FFA: リモートプレイヤー捕獲後、生存者が残り1人なら勝利判定
+    checkFFALastSurvivor(g);
   }
 }
 
@@ -11416,6 +11450,31 @@ function captureAlly(g, ally) {
   const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false); // Oni wins
+  }
+}
+
+// FFA: 生存者が残り1人になったら即勝利判定
+function checkFFALastSurvivor(g) {
+  if (!g._isMultiplayer || g._multiMode !== 'ffa' || g.gamePhase === 'result') return;
+  var survivors = [];
+  // 自分
+  if (!g.player.captured) {
+    survivors.push({ index: multiState.playerIndex, isMe: true });
+  }
+  // リモートプレイヤー
+  Object.keys(multiState.remotePlayers).forEach(function(k) {
+    var rp = multiState.remotePlayers[parseInt(k)];
+    if (rp && !rp.captured) {
+      survivors.push({ index: parseInt(k), isMe: false });
+    }
+  });
+  // 生存者が1人だけ → その人が勝利
+  if (survivors.length === 1) {
+    if (survivors[0].isMe) {
+      endGame(g, true);
+    } else {
+      endGame(g, false);
+    }
   }
 }
 
@@ -12381,7 +12440,7 @@ function togglePause(g) {
   if (g.paused && document.pointerLockElement) document.exitPointerLock();
 }
 
-function endGame(g, playerWon) {
+function endGame(g, playerWon, reason) {
   g.gamePhase = 'result';
   stopBGM();
   if (document.pointerLockElement) document.exitPointerLock();
@@ -12410,33 +12469,65 @@ function endGame(g, playerWon) {
   const stats = document.getElementById('result-stats');
 
   if (title) {
-    // マルチプレイFFA: 自分が捕まっていなければ勝利
-    let myWon = playerWon;
-    if (g._isMultiplayer && g._multiMode === 'ffa') {
-      myWon = !g.player.captured;
-    }
-    // Co-op: ステージ5クリアで最終勝利、それ以外は全滅
-    if (g._isMultiplayer && g._multiMode === 'coop') {
-      if (playerWon && g._stageNum >= 5) {
-        title.textContent = '🎉 ALL STAGES CLEAR!';
-        title.style.color = '#ffd700';
-        title.style.textShadow = '0 0 30px rgba(255,215,0,0.7)';
-      } else {
-        title.textContent = 'Stage ' + g._stageNum + ' — 全滅…';
-        title.style.color = '#ff4444';
-        title.style.textShadow = '0 0 20px rgba(255,68,68,0.5)';
-      }
+    // プレイヤー離脱によるステージ終了
+    if (reason === 'abandoned') {
+      title.textContent = 'ステージ終了';
+      title.style.color = '#ffaa00';
+      title.style.textShadow = '0 0 20px rgba(255,170,0,0.5)';
     } else {
-      title.textContent = myWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
-      title.style.color = myWon ? '#00ff41' : '#ff4444';
-      title.style.textShadow = myWon
-        ? '0 0 20px rgba(0,255,65,0.5)'
-        : '0 0 20px rgba(255,68,68,0.5)';
+      // マルチプレイFFA: 自分が捕まっていなければ勝利
+      let myWon = playerWon;
+      if (g._isMultiplayer && g._multiMode === 'ffa') {
+        myWon = !g.player.captured;
+      }
+      // Co-op: ステージ5クリアで最終勝利、それ以外は全滅
+      if (g._isMultiplayer && g._multiMode === 'coop') {
+        if (playerWon && g._stageNum >= 5) {
+          title.textContent = '🎉 ALL STAGES CLEAR!';
+          title.style.color = '#ffd700';
+          title.style.textShadow = '0 0 30px rgba(255,215,0,0.7)';
+        } else {
+          title.textContent = 'Stage ' + g._stageNum + ' — 全滅…';
+          title.style.color = '#ff4444';
+          title.style.textShadow = '0 0 20px rgba(255,68,68,0.5)';
+        }
+      } else if (g._isMultiplayer && g._multiMode === 'ffa') {
+        // FFA: 勝者名を表示
+        var winnerName = '';
+        if (myWon) {
+          winnerName = gameState.username || 'あなた';
+        } else {
+          // 生存しているリモートプレイヤーを探す
+          Object.keys(multiState.remotePlayers).forEach(function(k) {
+            var rp = multiState.remotePlayers[parseInt(k)];
+            if (rp && !rp.captured) {
+              var p = multiState.players[k];
+              if (p && p.username) winnerName = p.username;
+            }
+          });
+          if (!winnerName) winnerName = '不明';
+        }
+        title.textContent = myWon ? '🏆 勝利！' : '🏆 ' + winnerName + ' の勝利！';
+        title.style.color = myWon ? '#00ff41' : '#ffd700';
+        title.style.textShadow = myWon
+          ? '0 0 20px rgba(0,255,65,0.5)'
+          : '0 0 20px rgba(255,215,0,0.5)';
+      } else {
+        title.textContent = myWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
+        title.style.color = myWon ? '#00ff41' : '#ff4444';
+        title.style.textShadow = myWon
+          ? '0 0 20px rgba(0,255,65,0.5)'
+          : '0 0 20px rgba(255,68,68,0.5)';
+      }
     }
   }
 
   if (stats) {
-    if (g._isScoreAttack) {
+    if (reason === 'abandoned') {
+      stats.innerHTML = '<span style="font-size:16px;color:#ffaa00">他のプレイヤーが全員退出しました</span><br>' +
+        '<span style="font-size:14px;color:var(--text-secondary)">残り1名のためマルチプレイ続行不可</span><br>' +
+        '<span style="font-size:13px;color:var(--text-dim)">ゲーム続行不可のためステージを終了します</span>';
+    } else if (g._isScoreAttack) {
       // Score Attack: 缶キック回数をメインスコアとして表示
       const kicks = g._kickCount || 0;
       const survivalTime = g.gameTimer;
@@ -12542,29 +12633,229 @@ function endGame(g, playerWon) {
     }
   }
 
-  // Co-op: リトライボタンのラベルを動的変更
+  // マルチプレイ: リトライボタンのラベルを動的変更
   const retryBtnEl = document.getElementById('btn-retry');
-  if (retryBtnEl && g._isMultiplayer && g._multiMode === 'coop') {
-    if (playerWon && g._stageNum >= 5) {
-      retryBtnEl.textContent = 'ロビーへ戻る';
-      // 全クリア時はロビーに戻す
-      retryBtnEl.onclick = () => {
-        cleanupGame();
-        if (multiState.roomId) {
-          multiState.ready = false;
-          db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
-          db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
-          showScreen('lobby-screen');
-          initLobbyListeners();
-          updateLobbyUI();
-        }
-      };
+  if (retryBtnEl && g._isMultiplayer) {
+    if (g._multiMode === 'coop') {
+      if (playerWon && g._stageNum >= 5) {
+        retryBtnEl.textContent = 'ロビーへ戻る';
+        retryBtnEl.onclick = () => {
+          cleanupGame();
+          if (multiState.roomId) {
+            multiState.ready = false;
+            db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
+            db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
+            showScreen('lobby-screen');
+            initLobbyListeners();
+            updateLobbyUI();
+          }
+        };
+      } else {
+        retryBtnEl.textContent = '🔄 同じステージをリトライ';
+      }
     } else {
-      retryBtnEl.textContent = '🔄 同じステージをリトライ';
+      // FFA/Team: 「再戦」ボタン表示
+      retryBtnEl.textContent = '🔄 再戦';
     }
   }
 
+  // マルチプレイFFA/Team: 再戦投票UIを表示
+  var soloButtons = document.getElementById('result-buttons-solo');
+  var multiButtons = document.getElementById('result-buttons-multi');
+  if (g._isMultiplayer && g._multiMode !== 'coop') {
+    if (soloButtons) soloButtons.style.display = 'none';
+    if (multiButtons) multiButtons.style.display = 'block';
+    startRematchCountdown(g);
+  } else {
+    if (soloButtons) soloButtons.style.display = 'flex';
+    if (multiButtons) multiButtons.style.display = 'none';
+  }
+
   if (overlay) overlay.style.display = 'flex';
+}
+
+// --- REMATCH VOTING SYSTEM (FALL-DODGE実績パターン準拠) ---
+var _rematchTimer = null;
+var _rematchReadyRef = null;
+var _rematchPlayersRef = null;
+var _rematchResolved = false;
+
+function startRematchCountdown(g) {
+  var COUNTDOWN_SEC = 20;
+  var secondsLeft = COUNTDOWN_SEC;
+  var myChoice = null; // null=未選択, 'retry', 'exit'
+  _rematchResolved = false;
+
+  if (!multiState.roomId) return;
+  var roomRef = db.ref('rooms/' + multiState.roomId);
+
+  // ★FALL-DODGEパターン: カウントダウン開始時にreadyPlayersを必ずクリア
+  roomRef.child('readyPlayers').remove();
+
+  var countdownEl = document.getElementById('rematch-countdown');
+  var statusEl = document.getElementById('rematch-status');
+  var buttonsEl = document.getElementById('rematch-buttons');
+  var waitingEl = document.getElementById('rematch-waiting');
+  var yesBtn = document.getElementById('btn-rematch-yes');
+  var noBtn = document.getElementById('btn-rematch-no');
+
+  // UIレンダリング関数（FALL-DODGEのrenderFooterパターン）
+  function renderUI() {
+    if (countdownEl) {
+      countdownEl.textContent = '⏱ ' + secondsLeft + 's';
+      if (secondsLeft <= 5) {
+        countdownEl.style.color = '#ff0040';
+        countdownEl.style.textShadow = '0 0 12px rgba(255,0,0,0.8)';
+      } else {
+        countdownEl.style.color = '#ffd700';
+        countdownEl.style.textShadow = '0 0 8px rgba(255,204,0,0.5)';
+      }
+    }
+    if (myChoice === 'retry') {
+      if (buttonsEl) buttonsEl.style.display = 'none';
+      if (waitingEl) waitingEl.style.display = 'block';
+    } else {
+      if (buttonsEl) buttonsEl.style.display = 'flex';
+      if (waitingEl) waitingEl.style.display = 'none';
+    }
+  }
+  renderUI();
+
+  // 「再戦」ボタン
+  if (yesBtn) yesBtn.onclick = function() {
+    myChoice = 'retry';
+    roomRef.child('readyPlayers/' + multiState.playerIndex).set(true);
+    renderUI();
+  };
+
+  // 「退出する」ボタン
+  if (noBtn) noBtn.onclick = function() {
+    myChoice = 'exit';
+    cleanupRematchCountdown();
+    cleanupGame();
+    leaveLobby();
+  };
+
+  // 投票状態の表示更新
+  function updateReadyDisplay(readyPlayers) {
+    if (!statusEl) return;
+    var readyCount = readyPlayers ? Object.keys(readyPlayers).length : 0;
+    var totalCount = multiState.players ? Object.keys(multiState.players).filter(function(k) {
+      return multiState.players[k] && multiState.players[k].username;
+    }).length : 0;
+    var html = '';
+    if (readyCount > 0) {
+      var names = [];
+      Object.keys(readyPlayers).forEach(function(idx) {
+        var p = multiState.players[idx];
+        if (p && p.username) names.push(p.username);
+      });
+      html = '<span style="color:#00ff41">✔ ' + names.join(', ') + '</span>';
+      html += ' (' + readyCount + '/' + totalCount + ')';
+    }
+    statusEl.innerHTML = html;
+  }
+
+  // ★FALL-DODGEパターン: checkAllReadyはonce('value')で最新データを取得
+  function checkAllReady() {
+    roomRef.child('players').once('value', function(pSnap) {
+      var currentPlayers = pSnap.val();
+      var currentTotal = currentPlayers ? Object.keys(currentPlayers).filter(function(k) {
+        return currentPlayers[k] && currentPlayers[k].username;
+      }).length : 0;
+      if (currentPlayers) multiState.players = currentPlayers;
+      roomRef.child('readyPlayers').once('value', function(rSnap) {
+        var ready = rSnap.val();
+        var readyCount = ready ? Object.keys(ready).length : 0;
+        if (readyCount >= 2 && readyCount >= currentTotal) {
+          clearInterval(_rematchTimer); _rematchTimer = null;
+          resolveRematch();
+        }
+      });
+    });
+  }
+
+  // Firebase投票監視
+  _rematchReadyRef = roomRef.child('readyPlayers');
+  _rematchReadyRef.on('value', function(snap) {
+    updateReadyDisplay(snap.val());
+    checkAllReady();
+  });
+  _rematchPlayersRef = roomRef.child('players');
+  _rematchPlayersRef.on('value', function(snap) {
+    var currentPlayers = snap.val();
+    if (currentPlayers) multiState.players = currentPlayers;
+    checkAllReady();
+  });
+
+  // カウントダウンタイマー
+  _rematchTimer = setInterval(function() {
+    secondsLeft--;
+    renderUI();
+    if (secondsLeft <= 0) {
+      clearInterval(_rematchTimer); _rematchTimer = null;
+      resolveRematch();
+    }
+  }, 1000);
+}
+
+// ★FALL-DODGEパターン準拠: once('value')で読み直して判定
+function resolveRematch() {
+  if (_rematchResolved) return; // 二重実行防止
+  _rematchResolved = true;
+  // ★先にリスナーを停止して後続イベントを防ぐ
+  cleanupRematchCountdown();
+  if (!multiState.roomId) return;
+  var roomRef = db.ref('rooms/' + multiState.roomId);
+  roomRef.child('readyPlayers').once('value', function(snap) {
+    var ready = snap.val();
+    var readyCount = ready ? Object.keys(ready).length : 0;
+    var myReady = ready && ready[multiState.playerIndex];
+
+    if (readyCount >= 2 && myReady) {
+      // ★FALL-DODGEパターン: readyPlayersクリア
+      roomRef.child('readyPlayers').remove();
+      // 前ゲームデータクリア
+      roomRef.child('capturedPlayers').remove();
+      roomRef.child('oniPositions').remove();
+      roomRef.child('gameState').remove();
+      roomRef.child('canState').remove();
+      roomRef.child('playerPositions').remove();
+      roomRef.child('result').remove();
+      // 非再戦プレイヤーを削除
+      Object.keys(multiState.players).forEach(function(idx) {
+        if (multiState.players[idx] && multiState.players[idx].username && !(ready && ready[idx])) {
+          roomRef.child('players/' + idx).remove();
+        }
+      });
+      // ★FALL-DODGEパターン: 再戦プレイヤーの中で最小indexを新ホストに設定
+      var readyIndices = Object.keys(ready).map(Number).sort(function(a, b) { return a - b; });
+      var newHostIdx = readyIndices[0];
+      roomRef.child('host').set(newHostIdx);
+      multiState.isHost = (multiState.playerIndex === newHostIdx);
+      // ★FALL-DODGEパターン: 各プレイヤーのready状態をリセット（既存データのみ更新）
+      roomRef.child('players/' + multiState.playerIndex + '/ready').set(false);
+      multiState.ready = false;
+      roomRef.update({ status: 'waiting' });
+      cleanupGame();
+      showScreen('lobby-screen');
+      initLobbyListeners();
+      updateLobbyUI();
+    } else {
+      // 人数不足 → タイトルに戻る
+      if (myReady) {
+        showNotification('リトライ人数が不足のため終了します（2人以上必要）');
+      }
+      cleanupGame();
+      leaveLobby();
+    }
+  });
+}
+
+function cleanupRematchCountdown() {
+  if (_rematchTimer) { clearInterval(_rematchTimer); _rematchTimer = null; }
+  if (_rematchReadyRef) { _rematchReadyRef.off(); _rematchReadyRef = null; }
+  if (_rematchPlayersRef) { _rematchPlayersRef.off(); _rematchPlayersRef = null; }
 }
 
 // --- HUD UPDATES ---
@@ -13099,16 +13390,8 @@ function startGame(stageNum, mode) {
       // Co-op: 同ステージやり直し（ホストがFirebase経由で全員に通知）
       coopRetryStage(G);
     } else if (mode.startsWith('multi_')) {
-      // FFA/Team: ロビーに戻る
-      cleanupGame();
-      if (multiState.roomId) {
-        multiState.ready = false;
-        db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
-        db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
-        showScreen('lobby-screen');
-        initLobbyListeners();
-        updateLobbyUI();
-      }
+      // FFA/Team: 投票UI経由で再戦（endGameで表示される）
+      return; // result-buttons-multiが表示されているため、このボタンは非表示
     } else {
       cleanupGame(); startGame(stageNum, mode);
     }
@@ -13958,6 +14241,8 @@ function initMultiplayerSync(g) {
           rotY: posData[idx].rotY || 0
         };
         remote.crouching = posData[idx].crouching || false;
+        remote.moveSpeed = posData[idx].moveSpeed || 0;
+        remote.isDashing = posData[idx].isDashing || false;
         remote.lastUpdate = Date.now();
       }
     });
@@ -14102,6 +14387,12 @@ function initMultiplayerSync(g) {
       Object.keys(multiState.remotePlayers).forEach(k => {
         multiState.remotePlayers[k].captured = !!capData[k];
       });
+      // 自分の捕獲状態も同期
+      g.player.captured = !!capData[multiState.playerIndex];
+      // FFA: 生存者が残り1人なら即勝利/敗北判定
+      if (g._multiMode === 'ffa') {
+        checkFFALastSurvivor(g);
+      }
     });
     g._multiListeners.push({ ref: capRef, event: 'value', fn: onCap });
 
@@ -14253,11 +14544,11 @@ function initMultiplayerSync(g) {
       }
     });
 
-    // 残り1人 → 自動勝利
+    // 残り1人 → マルチプレイ続行不可（ステージクリアではない）
     if (currentKeys.length === 1 && currentKeys[0] === multiState.playerIndex) {
       if (g.gamePhase !== 'result') {
         showNotification('他の全プレイヤーが退席しました');
-        endGame(g, true);
+        endGame(g, false, 'abandoned');
       }
     }
 
@@ -14275,7 +14566,9 @@ function sendPlayerPosition(g) {
     y: Math.round(pos.y * 100) / 100,
     z: Math.round(pos.z * 100) / 100,
     rotY: Math.round((g.playerFig ? g.playerFig.group.rotation.y : 0) * 100) / 100,
-    crouching: g.player.crouching || false,
+    crouching: g.player.isCrouching || false,
+    moveSpeed: Math.round((g.player.moveSpeed || 0) * 100) / 100,
+    isDashing: g.player.isDashing || false,
     t: firebase.database.ServerValue.TIMESTAMP
   };
 
@@ -14356,14 +14649,11 @@ function updateMultiplayerRemotePlayers(g, dt) {
     if (dRot < -Math.PI) dRot += Math.PI * 2;
     remote.fig.group.rotation.y += dRot * lerpFactor;
 
-    // 移動判定でアニメーション更新
-    const dx = remote.targetPos.x - (remote.lastPos.x || 0);
-    const dz = remote.targetPos.z - (remote.lastPos.z || 0);
-    const speed = Math.sqrt(dx * dx + dz * dz);
-    const isMoving = speed > 0.1;
-    if (remote.fig.animate) {
-      remote.fig.animate(now / 1000, isMoving, remote.crouching || false, false);
-    }
+    // Firebase同期のmoveSpeedでアニメーション更新
+    var rmSpeed = remote.moveSpeed || 0;
+    var rmCrouching = remote.crouching || false;
+    var rmDashing = remote.isDashing || false;
+    updateStickAnimation(remote.fig, dt, rmSpeed, rmCrouching, rmDashing);
     remote.lastPos = { x: remote.targetPos.x, y: remote.targetPos.y, z: remote.targetPos.z };
 
     // 捕獲状態: 半透明にする
@@ -14478,6 +14768,8 @@ function hideCapturedOverlay(g) {
   if (el) el.style.display = 'none';
 }
 
+// ★FALL-DODGE/MAZE-HUNT準拠: ゲームリソースのみ解放、Firebaseプレイヤーデータには触らない
+// プレイヤーデータの削除はleaveLobby()でのみ行う（責務の分離）
 function cleanupMultiplayer(g) {
   // マルチプレイ固有のリスナーとタイマーを解除
   if (g._multiListeners) {
@@ -14503,34 +14795,13 @@ function cleanupMultiplayer(g) {
     }
   });
   multiState.remotePlayers = {};
-
-  // Firebaseからプレイヤー位置を削除
-  if (multiState.active && multiState.roomId) {
-    db.ref('rooms/' + multiState.roomId + '/playerPositions/' + multiState.playerIndex).remove().catch(function(){});
-    // ゲーム中にタイトルに戻る場合: プレイヤーデータも削除
-    if (multiState.playerIndex >= 0) {
-      var roomRef = db.ref('rooms/' + multiState.roomId);
-      roomRef.child('players/' + multiState.playerIndex).remove().catch(function(){});
-      roomRef.child('players/' + multiState.playerIndex).onDisconnect().cancel();
-      // 残りプレイヤーチェック（非同期だが待たない）
-      roomRef.child('players').once('value').then(function(snap) {
-        var remaining = snap.val();
-        if (!remaining || Object.keys(remaining).length === 0) {
-          roomRef.remove().catch(function(){});
-        } else if (multiState.isHost) {
-          var newHost = Math.min.apply(null, Object.keys(remaining).map(Number));
-          roomRef.child('host').set(newHost).catch(function(){});
-        }
-      });
-    }
-  }
 }
 
 function cleanupGame() {
   if (!G) return;
   G.disposed = true;
 
-  // マルチプレイのクリーンアップ
+  // マルチプレイのクリーンアップ（ゲームリソースのみ。プレイヤーデータはleaveLobbyで管理）
   if (G._isMultiplayer) {
     cleanupMultiplayer(G);
   }
