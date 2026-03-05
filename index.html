@@ -12837,7 +12837,7 @@ function resolveRematch() {
       roomRef.child('players/' + multiState.playerIndex + '/ready').set(false);
       multiState.ready = false;
       roomRef.update({ status: 'waiting' });
-      cleanupGame(true); // ★再戦時はプレイヤーデータを残す
+      cleanupGame();
       showScreen('lobby-screen');
       initLobbyListeners();
       updateLobbyUI();
@@ -14754,7 +14754,7 @@ function coopRetryStage(g) {
     roomRef.child('gameState').remove();
     roomRef.child('canState').remove();
   }
-  cleanupGame(true); // ★リトライ時はプレイヤーデータを残す
+  cleanupGame();
   startGame(stageNum, 'multi_coop');
 }
 
@@ -14768,7 +14768,9 @@ function hideCapturedOverlay(g) {
   if (el) el.style.display = 'none';
 }
 
-function cleanupMultiplayer(g, keepPlayerData) {
+// ★FALL-DODGE/MAZE-HUNT準拠: ゲームリソースのみ解放、Firebaseプレイヤーデータには触らない
+// プレイヤーデータの削除はleaveLobby()でのみ行う（責務の分離）
+function cleanupMultiplayer(g) {
   // マルチプレイ固有のリスナーとタイマーを解除
   if (g._multiListeners) {
     g._multiListeners.forEach(({ ref, event, fn }) => ref.off(event, fn));
@@ -14793,39 +14795,15 @@ function cleanupMultiplayer(g, keepPlayerData) {
     }
   });
   multiState.remotePlayers = {};
-
-  // ★再戦時(keepPlayerData=true)はプレイヤーデータを残す
-  if (keepPlayerData) return;
-
-  // Firebaseからプレイヤー位置を削除
-  if (multiState.active && multiState.roomId) {
-    db.ref('rooms/' + multiState.roomId + '/playerPositions/' + multiState.playerIndex).remove().catch(function(){});
-    // ゲーム中にタイトルに戻る場合: プレイヤーデータも削除
-    if (multiState.playerIndex >= 0) {
-      var roomRef = db.ref('rooms/' + multiState.roomId);
-      roomRef.child('players/' + multiState.playerIndex).remove().catch(function(){});
-      roomRef.child('players/' + multiState.playerIndex).onDisconnect().cancel();
-      // 残りプレイヤーチェック（非同期だが待たない）
-      roomRef.child('players').once('value').then(function(snap) {
-        var remaining = snap.val();
-        if (!remaining || Object.keys(remaining).length === 0) {
-          roomRef.remove().catch(function(){});
-        } else if (multiState.isHost) {
-          var newHost = Math.min.apply(null, Object.keys(remaining).map(Number));
-          roomRef.child('host').set(newHost).catch(function(){});
-        }
-      });
-    }
-  }
 }
 
-function cleanupGame(keepPlayerData) {
+function cleanupGame() {
   if (!G) return;
   G.disposed = true;
 
-  // マルチプレイのクリーンアップ
+  // マルチプレイのクリーンアップ（ゲームリソースのみ。プレイヤーデータはleaveLobbyで管理）
   if (G._isMultiplayer) {
-    cleanupMultiplayer(G, keepPlayerData);
+    cleanupMultiplayer(G);
   }
 
   // Cancel animation
