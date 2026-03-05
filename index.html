@@ -611,6 +611,7 @@ html, body {
 }
 @media (hover: none) and (pointer: coarse) {
   .pc-only { display: none !important; }
+  #hud-info-bar { bottom: 220px !important; }
 }
 
 /* ============================================================
@@ -11370,6 +11371,9 @@ function capturePlayer(g, oni) {
   const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false); // Oni wins
+  } else if (g._isMultiplayer && g._multiMode === 'ffa') {
+    // FFA: 自分が捕まった → 生存者チェック
+    checkFFALastSurvivor(g);
   }
 }
 
@@ -11388,6 +11392,9 @@ function captureRemotePlayer(g, remoteIndex) {
   const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false);
+  } else if (g._multiMode === 'ffa') {
+    // FFA: リモートプレイヤー捕獲後、生存者が残り1人なら勝利判定
+    checkFFALastSurvivor(g);
   }
 }
 
@@ -11416,6 +11423,31 @@ function captureAlly(g, ally) {
   const totalPlayers = getTotalPlayers(g);
   if (g.capturedCount >= totalPlayers) {
     endGame(g, false); // Oni wins
+  }
+}
+
+// FFA: 生存者が残り1人になったら即勝利判定
+function checkFFALastSurvivor(g) {
+  if (!g._isMultiplayer || g._multiMode !== 'ffa' || g.gamePhase === 'result') return;
+  var survivors = [];
+  // 自分
+  if (!g.player.captured) {
+    survivors.push({ index: multiState.playerIndex, isMe: true });
+  }
+  // リモートプレイヤー
+  Object.keys(multiState.remotePlayers).forEach(function(k) {
+    var rp = multiState.remotePlayers[parseInt(k)];
+    if (rp && !rp.captured) {
+      survivors.push({ index: parseInt(k), isMe: false });
+    }
+  });
+  // 生存者が1人だけ → その人が勝利
+  if (survivors.length === 1) {
+    if (survivors[0].isMe) {
+      endGame(g, true);
+    } else {
+      endGame(g, false);
+    }
   }
 }
 
@@ -12381,7 +12413,7 @@ function togglePause(g) {
   if (g.paused && document.pointerLockElement) document.exitPointerLock();
 }
 
-function endGame(g, playerWon) {
+function endGame(g, playerWon, reason) {
   g.gamePhase = 'result';
   stopBGM();
   if (document.pointerLockElement) document.exitPointerLock();
@@ -12410,33 +12442,44 @@ function endGame(g, playerWon) {
   const stats = document.getElementById('result-stats');
 
   if (title) {
-    // マルチプレイFFA: 自分が捕まっていなければ勝利
-    let myWon = playerWon;
-    if (g._isMultiplayer && g._multiMode === 'ffa') {
-      myWon = !g.player.captured;
-    }
-    // Co-op: ステージ5クリアで最終勝利、それ以外は全滅
-    if (g._isMultiplayer && g._multiMode === 'coop') {
-      if (playerWon && g._stageNum >= 5) {
-        title.textContent = '🎉 ALL STAGES CLEAR!';
-        title.style.color = '#ffd700';
-        title.style.textShadow = '0 0 30px rgba(255,215,0,0.7)';
-      } else {
-        title.textContent = 'Stage ' + g._stageNum + ' — 全滅…';
-        title.style.color = '#ff4444';
-        title.style.textShadow = '0 0 20px rgba(255,68,68,0.5)';
-      }
+    // プレイヤー離脱によるステージ終了
+    if (reason === 'abandoned') {
+      title.textContent = 'ステージ終了';
+      title.style.color = '#ffaa00';
+      title.style.textShadow = '0 0 20px rgba(255,170,0,0.5)';
     } else {
-      title.textContent = myWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
-      title.style.color = myWon ? '#00ff41' : '#ff4444';
-      title.style.textShadow = myWon
-        ? '0 0 20px rgba(0,255,65,0.5)'
-        : '0 0 20px rgba(255,68,68,0.5)';
+      // マルチプレイFFA: 自分が捕まっていなければ勝利
+      let myWon = playerWon;
+      if (g._isMultiplayer && g._multiMode === 'ffa') {
+        myWon = !g.player.captured;
+      }
+      // Co-op: ステージ5クリアで最終勝利、それ以外は全滅
+      if (g._isMultiplayer && g._multiMode === 'coop') {
+        if (playerWon && g._stageNum >= 5) {
+          title.textContent = '🎉 ALL STAGES CLEAR!';
+          title.style.color = '#ffd700';
+          title.style.textShadow = '0 0 30px rgba(255,215,0,0.7)';
+        } else {
+          title.textContent = 'Stage ' + g._stageNum + ' — 全滅…';
+          title.style.color = '#ff4444';
+          title.style.textShadow = '0 0 20px rgba(255,68,68,0.5)';
+        }
+      } else {
+        title.textContent = myWon ? t('RESULT_CLEAR') : t('RESULT_GAMEOVER');
+        title.style.color = myWon ? '#00ff41' : '#ff4444';
+        title.style.textShadow = myWon
+          ? '0 0 20px rgba(0,255,65,0.5)'
+          : '0 0 20px rgba(255,68,68,0.5)';
+      }
     }
   }
 
   if (stats) {
-    if (g._isScoreAttack) {
+    if (reason === 'abandoned') {
+      stats.innerHTML = '<span style="font-size:16px;color:#ffaa00">他のプレイヤーが全員退出しました</span><br>' +
+        '<span style="font-size:14px;color:var(--text-secondary)">残り1名のためマルチプレイ続行不可</span><br>' +
+        '<span style="font-size:13px;color:var(--text-dim)">ゲーム続行不可のためステージを終了します</span>';
+    } else if (g._isScoreAttack) {
       // Score Attack: 缶キック回数をメインスコアとして表示
       const kicks = g._kickCount || 0;
       const survivalTime = g.gameTimer;
@@ -14102,6 +14145,12 @@ function initMultiplayerSync(g) {
       Object.keys(multiState.remotePlayers).forEach(k => {
         multiState.remotePlayers[k].captured = !!capData[k];
       });
+      // 自分の捕獲状態も同期
+      g.player.captured = !!capData[multiState.playerIndex];
+      // FFA: 生存者が残り1人なら即勝利/敗北判定
+      if (g._multiMode === 'ffa') {
+        checkFFALastSurvivor(g);
+      }
     });
     g._multiListeners.push({ ref: capRef, event: 'value', fn: onCap });
 
@@ -14253,11 +14302,11 @@ function initMultiplayerSync(g) {
       }
     });
 
-    // 残り1人 → 自動勝利
+    // 残り1人 → マルチプレイ続行不可（ステージクリアではない）
     if (currentKeys.length === 1 && currentKeys[0] === multiState.playerIndex) {
       if (g.gamePhase !== 'result') {
         showNotification('他の全プレイヤーが退席しました');
-        endGame(g, true);
+        endGame(g, false, 'abandoned');
       }
     }
 
