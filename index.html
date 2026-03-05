@@ -909,14 +909,14 @@ html, body {
 }
 /* 横向きスマホ: ミニマップをステージ名の隣（中央上部）に配置 */
 @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
-  #hud-minimap { width: 55px !important; height: 55px !important; top: 32px !important; left: auto !important; right: calc(12px + env(safe-area-inset-right, 0px)) !important; transform: none !important; bottom: auto !important; }
+  #hud-minimap { width: 55px !important; height: 55px !important; top: 4px !important; left: 35% !important; right: auto !important; transform: none !important; bottom: auto !important; }
 }
 /* Mobile game controls */
 #mobile-joystick { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); left: calc(30px + env(safe-area-inset-left, 0px)); width: 130px; height: 130px; border-radius: 50%; border: 2px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.25); touch-action: none; }
 #joystick-knob { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: radial-gradient(circle at 40% 38%, rgba(120,180,255,0.6), rgba(85,153,255,0.25)); border: 2px solid rgba(85,153,255,0.7); box-shadow: 0 0 10px rgba(85,153,255,0.3); pointer-events: none; transition: box-shadow 0.15s; }
 #joystick-knob.active { box-shadow: 0 0 18px rgba(85,153,255,0.6); border-color: rgba(120,200,255,0.9); }
 /* マップボタン: 右上に独立配置 */
-#mob-map { position: absolute; top: 58px; right: calc(12px + env(safe-area-inset-right, 0px)); font-family: 'Share Tech Mono', monospace; font-size: 11px; color: #fff; background: rgba(0,0,0,0.5); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 6px; width: auto; height: auto; padding: 4px 10px; touch-action: none; }
+#mob-map { position: absolute; top: 68px; right: calc(12px + env(safe-area-inset-right, 0px)); font-family: 'Share Tech Mono', monospace; font-size: 11px; color: #fff; background: rgba(0,0,0,0.5); border: 1.5px solid rgba(85,153,255,0.4); border-radius: 6px; width: auto; height: auto; padding: 4px 10px; touch-action: none; }
 #mob-map:active { background: rgba(85,153,255,0.3); border-color: rgba(120,200,255,0.8); }
 /* ダッシュ/しゃがむ: 右下に横並び */
 #mobile-buttons { position: absolute; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: row; gap: 10px; }
