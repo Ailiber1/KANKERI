@@ -738,7 +738,7 @@ html, body {
   #hud-info-bar { top: 86px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
-  #hud-minimap { width: 45px; height: 45px; top: auto; left: auto; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); right: calc(50px + env(safe-area-inset-right, 0px)); }
+  #hud-minimap { width: 50px; height: 50px; top: auto; left: auto; bottom: calc(210px + env(safe-area-inset-bottom, 0px)); right: calc(38px + env(safe-area-inset-right, 0px)); }
   #hud-action-prompt { font-size: 13px; padding: 6px 14px; bottom: 90px; }
   #hud-peek-prompt { font-size: 12px; padding: 4px 12px; bottom: 130px; }
   #kick-gauge-wrap { min-width: 240px; padding: 14px 18px; }
@@ -869,7 +869,7 @@ html, body {
 }
 /* 横向きスマホ: ミニマップをステージ名の隣（中央上部）に配置 */
 @media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
-  #hud-minimap { width: 40px !important; height: 40px !important; top: 6px !important; left: 50% !important; transform: translateX(-50%); bottom: auto !important; right: auto !important; }
+  #hud-minimap { width: 60px !important; height: 60px !important; top: 4px !important; left: 50% !important; transform: translateX(-50%); bottom: auto !important; right: auto !important; }
 }
 /* Mobile game controls */
 #mobile-joystick { position: absolute; bottom: calc(30px + env(safe-area-inset-bottom, 0px)); left: calc(30px + env(safe-area-inset-left, 0px)); width: 130px; height: 130px; border-radius: 50%; border: 2px solid rgba(85,153,255,0.4); background: rgba(0,0,0,0.25); touch-action: none; }
@@ -1240,7 +1240,7 @@ html, body {
     </div>
     <!-- Mobile controls -->
     <div id="mobile-joystick" class="mobile-only" style="display:none;"><div id="joystick-knob"></div></div>
-    <button id="mob-map" class="mobile-only" data-i18n="MOB_MAP" style="display:none;">マップ</button>
+    <button id="mob-map" class="mobile-only" style="display:none;">全体を見る</button>
     <div id="mobile-buttons" class="mobile-only" style="display:none;">
       <button id="mob-dash" data-i18n="MOB_DASH">ダッシュ</button>
       <button id="mob-crouch" data-i18n="MOB_CROUCH">しゃがむ</button>
