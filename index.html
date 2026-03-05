@@ -12769,10 +12769,11 @@ function endGame(g, playerWon, reason) {
     }
   }
 
-  // マルチプレイFFA/Team: 再戦投票UIを表示
+  // マルチプレイ: 再戦投票UIを表示（FFA/Team + Co-op全滅時）
   var soloButtons = document.getElementById('result-buttons-solo');
   var multiButtons = document.getElementById('result-buttons-multi');
-  if (g._isMultiplayer && g._multiMode !== 'coop') {
+  var useRematchVoting = g._isMultiplayer && (g._multiMode !== 'coop' || !playerWon);
+  if (useRematchVoting) {
     if (soloButtons) soloButtons.style.display = 'none';
     if (multiButtons) multiButtons.style.display = 'block';
     startRematchCountdown(g);
