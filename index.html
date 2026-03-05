@@ -619,14 +619,20 @@ html, body {
    ============================================================ */
 #multi-modal .mode-cards { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 .mode-card {
-  background: rgba(20, 30, 60, 0.6);
-  border: 1px solid rgba(85, 153, 255, 0.2);
+  background: transparent;
+  border: 1px solid rgba(85, 153, 255, 0.08);
   padding: 12px 14px;
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
+  opacity: 0.45;
 }
-.mode-card:hover, .mode-card.selected {
+.mode-card:hover {
+  opacity: 0.7;
+  border-color: rgba(85, 153, 255, 0.3);
+}
+.mode-card.selected {
+  opacity: 1;
   border-color: var(--neon-cyan);
   background: rgba(0, 229, 255, 0.08);
 }
