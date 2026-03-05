@@ -12837,7 +12837,7 @@ function resolveRematch() {
       roomRef.child('players/' + multiState.playerIndex + '/ready').set(false);
       multiState.ready = false;
       roomRef.update({ status: 'waiting' });
-      cleanupGame();
+      cleanupGame(true); // ★再戦時はプレイヤーデータを残す
       showScreen('lobby-screen');
       initLobbyListeners();
       updateLobbyUI();
@@ -14754,7 +14754,7 @@ function coopRetryStage(g) {
     roomRef.child('gameState').remove();
     roomRef.child('canState').remove();
   }
-  cleanupGame();
+  cleanupGame(true); // ★リトライ時はプレイヤーデータを残す
   startGame(stageNum, 'multi_coop');
 }
 
@@ -14768,7 +14768,7 @@ function hideCapturedOverlay(g) {
   if (el) el.style.display = 'none';
 }
 
-function cleanupMultiplayer(g) {
+function cleanupMultiplayer(g, keepPlayerData) {
   // マルチプレイ固有のリスナーとタイマーを解除
   if (g._multiListeners) {
     g._multiListeners.forEach(({ ref, event, fn }) => ref.off(event, fn));
@@ -14794,6 +14794,9 @@ function cleanupMultiplayer(g) {
   });
   multiState.remotePlayers = {};
 
+  // ★再戦時(keepPlayerData=true)はプレイヤーデータを残す
+  if (keepPlayerData) return;
+
   // Firebaseからプレイヤー位置を削除
   if (multiState.active && multiState.roomId) {
     db.ref('rooms/' + multiState.roomId + '/playerPositions/' + multiState.playerIndex).remove().catch(function(){});
@@ -14816,14 +14819,13 @@ function cleanupMultiplayer(g) {
   }
 }
 
-// FFA/Team即再戦: 前ゲームデータクリア→同じ設定で即ゲーム再開始
-function cleanupGame() {
+function cleanupGame(keepPlayerData) {
   if (!G) return;
   G.disposed = true;
 
   // マルチプレイのクリーンアップ
   if (G._isMultiplayer) {
-    cleanupMultiplayer(G);
+    cleanupMultiplayer(G, keepPlayerData);
   }
 
   // Cancel animation
