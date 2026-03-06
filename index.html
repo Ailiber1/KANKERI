@@ -875,6 +875,10 @@ html, body {
 #hide-countdown { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; }
 #hide-countdown-text { font-family: 'Cinzel Decorative', serif; font-size: 36px; color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,0.5); }
 #hide-countdown-time { font-family: 'Share Tech Mono', monospace; font-size: 64px; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.4); }
+#oni-wait-overlay { position: absolute; top: 45%; left: 50%; transform: translate(-50%,-50%); text-align: center; z-index: 40; pointer-events: none; }
+#oni-wait-text { font-family: 'Noto Sans JP', sans-serif; font-size: 20px; color: #ff6666; text-shadow: 0 0 10px rgba(255,50,50,0.5); }
+#oni-wait-timer { font-family: 'Share Tech Mono', monospace; font-size: 56px; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.4); margin: 8px 0; }
+#oni-wait-sub { font-family: 'Noto Sans JP', sans-serif; font-size: 13px; color: rgba(255,255,255,0.5); }
 #pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .pause-panel { max-width: 300px; width: 90%; padding: 30px; }
 #controls-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 55; }
@@ -1366,6 +1370,12 @@ html, body {
     <div id="hide-countdown" style="display:none;">
       <div id="hide-countdown-text">隠れろ！</div>
       <div id="hide-countdown-time">10</div>
+    </div>
+    <!-- 鬼待機オーバーレイ（チーム戦: placement/kick/hideフェーズ中） -->
+    <div id="oni-wait-overlay" style="display:none;">
+      <div id="oni-wait-text">ランナーが隠れています…</div>
+      <div id="oni-wait-timer"></div>
+      <div id="oni-wait-sub">待機中</div>
     </div>
     <!-- Mobile controls -->
     <div id="mobile-joystick" class="mobile-only" style="display:none;"><div id="joystick-knob"></div></div>
@@ -11842,7 +11852,7 @@ function updateCanPhysics(g, dt) {
         g.phaseTimer = g.hideTime || 10;
         // 鬼には「隠れろ」ではなく待機メッセージ
         if (g._isOniPlayer) {
-          showCenterAlert('⏳ ランナーが隠れている…', Math.ceil(g.phaseTimer) + '秒', 3000);
+          showOniWaitOverlay('ランナーが隠れています…', true);
         } else {
           showHideCountdown(g, true);
         }
@@ -12420,6 +12430,21 @@ function showHideCountdown(g, show) {
   const el = document.getElementById('hide-countdown');
   if (el) el.style.display = show ? 'block' : 'none';
 }
+function showOniWaitOverlay(msg, show) {
+  var el = document.getElementById('oni-wait-overlay');
+  if (!el) return;
+  if (show) {
+    var textEl = document.getElementById('oni-wait-text');
+    if (textEl) textEl.textContent = msg || 'ランナーが隠れています…';
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+function updateOniWaitTimer(sec) {
+  var el = document.getElementById('oni-wait-timer');
+  if (el) el.textContent = Math.ceil(Math.max(0, sec));
+}
 
 function updateGamePhases(g, dt) {
   switch (g.gamePhase) {
@@ -12447,9 +12472,14 @@ function updateGamePhases(g, dt) {
       updateKickGauge(g, dt); // Allow rescue kick during hide phase too
       const hideEl = document.getElementById('hide-countdown-time');
       if (hideEl) hideEl.textContent = Math.ceil(Math.max(0, g.phaseTimer));
+      // 鬼の待機オーバーレイにタイマーを反映
+      if (g._isOniPlayer && g._multiMode === 'team') {
+        updateOniWaitTimer(g.phaseTimer);
+      }
       if (g.phaseTimer <= 0) {
         g.gamePhase = 'seek';
         showHideCountdown(g, false);
+        showOniWaitOverlay(null, false);
         showNotification(g._isOniPlayer ? '探しに行け！' : '鬼が動き出した！');
         SoundManager.playGameSE('notify');
         // マルチプレイ: seekフェーズへの遷移を同期
@@ -13762,9 +13792,17 @@ function showCanPlacementUI(g) {
       isRepresentative = multiState.isHost;
     }
     if (!isRepresentative) {
-      const msg = g._isOniPlayer
-        ? 'ランナーが缶を蹴るのを待っています…'
-        : '代表ランナーが缶の配置を選んでいます…';
+      if (g._isOniPlayer && g._multiMode === 'team') {
+        // 鬼にはcan-placement-wrapではなく待機オーバーレイを表示
+        wrap.style.display = 'none';
+        showOniWaitOverlay('ランナーが缶を配置中…', true);
+        var wtEl = document.getElementById('oni-wait-timer');
+        if (wtEl) wtEl.textContent = '';
+        var wsEl = document.getElementById('oni-wait-sub');
+        if (wsEl) wsEl.textContent = '待機中';
+        return;
+      }
+      const msg = '代表ランナーが缶の配置を選んでいます…';
       opts.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:16px;font-size:14px;">' + msg + '</div>';
       if (confirmBtn) confirmBtn.style.display = 'none';
       wrap.style.display = 'block';
@@ -14590,19 +14628,23 @@ function initMultiplayerSync(g) {
           // 前進のみ許可
           if (newO !== undefined && curO !== undefined && newO > curO) {
             g.gamePhase = state.gamePhase;
-            // kickフェーズ: 缶配置UIを非表示
+            // kickフェーズ: 缶配置UIを非表示、鬼は待機オーバーレイ更新
             if (state.gamePhase === 'kick') {
               var cpWrap = document.getElementById('can-placement-wrap');
               if (cpWrap) cpWrap.style.display = 'none';
+              showOniWaitOverlay('ランナーが缶を蹴っています…', true);
+              var wtEl2 = document.getElementById('oni-wait-timer');
+              if (wtEl2) wtEl2.textContent = '';
             }
             // hideフェーズ: phaseTimerをセット（カウントダウンは鬼には表示しない）
             if (state.gamePhase === 'hide' && state.hideTime) {
               g.hideTime = state.hideTime;
               g.phaseTimer = state.hideTime;
-              showCenterAlert('⏳ ランナーが隠れている…', Math.ceil(state.hideTime) + '秒', 3000);
+              showOniWaitOverlay('ランナーが隠れています…', true);
             }
             if (state.gamePhase === 'seek') {
               showHideCountdown(g, false);
+              showOniWaitOverlay(null, false);
               showNotification('探しに行け！');
               SoundManager.playGameSE('notify');
             }
@@ -14692,8 +14734,14 @@ function initMultiplayerSync(g) {
             ? (g._teamB && g._teamB.length > 0 && Math.min(...g._teamB) === multiState.playerIndex)
             : multiState.isHost;
           if (!isKicker) {
-            const kickMsg = g._multiMode === 'team' ? '🦵 ランナーが缶を蹴っています…' : '🦵 ホストが缶を蹴っています…';
-            showCenterAlert(kickMsg, 'しばらくお待ちください', 5000);
+            if (g._isOniPlayer && g._multiMode === 'team') {
+              showOniWaitOverlay('ランナーが缶を蹴っています…', true);
+              var wtEl3 = document.getElementById('oni-wait-timer');
+              if (wtEl3) wtEl3.textContent = '';
+            } else {
+              const kickMsg = g._multiMode === 'team' ? '🦵 ランナーが缶を蹴っています…' : '🦵 ホストが缶を蹴っています…';
+              showCenterAlert(kickMsg, 'しばらくお待ちください', 5000);
+            }
           }
         }
         // kick → hide: キックゲージを非表示、かくれんぼカウントダウンを表示
@@ -14706,7 +14754,7 @@ function initMultiplayerSync(g) {
           }
           // 鬼には「隠れろ」ではなく待機メッセージ
           if (g._isOniPlayer) {
-            showCenterAlert('⏳ ランナーが隠れている…', Math.ceil(state.hideTime) + '秒', 3000);
+            showOniWaitOverlay('ランナーが隠れています…', true);
           } else {
             showHideCountdown(g, true);
           }
@@ -14714,6 +14762,7 @@ function initMultiplayerSync(g) {
         // hide → seek: かくれんぼカウントダウンを非表示
         if (state.gamePhase === 'seek') {
           showHideCountdown(g, false);
+          showOniWaitOverlay(null, false);
           if (g._isOniPlayer) {
             showNotification('探しに行け！');
           }
