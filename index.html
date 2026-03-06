@@ -917,12 +917,16 @@ html, body {
 }
 /* 横向きスマホ: ロビー画面のスクロール対応 */
 @media (orientation: landscape) and (max-height: 500px) {
-  /* 核心修正: justify-content: center → flex-start で上からコンテンツ配置 + 内部スクロール */
+  /* 核心修正: lobby-panel自体を内部スクロールコンテナにする */
   #lobby-screen {
     justify-content: flex-start !important;
+    padding: 4px 0 !important;
+  }
+  #lobby-screen .lobby-panel {
+    max-height: calc(100vh - 8px) !important;
+    max-height: calc(100dvh - 8px) !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    padding: 8px 0 !important;
   }
   #lobby-screen .lobby-panel { padding: 6px 10px !important; width: min(480px, 92vw) !important; }
   #lobby-screen .lobby-room-label { font-size: 9px !important; margin-bottom: 0 !important; }
