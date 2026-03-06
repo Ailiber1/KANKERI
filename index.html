@@ -793,13 +793,14 @@ html, body {
   font-size: 64px; color: rgba(255,68,68,0.5); text-shadow: 0 0 15px rgba(255,0,0,0.3);
   transition: color 0.15s, text-shadow 0.15s, font-size 0.15s;
   pointer-events: auto; cursor: pointer; user-select: none;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  display: flex; flex-direction: column-reverse; align-items: center; gap: 6px;
 }
 #oni-reticle .reticle-label {
-  font-size: 14px; font-family: 'Noto Sans JP', sans-serif;
+  font-size: 13px; font-family: 'Noto Sans JP', sans-serif;
   color: #ffffff; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,68,68,0.6);
-  padding: 4px 12px; border-radius: 4px; white-space: nowrap;
+  padding: 5px 14px; border-radius: 6px; white-space: nowrap;
   text-shadow: 0 0 4px rgba(255,68,68,0.5);
+  pointer-events: none;
 }
 #oni-reticle.locked {
   color: #ff2222; text-shadow: 0 0 30px rgba(255,0,0,0.8); font-size: 72px;
@@ -13923,27 +13924,49 @@ function updateOniPlayerHUD(g, dt) {
   const hasTarget = checkReticleOnRunner(g);
   if (reticle) {
     reticle.classList.toggle('locked', hasTarget);
-    // レティクルに缶アクションラベルを表示
+    // レティクルに状態ラベルを常に表示（ユーザーが操作を理解しやすくする）
     let label = '';
+    let labelStyle = 'default'; // default, action, locked
     if (g.can) {
       const canDist = g.player.position.distanceTo(g.can.group.position);
       if (canDist < 2.5 && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
-        label = '缶を踏む';
+        label = '⚡ 缶を踏む（捕獲）';
+        labelStyle = 'action';
       } else if (canDist < 2.5 && !g.can.isAtHome && !op.canCarrying) {
-        label = '缶を拾う';
+        label = '📦 缶を拾う';
+        labelStyle = 'action';
+      } else if (op.lockedTarget >= 0 && op.lockValidated) {
+        label = '🔒 ロック中 — 缶に近づけ！';
+        labelStyle = 'locked';
+      } else if (hasTarget && op.lockedTarget < 0) {
+        label = '👁 ランナー発見中…';
+      } else if (op.canCarrying) {
+        label = '📦 缶を運搬中';
+      } else {
+        label = '👁 ランナーを探せ';
       }
     }
     let labelEl = reticle.querySelector('.reticle-label');
-    if (label) {
-      if (!labelEl) {
-        labelEl = document.createElement('div');
-        labelEl.className = 'reticle-label';
-        reticle.appendChild(labelEl);
-      }
-      labelEl.textContent = label;
-      labelEl.style.display = 'block';
-    } else if (labelEl) {
-      labelEl.style.display = 'none';
+    if (!labelEl) {
+      labelEl = document.createElement('div');
+      labelEl.className = 'reticle-label';
+      reticle.appendChild(labelEl);
+    }
+    labelEl.textContent = label;
+    labelEl.style.display = 'block';
+    // アクション可能時は強調
+    if (labelStyle === 'action') {
+      labelEl.style.background = 'rgba(255,34,34,0.8)';
+      labelEl.style.borderColor = 'rgba(255,100,100,0.9)';
+      labelEl.style.fontSize = '16px';
+    } else if (labelStyle === 'locked') {
+      labelEl.style.background = 'rgba(255,170,0,0.7)';
+      labelEl.style.borderColor = 'rgba(255,200,0,0.9)';
+      labelEl.style.fontSize = '13px';
+    } else {
+      labelEl.style.background = 'rgba(0,0,0,0.6)';
+      labelEl.style.borderColor = 'rgba(255,68,68,0.4)';
+      labelEl.style.fontSize = '13px';
     }
   }
 
@@ -14334,8 +14357,8 @@ function addOniEyeGlow(g, fig) {
   const coneGeo = new THREE.CircleGeometry(10, 16, -Math.PI / 3, Math.PI * 2 / 3);
   g.geometries.push(coneGeo);
   const coneMat = new THREE.MeshBasicMaterial({
-    color: 0xff3333, transparent: true, opacity: 0.15,
-    side: THREE.DoubleSide
+    color: 0xff3333, transparent: true, opacity: 0.06,
+    side: THREE.DoubleSide, depthWrite: false
   });
   g.materials.push(coneMat);
   const cone = new THREE.Mesh(coneGeo, coneMat);
@@ -14527,10 +14550,15 @@ function initMultiplayerSync(g) {
           const canWrap = document.getElementById('can-placement-wrap');
           if (canWrap) canWrap.style.display = 'none';
         }
-        // 非ホスト: kickフェーズ → 待機メッセージを表示
+        // kickフェーズ → 待機メッセージを表示（キッカー本人には表示しない）
         if (state.gamePhase === 'kick') {
-          const kickMsg = g._multiMode === 'team' ? '🦵 ランナーが缶を蹴っています…' : '🦵 ホストが缶を蹴っています…';
-          showCenterAlert(kickMsg, 'しばらくお待ちください', 5000);
+          const isKicker = g._multiMode === 'team'
+            ? (g._teamB && g._teamB.length > 0 && Math.min(...g._teamB) === multiState.playerIndex)
+            : multiState.isHost;
+          if (!isKicker) {
+            const kickMsg = g._multiMode === 'team' ? '🦵 ランナーが缶を蹴っています…' : '🦵 ホストが缶を蹴っています…';
+            showCenterAlert(kickMsg, 'しばらくお待ちください', 5000);
+          }
         }
         // kick → hide: キックゲージを非表示、かくれんぼカウントダウンを表示
         if (state.gamePhase === 'hide') {
