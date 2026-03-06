@@ -523,13 +523,13 @@ html, body {
 
 /* Center alert (鬼追加通知など) */
 .center-alert {
-  position: fixed; top: 50%; left: 50%;
+  position: fixed; top: 40%; left: 50%;
   transform: translate(-50%, -50%) scale(0.5);
   background: rgba(0,0,0,0.85);
   border: 2px solid #ff3366;
-  padding: 20px 50px;
+  padding: 16px 40px;
   font-family: 'Share Tech Mono', monospace;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: bold;
   color: #ff3366;
   z-index: 400;
@@ -554,6 +554,11 @@ html, body {
 @keyframes centerAlertOut {
   0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+}
+/* 横向きスマホ: center-alertをコンパクトに */
+@media (orientation: landscape) and (max-height: 500px) {
+  .center-alert { top: 35% !important; font-size: 16px !important; padding: 10px 24px !important; }
+  .center-alert .sub-text { font-size: 10px !important; }
 }
 
 /* Loading screen */
@@ -12450,7 +12455,8 @@ function updateGamePhases(g, dt) {
           if (hideDetour) { hideTargetX = hideDetour.x; hideTargetZ = hideDetour.z; }
           moveOni(oni, hideTargetX, hideTargetZ, oni.speed * 0.8 * hideNightMult, dt, g);
           // Score Attackでは缶に近づくが回収はしない（seekフェーズで回収させる）
-          if (!g._isScoreAttack) {
+          // チーム戦ではAI鬼は不要（プレイヤーが鬼を操作する）
+          if (!g._isScoreAttack && g._multiMode !== 'team') {
             const crx = oni.position.x - canPos.x, crz = oni.position.z - canPos.z;
             if (Math.sqrt(crx*crx + crz*crz) < 1.5 && !g.can.isAtHome) {
               g.can.group.position.copy(g.can.homePos);
@@ -13762,7 +13768,7 @@ function showCanPlacementUI(g) {
  * runnersWon: true=ランナー勝利（時間切れ）, false=鬼勝利（全員捕獲）
  */
 function endTeamBattle(g, runnersWon) {
-  // ホスト: Firebase結果更新
+  // ホスト: Firebase結果更新 + gamePhaseをresultに設定
   if (multiState.isHost && multiState.roomId) {
     db.ref('rooms/' + multiState.roomId).update({
       status: 'result',
@@ -13770,6 +13776,10 @@ function endTeamBattle(g, runnersWon) {
         runnersWon: runnersWon,
         endTime: firebase.database.ServerValue.TIMESTAMP
       }
+    });
+    // gameStateにresultを書いて非ホスト（ランナー）にも通知
+    db.ref('rooms/' + multiState.roomId + '/gameState').update({
+      gamePhase: 'result'
     });
     // teamBattleデータをクリーンアップ
     db.ref('rooms/' + multiState.roomId + '/teamBattle').remove();
@@ -14039,30 +14049,39 @@ function checkReticleOnRunner(g) {
   const camera = g.camera;
   if (!camera) return false;
 
-  // カメラの前方レイ
-  const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-  raycaster.far = 20; // 20m
+  // スクリーンスペース判定: 各ランナーの画面上の位置が画面中央付近かチェック
+  // レイキャストだと棒人間のメッシュが小さく遠距離で当たりにくいため
+  const teamB = g._teamB || [];
+  let bestIdx = -1;
+  let bestDist = Infinity;
+  const _v = new THREE.Vector3();
 
-  // リモートプレイヤーのメッシュを集める
-  const targets = [];
   Object.keys(multiState.remotePlayers).forEach(k => {
-    const rp = multiState.remotePlayers[k];
+    const idx = parseInt(k);
+    const rp = multiState.remotePlayers[idx];
     if (!rp || !rp.fig || rp.captured) return;
-    // ランナーチームのみ
-    const teamB = g._teamB || [];
-    if (!teamB.includes(parseInt(k))) return;
-    rp.fig.group.traverse(obj => {
-      if (obj.isMesh) {
-        obj._remotePlayerIndex = parseInt(k);
-        targets.push(obj);
-      }
-    });
+    if (!teamB.includes(idx)) return;
+
+    // 3D距離チェック（20m以内）
+    const worldDist = g.player.position.distanceTo(rp.fig.group.position);
+    if (worldDist > 20) return;
+
+    // プレイヤーの胸あたり（y+0.8）をスクリーン座標に変換
+    _v.copy(rp.fig.group.position);
+    _v.y += 0.8;
+    _v.project(camera);
+
+    // NDC座標で画面中央からの距離（±0.15 = 約画面の15%以内）
+    const screenDist = Math.sqrt(_v.x * _v.x + _v.y * _v.y);
+    // カメラの前方にいるか（z < 1）
+    if (_v.z < 1 && screenDist < 0.15 && worldDist < bestDist) {
+      bestDist = worldDist;
+      bestIdx = idx;
+    }
   });
 
-  const hits = raycaster.intersectObjects(targets, false);
-  if (hits.length > 0) {
-    g._oniPlayer._reticleTarget = hits[0].object._remotePlayerIndex;
+  if (bestIdx >= 0) {
+    g._oniPlayer._reticleTarget = bestIdx;
     return true;
   }
   g._oniPlayer._reticleTarget = -1;
@@ -14323,7 +14342,7 @@ function handleOniPlayerInput(g, key) {
  * createOni() と同じパラメータを使用
  */
 function addOniEyeGlow(g, fig) {
-  const head = fig.group.children[0]; // head mesh
+  const head = fig.head; // createStickFigureの返り値のheadプロパティを使用
   if (!head) return;
   const headRadius = 0.17;
 
@@ -14363,6 +14382,20 @@ function addOniEyeGlow(g, fig) {
   eyeLight.position.set(0, 0.04, headRadius * 0.9);
   head.add(eyeLight);
   fig.eyeLight = eyeLight;
+
+  // === ツノ（createOniと同じ構造） ===
+  const hornMat = new THREE.MeshBasicMaterial({ color: 0x660000 });
+  g.materials.push(hornMat);
+  const hornGeo = new THREE.ConeGeometry(0.035, 0.18, 8);
+  g.geometries.push(hornGeo);
+  const leftHorn = new THREE.Mesh(hornGeo, hornMat);
+  leftHorn.position.set(-0.08, headRadius * 0.75, 0);
+  leftHorn.rotation.z = 0.3;
+  head.add(leftHorn);
+  const rightHorn = new THREE.Mesh(hornGeo, hornMat);
+  rightHorn.position.set(0.08, headRadius * 0.75, 0);
+  rightHorn.rotation.z = -0.3;
+  head.add(rightHorn);
 
   // === vision cone（地面にワインレッドの半透明センサー扇形） ===
   const coneGeo = new THREE.CircleGeometry(8, 16, -Math.PI / 3, Math.PI * 2 / 3);
