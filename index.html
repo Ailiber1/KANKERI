@@ -1838,6 +1838,10 @@ function initLobbyListeners() {
   initRoleSelectButtons();
   initCpuOniButtons();
   multiState._cpuOniCount = 0;
+  // ホスト: FirebaseのCPU鬼数をリセット
+  if (multiState.isHost && multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/cpuOniCount').set(0);
+  }
 
   const roomRef = db.ref('rooms/' + multiState.roomId);
 
