@@ -14734,16 +14734,16 @@ function initMultiplayerSync(g) {
             showCenterAlert('👁 見つけた！', targetName + '！', 2000);
           } else {
             // 仲間の鬼が発見した → 通知のみ（缶は踏めない）
-            showCenterAlert('👁 ' + oniName + 'が発見！', targetName + '！', 2000);
+            showCenterAlert('👁 ' + oniName + 'が発見', targetName, 2000);
           }
         } else {
           // === ランナーチーム ===
           if (targetIdx === multiState.playerIndex) {
             // 自分が見つかった
-            showCenterAlert('👁 見つかった！', '鬼に発見された！逃げろ！', 3000);
+            showCenterAlert('👁 見つかった！', '缶を蹴れ！', 2500);
           } else {
             // 味方が見つかった
-            showCenterAlert('👁 ' + targetName + 'が見つかった！', '', 2000);
+            showCenterAlert('👁 ' + targetName + 'が発見された', '', 2000);
           }
         }
         SoundManager.playGameSE('found');
