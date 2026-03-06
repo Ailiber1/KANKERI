@@ -660,6 +660,8 @@ html, body {
 .lobby-panel {
   position: relative; z-index: 2;
   width: min(480px, 92vw);
+  max-height: calc(100dvh - 20px);
+  overflow-y: auto;
   background: var(--bg-panel);
   border: 1px solid rgba(85, 153, 255, 0.25);
   padding: 24px 20px;
@@ -1198,13 +1200,13 @@ html, body {
     <div class="team-assign-section" id="team-assign-section">
       <div class="team-assign-label">⚔ ロールを選択</div>
       <div class="role-select-buttons">
-        <button class="role-btn role-btn-runner active" data-role="runner">
-          <span class="role-icon">🏃</span>
-          <span class="role-name" data-i18n-ja="ランナー" data-i18n-en="RUNNER">ランナー</span>
-        </button>
         <button class="role-btn role-btn-oni" data-role="oni">
           <span class="role-icon">👹</span>
           <span class="role-name" data-i18n-ja="鬼" data-i18n-en="ONI">鬼</span>
+        </button>
+        <button class="role-btn role-btn-runner active" data-role="runner">
+          <span class="role-icon">🏃</span>
+          <span class="role-name" data-i18n-ja="ランナー" data-i18n-en="RUNNER">ランナー</span>
         </button>
       </div>
       <div class="team-assign-grid">
