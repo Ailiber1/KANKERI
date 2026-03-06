@@ -792,6 +792,13 @@ html, body {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
   font-size: 64px; color: rgba(255,68,68,0.5); text-shadow: 0 0 15px rgba(255,0,0,0.3);
   transition: color 0.15s, text-shadow 0.15s, font-size 0.15s;
+  pointer-events: auto; cursor: pointer; user-select: none;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+#oni-reticle .reticle-label {
+  font-size: 14px; font-family: 'Noto Sans JP', sans-serif;
+  background: rgba(255,34,34,0.7); padding: 4px 12px; border-radius: 4px;
+  white-space: nowrap;
 }
 #oni-reticle.locked {
   color: #ff2222; text-shadow: 0 0 30px rgba(255,0,0,0.8); font-size: 72px;
@@ -11794,8 +11801,14 @@ function updateCanPhysics(g, dt) {
         g.gamePhase = 'hide';
         g.phaseTimer = g.hideTime || 10;
         showHideCountdown(g, true);
-        // マルチプレイ: フェーズ変更を同期
-        if (g._isMultiplayer && multiState.isHost) syncGameState(g);
+        // マルチプレイ: フェーズ変更を同期（ホストでも代表ランナーでも書き込む）
+        if (g._isMultiplayer && multiState.roomId) {
+          db.ref('rooms/' + multiState.roomId + '/gameState').update({
+            gamePhase: 'hide',
+            hideTime: g.hideTime || 10,
+            gameTimer: g.gameTimer
+          });
+        }
       }
     }
   }
@@ -12394,6 +12407,10 @@ function updateGamePhases(g, dt) {
         showHideCountdown(g, false);
         showNotification('鬼が動き出した！');
         SoundManager.playGameSE('notify');
+        // マルチプレイ: seekフェーズへの遷移を同期
+        if (g._isMultiplayer && multiState.roomId) {
+          db.ref('rooms/' + multiState.roomId + '/gameState').update({ gamePhase: 'seek' });
+        }
         // 缶が未回収なら最初の鬼をrecoveryに、残りはpatrolに
         for (let i = 0; i < g.onis.length; i++) {
           if (i === 0 && !g.can.isAtHome) {
@@ -12605,8 +12622,15 @@ function confirmCanPlacement(g) {
   // マルチプレイ: 缶の位置とフェーズを同期（代表ランナーまたはホスト）
   if (g._isMultiplayer && multiState.roomId) {
     db.ref('rooms/' + multiState.roomId + '/canState').set({
-      position: { x: Math.round(pos.x * 100) / 100, y: Math.round(canY * 100) / 100, z: Math.round(pos.z * 100) / 100 }
+      position: { x: Math.round(pos.x * 100) / 100, y: Math.round(canY * 100) / 100, z: Math.round(pos.z * 100) / 100 },
+      isAtHome: true,
+      homePos: { x: Math.round(pos.x * 100) / 100, y: Math.round(canY * 100) / 100, z: Math.round(pos.z * 100) / 100 }
     });
+    // フェーズ変更も同期（非ホストでも書き込む）
+    db.ref('rooms/' + multiState.roomId + '/gameState').update({
+      gamePhase: 'kick'
+    });
+    // 缶の配置UIを全プレイヤーで非表示にする
     if (multiState.isHost) syncGameState(g);
   }
   const spawnDirs = [
@@ -13209,6 +13233,12 @@ function updateHUD(g) {
 }
 
 function updateMinimap(g) {
+  // 鬼プレイヤーにはミニマップを表示しない
+  if (g._isOniPlayer) {
+    const minimapEl = document.getElementById('hud-minimap');
+    if (minimapEl) minimapEl.style.display = 'none';
+    return;
+  }
   const canvas = document.getElementById('minimap-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -13801,19 +13831,23 @@ function initOniPlayerControls(g) {
     lockCooldown: 0           // ロックオン失敗後のクールダウン
   };
 
-  // モバイル: ロックオンボタン（mob-actionが「発見」に変わるので元のoni-lockon-btnは非表示のまま）
-  const isMobile = 'ontouchstart' in window;
-  const lockonBtn = document.getElementById('oni-lockon-btn');
-  // oni-lockon-btnは非表示のまま（mob-actionで代替）
-
-  // 缶タッチボタン（PC: Space、モバイル: タップ）
-  const touchBtn = document.getElementById('oni-can-touch-btn');
-  if (touchBtn) {
-    touchBtn.addEventListener('click', () => oniCanTouch(g));
-  }
-  const pickupBtn = document.getElementById('oni-pickup-btn');
-  if (pickupBtn) {
-    pickupBtn.addEventListener('click', () => oniPickupCan(g));
+  // レティクル(◎)をタップで缶踏む/缶拾うアクション実行
+  const reticleEl = document.getElementById('oni-reticle');
+  if (reticleEl) {
+    reticleEl.addEventListener('click', () => {
+      if (!g._oniPlayer) return;
+      const op = g._oniPlayer;
+      if (g.can) {
+        const canDist = g.player.position.distanceTo(g.can.group.position);
+        if (canDist < 2.5) {
+          if (g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
+            oniCanTouch(g);
+          } else if (!g.can.isAtHome && !op.canCarrying) {
+            oniPickupCan(g);
+          }
+        }
+      }
+    });
   }
 }
 
@@ -13886,7 +13920,31 @@ function updateOniPlayerHUD(g, dt) {
   // AI自動検知 — ランナーが画面内に映っていたら自動ロックオン
   const reticle = document.getElementById('oni-reticle');
   const hasTarget = checkReticleOnRunner(g);
-  if (reticle) reticle.classList.toggle('locked', hasTarget);
+  if (reticle) {
+    reticle.classList.toggle('locked', hasTarget);
+    // レティクルに缶アクションラベルを表示
+    let label = '';
+    if (g.can) {
+      const canDist = g.player.position.distanceTo(g.can.group.position);
+      if (canDist < 2.5 && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
+        label = '缶を踏む';
+      } else if (canDist < 2.5 && !g.can.isAtHome && !op.canCarrying) {
+        label = '缶を拾う';
+      }
+    }
+    let labelEl = reticle.querySelector('.reticle-label');
+    if (label) {
+      if (!labelEl) {
+        labelEl = document.createElement('div');
+        labelEl.className = 'reticle-label';
+        reticle.appendChild(labelEl);
+      }
+      labelEl.textContent = label;
+      labelEl.style.display = 'block';
+    } else if (labelEl) {
+      labelEl.style.display = 'none';
+    }
+  }
 
   // 自動検知ロジック: ランナーが視界内に一定時間(0.8秒)いたら自動発見
   if (hasTarget && op.lockedTarget < 0 && op.lockCooldown <= 0) {
@@ -13899,23 +13957,10 @@ function updateOniPlayerHUD(g, dt) {
     op._autoDetectTimer = 0;
   }
 
-  // mob-actionボタンの表示テキスト更新（鬼用）
+  // 鬼プレイヤー: mob-actionボタンを非表示（レティクル◎で操作する）
   const mobAction = document.getElementById('mob-action');
   if (mobAction && g._isOniPlayer) {
-    if (g.can) {
-      const canDist = g.player.position.distanceTo(g.can.group.position);
-      const nearCan = canDist < 2.5;
-      if (nearCan && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated) {
-        mobAction.textContent = '缶を踏む';
-        mobAction.style.opacity = '1';
-      } else if (nearCan && !g.can.isAtHome && !op.canCarrying) {
-        mobAction.textContent = '缶を拾う';
-        mobAction.style.opacity = '1';
-      } else {
-        mobAction.textContent = '缶を踏む';
-        mobAction.style.opacity = '0.3';
-      }
-    }
+    mobAction.style.display = 'none';
   }
 
   // 缶方向矢印
@@ -14530,6 +14575,10 @@ function initMultiplayerSync(g) {
       if (g.can) {
         if (canData.isAtHome !== undefined) g.can.isAtHome = canData.isAtHome;
         if (canData.isFlying !== undefined) g.can.isFlying = canData.isFlying;
+        // homePos更新（代表ランナーが配置を決定した場合）
+        if (canData.homePos && g.can.homePos) {
+          g.can.homePos.set(canData.homePos.x || 0, canData.homePos.y || 0, canData.homePos.z || 0);
+        }
       }
     });
     g._multiListeners.push({ ref: canRef, event: 'value', fn: onCan });
