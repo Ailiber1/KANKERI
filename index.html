@@ -9343,6 +9343,16 @@ function updatePlayer(g, dt) {
     return;
   }
 
+  // チーム戦の鬼: seekフェーズまで移動不可（缶蹴り＋隠れ時間が終わるまで待機）
+  if (g._isOniPlayer && g._multiMode === 'team' && g.gamePhase !== 'seek' && g.gamePhase !== 'result') {
+    ctrl.moveSpeed = 0;
+    ctrl.isDashing = false;
+    const fig = g.playerFig;
+    fig.group.position.copy(ctrl.position);
+    updateStickAnimation(fig, dt, 0, false, false);
+    return;
+  }
+
   const keys = ctrl.keys;
 
   // Crouching toggle
