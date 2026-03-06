@@ -915,20 +915,27 @@ html, body {
   #lobby-screen .lobby-btn-row .btn { padding: 8px 10px !important; font-size: 12px !important; }
   #lobby-screen .lobby-chat { max-height: 50px !important; margin-top: 6px !important; }
 }
-/* 横向きスマホ: ロビー画面のスクロール対応 */
+/* 横向きスマホ: body/htmlのoverflow解除でロビー画面スクロール許可 */
 @media (orientation: landscape) and (max-height: 500px) {
-  /* 核心修正: lobby-panel自体を内部スクロールコンテナにする */
+  html.lobby-active, html.lobby-active body {
+    overflow: visible !important;
+    overflow-y: visible !important;
+    height: auto !important;
+    min-height: 100% !important;
+  }
+  /* #lobby-screen を通常ブロック要素に変更 */
   #lobby-screen {
-    justify-content: flex-start !important;
-    padding: 4px 0 !important;
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    overflow: visible !important;
+    padding: 8px 0 !important;
+    text-align: center !important;
   }
-  #lobby-screen .lobby-panel {
-    max-height: calc(100vh - 8px) !important;
-    max-height: calc(100dvh - 8px) !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-  #lobby-screen .lobby-panel { padding: 6px 10px !important; width: min(480px, 92vw) !important; }
+  #lobby-screen .lobby-panel { padding: 6px 10px !important; width: min(480px, 92vw) !important; margin: 0 auto 8px !important; max-height: none !important; overflow: visible !important; }
   #lobby-screen .lobby-room-label { font-size: 9px !important; margin-bottom: 0 !important; }
   #lobby-screen .lobby-room-id { font-size: 16px !important; margin-bottom: 0 !important; letter-spacing: 2px !important; }
   #lobby-screen .lobby-mode { font-size: 10px !important; margin-bottom: 2px !important; }
