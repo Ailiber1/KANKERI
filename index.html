@@ -9170,16 +9170,12 @@ function createPlayerController(g) {
     if (bEl) bEl.style.display = 'flex';
     const mobActionEl = document.getElementById('mob-action');
     if (mobActionEl) {
-      // チーム戦の鬼プレイヤー: 「蹴る」→「缶を踏む」に変更
+      // 鬼プレイヤー: mob-actionは非表示（レティクル◎で操作する）
       if (g._isOniPlayer) {
-        mobActionEl.textContent = '缶を踏む';
-        mobActionEl.style.background = 'rgba(255,34,34,0.4)';
-        mobActionEl.style.border = '2px solid rgba(255,68,68,0.7)';
-        mobActionEl.style.color = '#ff4444';
-        mobActionEl.style.boxShadow = '0 0 12px rgba(255,68,68,0.3)';
-        mobActionEl.style.fontSize = '11px';
+        mobActionEl.style.display = 'none';
+      } else {
+        mobActionEl.style.display = 'flex';
       }
-      mobActionEl.style.display = 'flex';
     }
     const mobMapEl = document.getElementById('mob-map');
     // 鬼プレイヤーにはマップを表示しない（ランナーの位置がわかってしまうため）
@@ -13170,21 +13166,25 @@ function updateHUD(g) {
   const actionEl = document.getElementById('hud-action-prompt');
   if (actionEl) {
     if (g._isOniPlayer && g._oniPlayer) {
-      // 鬼プレイヤー用アクションプロンプト
-      const op = g._oniPlayer;
-      const canPos = g.can ? g.can.group.position : null;
-      const nearCan = canPos && g.player.position.distanceTo(canPos) < 2.5;
-      if (nearCan && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
-        actionEl.textContent = g.player.isMobile ? '缶タッチ！（捕獲）' : 'Space: 缶タッチ！（捕獲）';
-        actionEl.style.display = 'block';
-      } else if (nearCan && !g.can.isAtHome && !op.canCarrying) {
-        actionEl.textContent = g.player.isMobile ? '缶を拾う' : 'Space: 缶を拾う';
-        actionEl.style.display = 'block';
-      } else if (op._reticleTarget >= 0 && op.lockedTarget < 0 && op.lockCooldown <= 0) {
-        actionEl.textContent = g.player.isMobile ? 'ロックオン' : 'Space: ロックオン';
-        actionEl.style.display = 'block';
-      } else {
+      // 鬼プレイヤー: モバイルではレティクル(◎)に統一、PC版のみテキストプロンプト表示
+      if (g.player.isMobile) {
         actionEl.style.display = 'none';
+      } else {
+        const op = g._oniPlayer;
+        const canPos = g.can ? g.can.group.position : null;
+        const nearCan = canPos && g.player.position.distanceTo(canPos) < 2.5;
+        if (nearCan && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
+          actionEl.textContent = 'Space: 缶タッチ！（捕獲）';
+          actionEl.style.display = 'block';
+        } else if (nearCan && !g.can.isAtHome && !op.canCarrying) {
+          actionEl.textContent = 'Space: 缶を拾う';
+          actionEl.style.display = 'block';
+        } else if (op._reticleTarget >= 0 && op.lockedTarget < 0 && op.lockCooldown <= 0) {
+          actionEl.textContent = 'Space: ロックオン';
+          actionEl.style.display = 'block';
+        } else {
+          actionEl.style.display = 'none';
+        }
       }
     } else if (g.player.canKick && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
       actionEl.textContent = g.player.isMobile ? 'KICKボタン: 缶を蹴る！' : 'F: 缶を蹴る！';
@@ -14512,7 +14512,8 @@ function initMultiplayerSync(g) {
         }
         // 非ホスト: kickフェーズ → 待機メッセージを表示
         if (state.gamePhase === 'kick') {
-          showCenterAlert('🦵 ホストが缶を蹴っています…', 'しばらくお待ちください', 5000);
+          const kickMsg = g._multiMode === 'team' ? '🦵 ランナーが缶を蹴っています…' : '🦵 ホストが缶を蹴っています…';
+          showCenterAlert(kickMsg, 'しばらくお待ちください', 5000);
         }
         // kick → hide: キックゲージを非表示、かくれんぼカウントダウンを表示
         if (state.gamePhase === 'hide') {
@@ -14767,7 +14768,9 @@ function syncGameState(g) {
     hideTime: g.hideTime || 0
   });
   // 缶の位置も同期（isAtHomeも含む）
-  if (g.can) {
+  // チーム戦でホストが鬼の場合、缶のキック・飛行はランナー（非ホスト）が制御するため
+  // ホストのローカル状態で上書きしない（缶がホームに戻るバグの原因）
+  if (g.can && !(g._multiMode === 'team' && g._isOniPlayer)) {
     db.ref('rooms/' + multiState.roomId + '/canState').set({
       position: {
         x: Math.round(g.can.group.position.x * 100) / 100,
