@@ -917,16 +917,18 @@ html, body {
 }
 /* 横向きスマホ: ロビー画面2カラムレイアウト */
 @media (orientation: landscape) and (max-height: 500px) {
-  #lobby-screen { justify-content: center !important; padding: 0 !important; }
+  #lobby-screen { justify-content: stretch !important; padding: 4px !important; }
   #lobby-screen .lobby-panel {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 1px 10px !important;
-    padding: 6px 10px !important;
-    width: min(600px, 96vw) !important;
+    padding: 8px 14px !important;
+    width: 100% !important;
+    max-width: 100% !important;
     max-height: none !important;
     overflow: visible !important;
-    align-items: start !important;
+    align-content: center !important;
+    flex: 1 !important;
   }
   /* 左カラム: ルーム情報・ステージ・プレイヤー */
   #lobby-screen .lobby-room-label { grid-column: 1 !important; font-size: 8px !important; margin-bottom: 0 !important; text-align: center; }
