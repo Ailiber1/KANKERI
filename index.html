@@ -11840,7 +11840,12 @@ function updateCanPhysics(g, dt) {
       if (g.gamePhase === 'kick') {
         g.gamePhase = 'hide';
         g.phaseTimer = g.hideTime || 10;
-        showHideCountdown(g, true);
+        // 鬼には「隠れろ」ではなく待機メッセージ
+        if (g._isOniPlayer) {
+          showCenterAlert('⏳ ランナーが隠れている…', Math.ceil(g.phaseTimer) + '秒', 3000);
+        } else {
+          showHideCountdown(g, true);
+        }
         // マルチプレイ: フェーズ変更を同期（ホストでも代表ランナーでも書き込む）
         if (g._isMultiplayer && multiState.roomId) {
           db.ref('rooms/' + multiState.roomId + '/gameState').update({
@@ -12445,7 +12450,7 @@ function updateGamePhases(g, dt) {
       if (g.phaseTimer <= 0) {
         g.gamePhase = 'seek';
         showHideCountdown(g, false);
-        showNotification('鬼が動き出した！');
+        showNotification(g._isOniPlayer ? '探しに行け！' : '鬼が動き出した！');
         SoundManager.playGameSE('notify');
         // マルチプレイ: seekフェーズへの遷移を同期
         if (g._isMultiplayer && multiState.roomId) {
