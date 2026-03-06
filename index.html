@@ -8642,26 +8642,33 @@ function buildTempleObjects(g) {
 // --- CAN ---
 function createCan(g) {
   const canGroup = new THREE.Group();
-  // Can body（視認しやすいサイズ・色）
-  const canGeo = new THREE.CylinderGeometry(0.18, 0.16, 0.45, 16);
+  // Can body（常に視認可能なMeshBasicMaterial + 大きめサイズ）
+  const canGeo = new THREE.CylinderGeometry(0.2, 0.18, 0.5, 16);
   g.geometries.push(canGeo);
-  const canMat = new THREE.MeshStandardMaterial({
-    color: 0xcccccc, metalness: 0.85, roughness: 0.2,
-    emissive: 0x00ffaa, emissiveIntensity: 0.6
-  });
+  const canMat = new THREE.MeshBasicMaterial({ color: 0xdddddd });
   g.materials.push(canMat);
   const canMesh = new THREE.Mesh(canGeo, canMat);
-  canMesh.castShadow = true;
+  canMesh.position.y = 0.25; // 底面を地面に合わせる
   canGroup.add(canMesh);
 
   // 缶のラベル（赤い帯で目立たせる）
-  const labelGeo = new THREE.CylinderGeometry(0.185, 0.165, 0.2, 16);
+  const labelGeo = new THREE.CylinderGeometry(0.205, 0.185, 0.22, 16);
   g.geometries.push(labelGeo);
-  const labelMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+  const labelMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
   g.materials.push(labelMat);
   const labelMesh = new THREE.Mesh(labelGeo, labelMat);
-  labelMesh.position.y = 0.02;
+  labelMesh.position.y = 0.25;
   canGroup.add(labelMesh);
+
+  // 缶の蓋（上面を銀色に）
+  const lidGeo = new THREE.CircleGeometry(0.2, 16);
+  g.geometries.push(lidGeo);
+  const lidMat = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, side: THREE.DoubleSide });
+  g.materials.push(lidMat);
+  const lid = new THREE.Mesh(lidGeo, lidMat);
+  lid.rotation.x = -Math.PI / 2;
+  lid.position.y = 0.5;
+  canGroup.add(lid);
 
   // === 光柱ビーム（遠くからでも目立つ垂直の光） ===
   const beamGeo = new THREE.CylinderGeometry(0.3, 0.8, 20, 16, 1, true);
@@ -14827,9 +14834,10 @@ function syncGameState(g) {
     });
   }
   // 缶の位置も同期（isAtHomeも含む）
-  // チーム戦でホストが鬼の場合、缶のキック・飛行はランナー（非ホスト）が制御するため
-  // ホストのローカル状態で上書きしない（缶がホームに戻るバグの原因）
-  if (g.can && !(g._multiMode === 'team' && g._isOniPlayer)) {
+  // チーム戦ではcanStateの書き込みをスキップ
+  // 缶の制御は代表ランナー（キッカー）がイベント駆動で行うため、
+  // syncGameStateの定期上書きは古い状態で上書きするバグの原因になる
+  if (g.can && g._multiMode !== 'team') {
     db.ref('rooms/' + multiState.roomId + '/canState').set({
       position: {
         x: Math.round(g.can.group.position.x * 100) / 100,
