@@ -1978,7 +1978,6 @@ function getTeamAssignments() {
 function updateTeamAssignUI() {
   const oniListEl = document.getElementById('team-oni-list');
   const runnerListEl = document.getElementById('team-runner-list');
-  const randomBtn = document.getElementById('btn-team-random');
   if (!oniListEl || !runnerListEl) return;
 
   const { teamA, teamB } = getTeamAssignments();
@@ -2010,30 +2009,18 @@ function updateTeamAssignUI() {
   });
   runnerListEl.innerHTML = runnerHtml || '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:8px;">—</div>';
 
-  // ホストのみ: クリックでチーム切替 & ランダムボタン
-  if (randomBtn) randomBtn.style.display = multiState.isHost ? 'block' : 'none';
+  // ホストのみ: クリックでチーム切替（名前クリックで相手チームに移動）
   if (multiState.isHost) {
-    // 鬼チーム列クリック → 鬼に割り当て（既に鬼なら何もしない）
+    // 鬼チームのプレイヤーをクリック → ランナーに移動
     oniListEl.querySelectorAll('.team-slot').forEach(el => {
-      el.onclick = () => movePlayerToTeam(parseInt(el.dataset.idx), 'oni');
-    });
-    // ランナーチーム列クリック → ランナーに割り当て（既にランナーなら何もしない）
-    runnerListEl.querySelectorAll('.team-slot').forEach(el => {
+      el.style.cursor = 'pointer';
       el.onclick = () => movePlayerToTeam(parseInt(el.dataset.idx), 'runner');
     });
-    // 列全体をクリック可能に（空欄クリックで最後のプレイヤーを移動）
-    oniListEl.onclick = (e) => {
-      if (e.target.classList.contains('team-slot')) return; // スロット自身は上記で処理
-      // ランナーチームから最後の1人を鬼に移動
-      const rb = getTeamAssignments().teamB;
-      if (rb.length > 0) movePlayerToTeam(rb[rb.length - 1], 'oni');
-    };
-    runnerListEl.onclick = (e) => {
-      if (e.target.classList.contains('team-slot')) return;
-      // 鬼チームから最後の1人をランナーに移動
-      const ra = getTeamAssignments().teamA;
-      if (ra.length > 0) movePlayerToTeam(ra[ra.length - 1], 'runner');
-    };
+    // ランナーチームのプレイヤーをクリック → 鬼に移動
+    runnerListEl.querySelectorAll('.team-slot').forEach(el => {
+      el.style.cursor = 'pointer';
+      el.onclick = () => movePlayerToTeam(parseInt(el.dataset.idx), 'oni');
+    });
   }
 }
 
