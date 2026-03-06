@@ -915,50 +915,46 @@ html, body {
   #lobby-screen .lobby-btn-row .btn { padding: 8px 10px !important; font-size: 12px !important; }
   #lobby-screen .lobby-chat { max-height: 50px !important; margin-top: 6px !important; }
 }
-/* 横向きスマホ: body/htmlのoverflow解除でロビー画面スクロール許可 */
+/* 横向きスマホ: ロビー画面2カラムレイアウト */
 @media (orientation: landscape) and (max-height: 500px) {
-  html.lobby-active, html.lobby-active body {
+  #lobby-screen { justify-content: flex-start !important; padding: 4px 0 !important; }
+  #lobby-screen .lobby-panel {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 1px 10px !important;
+    padding: 6px 10px !important;
+    width: min(600px, 96vw) !important;
+    max-height: none !important;
     overflow: visible !important;
-    overflow-y: visible !important;
-    height: auto !important;
-    min-height: 100% !important;
+    align-items: start !important;
   }
-  /* #lobby-screen を通常ブロック要素に変更 */
-  #lobby-screen {
-    position: relative !important;
-    display: block !important;
-    width: 100% !important;
-    height: auto !important;
-    min-height: 100vh !important;
-    min-height: 100dvh !important;
-    overflow: visible !important;
-    padding: 8px 0 !important;
-    text-align: center !important;
-  }
-  #lobby-screen .lobby-panel { padding: 6px 10px !important; width: min(480px, 92vw) !important; margin: 0 auto 8px !important; max-height: none !important; overflow: visible !important; }
-  #lobby-screen .lobby-room-label { font-size: 9px !important; margin-bottom: 0 !important; }
-  #lobby-screen .lobby-room-id { font-size: 16px !important; margin-bottom: 0 !important; letter-spacing: 2px !important; }
-  #lobby-screen .lobby-mode { font-size: 10px !important; margin-bottom: 2px !important; }
-  #lobby-screen .lobby-stage-select { margin: 2px 0 !important; }
-  #lobby-screen .lobby-stage-label { font-size: 10px !important; margin-bottom: 1px !important; }
-  #lobby-screen .neon-select { font-size: 11px !important; padding: 3px 5px !important; }
-  #lobby-screen .lobby-player-list { margin: 0 0 3px !important; }
-  #lobby-screen .lobby-player { padding: 3px 6px !important; }
-  #lobby-screen .lobby-player-name { font-size: 11px !important; }
-  #lobby-screen .lobby-player-status { font-size: 9px !important; }
+  /* 左カラム: ルーム情報・ステージ・プレイヤー */
+  #lobby-screen .lobby-room-label { grid-column: 1 !important; font-size: 8px !important; margin-bottom: 0 !important; text-align: center; }
+  #lobby-screen .lobby-room-id { grid-column: 1 !important; font-size: 18px !important; margin-bottom: 0 !important; letter-spacing: 2px !important; text-align: center; }
+  #lobby-screen .lobby-mode { grid-column: 1 !important; font-size: 9px !important; margin-bottom: 2px !important; text-align: center; }
+  #lobby-screen .lobby-stage-select { grid-column: 1 !important; margin: 2px 0 !important; }
+  #lobby-screen .lobby-stage-label { font-size: 9px !important; margin-bottom: 1px !important; }
+  #lobby-screen .neon-select { font-size: 10px !important; padding: 2px 4px !important; }
+  #lobby-screen .lobby-player-list { grid-column: 1 !important; margin: 2px 0 !important; }
+  #lobby-screen .lobby-player { padding: 2px 6px !important; }
+  #lobby-screen .lobby-player-name { font-size: 10px !important; }
+  #lobby-screen .lobby-player-status { font-size: 8px !important; }
   #lobby-screen .lobby-slot-empty { display: none !important; }
-  #lobby-screen .team-assign-section { margin: 3px 0 !important; }
-  #lobby-screen .team-assign-label { font-size: 10px !important; margin-bottom: 2px !important; }
-  #lobby-screen .role-select-buttons { gap: 6px !important; margin-bottom: 3px !important; }
-  #lobby-screen .role-btn { padding: 4px 8px !important; max-width: 120px !important; }
-  #lobby-screen .role-btn .role-icon { font-size: 16px !important; margin-bottom: 0 !important; }
-  #lobby-screen .role-btn .role-name { font-size: 10px !important; }
-  #lobby-screen .team-assign-grid { gap: 4px !important; }
-  #lobby-screen .team-column { padding: 3px 5px !important; min-height: 24px !important; }
-  #lobby-screen .team-column-title { font-size: 9px !important; margin-bottom: 1px !important; }
-  #lobby-screen .team-slot { padding: 2px 4px !important; font-size: 10px !important; margin: 1px 0 !important; }
-  #lobby-screen .lobby-btn-row { margin-top: 4px !important; }
-  #lobby-screen .lobby-btn-row .btn { padding: 5px 8px !important; font-size: 11px !important; }
+  /* 右カラム: チーム選択（1行目から右側に配置） */
+  #lobby-screen .team-assign-section { grid-column: 2 !important; grid-row: 1 / span 5 !important; margin: 0 !important; align-self: center !important; }
+  #lobby-screen .team-assign-label { font-size: 9px !important; margin-bottom: 2px !important; }
+  #lobby-screen .role-select-buttons { gap: 4px !important; margin-bottom: 3px !important; }
+  #lobby-screen .role-btn { padding: 3px 6px !important; max-width: 100px !important; }
+  #lobby-screen .role-btn .role-icon { font-size: 14px !important; margin-bottom: 0 !important; }
+  #lobby-screen .role-btn .role-name { font-size: 9px !important; }
+  #lobby-screen .team-assign-grid { gap: 3px !important; }
+  #lobby-screen .team-column { padding: 2px 4px !important; min-height: 20px !important; }
+  #lobby-screen .team-column-title { font-size: 8px !important; margin-bottom: 1px !important; }
+  #lobby-screen .team-slot { padding: 1px 3px !important; font-size: 9px !important; margin: 1px 0 !important; }
+  /* 下段: ボタン（全幅） */
+  #lobby-screen .lobby-btn-row { grid-column: 1 / -1 !important; margin-top: 3px !important; }
+  #lobby-screen .lobby-btn-row .btn { padding: 6px 10px !important; font-size: 11px !important; }
+  /* 非表示要素 */
   #lobby-screen .lobby-chat { display: none !important; }
   #lobby-screen .corner-bl, #lobby-screen .corner-br { display: none !important; }
   #lobby-screen .scanlines-bg { display: none !important; }
