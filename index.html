@@ -2026,6 +2026,8 @@ function updateTeamAssignUI() {
 function movePlayerToTeam(playerIdx, targetRole) {
   if (!multiState.isHost) return;
   const { teamA, teamB } = getTeamAssignments();
+  // 全プレイヤーのインデックス一覧
+  const allPlayers = Object.keys(multiState.players).map(Number).sort((a, b) => a - b);
   // 現在のチームから削除
   const aIdx = teamA.indexOf(playerIdx);
   if (aIdx >= 0) teamA.splice(aIdx, 1);
@@ -2034,6 +2036,13 @@ function movePlayerToTeam(playerIdx, targetRole) {
   // 目標チームに追加
   if (targetRole === 'oni') teamA.push(playerIdx);
   else teamB.push(playerIdx);
+  // 未割り当てのプレイヤーを反対側に自動配置
+  allPlayers.forEach(idx => {
+    if (!teamA.includes(idx) && !teamB.includes(idx)) {
+      if (targetRole === 'oni') teamB.push(idx);
+      else teamA.push(idx);
+    }
+  });
   // Firebase更新
   saveTeamAssignment(teamA, teamB);
 }
