@@ -917,8 +917,8 @@ html, body {
 }
 /* 横向きスマホ: ロビー画面のスクロール対応 */
 @media (orientation: landscape) and (max-height: 500px) {
-  #lobby-screen { align-items: flex-start !important; justify-content: center !important; padding: 4px 0 !important; overflow-y: scroll !important; -webkit-overflow-scrolling: touch; }
-  #lobby-screen .lobby-panel { padding: 8px 12px !important; max-height: none !important; overflow-y: visible !important; width: min(420px, 88vw) !important; margin: 4px auto !important; }
+  #lobby-screen { position: absolute !important; height: auto !important; min-height: 100% !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; align-items: flex-start !important; justify-content: center !important; padding: 8px 0 !important; }
+  #lobby-screen .lobby-panel { padding: 8px 12px !important; max-height: none !important; overflow-y: visible !important; width: min(420px, 88vw) !important; margin: 4px auto 20px !important; }
   #lobby-screen .lobby-room-id { font-size: 18px !important; margin-bottom: 0 !important; letter-spacing: 3px !important; }
   #lobby-screen .lobby-mode { font-size: 10px !important; margin-bottom: 4px !important; }
   #lobby-screen .lobby-stage-select { margin: 4px 0 !important; }
@@ -2028,12 +2028,9 @@ function updateTeamAssignUI() {
     const role = (idx === multiState.playerIndex && myLocalRole) ? myLocalRole : p.selectedRole;
     if (role === 'oni') {
       teamA.push(idx);
-    } else if (role === 'runner') {
-      teamB.push(idx);
     } else {
-      // 未選択: デフォルト分け（前半=鬼, 後半=ランナー）
-      if (i < Math.ceil(pKeys.length / 2)) teamA.push(idx);
-      else teamB.push(idx);
+      // 未選択 or runner → ランナーチーム（ボタンのデフォルトと一致）
+      teamB.push(idx);
     }
   });
   multiState._teamA = teamA;
