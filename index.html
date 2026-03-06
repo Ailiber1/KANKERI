@@ -917,8 +917,8 @@ html, body {
 }
 /* 横向きスマホ: ロビー画面のスクロール対応 */
 @media (orientation: landscape) and (max-height: 500px) {
-  #lobby-screen { align-items: center !important; justify-content: flex-start !important; padding: 4px 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
-  #lobby-screen .lobby-panel { padding: 8px 12px !important; max-height: calc(100vh - 8px) !important; max-height: calc(100dvh - 8px) !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; width: min(420px, 88vw) !important; }
+  #lobby-screen { align-items: flex-start !important; justify-content: center !important; padding: 4px 0 !important; overflow-y: scroll !important; -webkit-overflow-scrolling: touch; }
+  #lobby-screen .lobby-panel { padding: 8px 12px !important; max-height: none !important; overflow-y: visible !important; width: min(420px, 88vw) !important; margin: 4px auto !important; }
   #lobby-screen .lobby-room-id { font-size: 18px !important; margin-bottom: 0 !important; letter-spacing: 3px !important; }
   #lobby-screen .lobby-mode { font-size: 10px !important; margin-bottom: 4px !important; }
   #lobby-screen .lobby-stage-select { margin: 4px 0 !important; }
@@ -2020,12 +2020,15 @@ function updateTeamAssignUI() {
   const pKeys = Object.keys(players).map(Number).sort((a, b) => a - b);
   const teamA = []; // 鬼
   const teamB = []; // ランナー
+  // 自分のローカル選択を優先（Firebase同期遅延対策）
+  const myLocalRole = multiState._mySelectedRole;
   pKeys.forEach((idx, i) => {
     const p = players[idx];
     if (!p) return;
-    if (p.selectedRole === 'oni') {
+    const role = (idx === multiState.playerIndex && myLocalRole) ? myLocalRole : p.selectedRole;
+    if (role === 'oni') {
       teamA.push(idx);
-    } else if (p.selectedRole === 'runner') {
+    } else if (role === 'runner') {
       teamB.push(idx);
     } else {
       // 未選択: デフォルト分け（前半=鬼, 後半=ランナー）
@@ -2092,15 +2095,16 @@ function initRoleSelectButtons() {
       // ボタンUI更新
       document.querySelectorAll('#team-assign-section .role-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      // Firebaseに自分のselectedRoleを書き込み
-      if (multiState.roomId) {
-        db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/selectedRole').set(role);
-      }
-      // ローカル更新
+      // ローカル即時反映（Firebase同期遅延対策）
+      multiState._mySelectedRole = role;
       if (multiState.players[multiState.playerIndex]) {
         multiState.players[multiState.playerIndex].selectedRole = role;
       }
       updateTeamAssignUI();
+      // Firebaseに自分のselectedRoleを書き込み
+      if (multiState.roomId) {
+        db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/selectedRole').set(role);
+      }
     });
   });
 }
