@@ -14023,8 +14023,8 @@ function updateOniPlayerHUD(g, dt) {
     }
   }
 
-  // 自動検知ロジック: ランナーが視界内に一定時間(0.8秒)いたら自動発見
-  if (hasTarget && op.lockedTarget < 0 && op.lockCooldown <= 0) {
+  // 自動検知ロジック: ランナーが視界内に一定時間(0.8秒)いたら自動発見（seekフェーズのみ）
+  if (g.gamePhase === 'seek' && hasTarget && op.lockedTarget < 0 && op.lockCooldown <= 0) {
     op._autoDetectTimer = (op._autoDetectTimer || 0) + dt;
     if (op._autoDetectTimer >= 0.8) {
       op._autoDetectTimer = 0;
@@ -14451,6 +14451,11 @@ function addOniEyeGlow(g, fig) {
 function initMultiplayerSync(g) {
   if (!multiState.active || !multiState.roomId) return;
   const roomRef = db.ref('rooms/' + multiState.roomId);
+
+  // ゲーム開始時に前回のlockOnデータをクリア（誤通知防止）
+  if (multiState.isHost) {
+    roomRef.child('lockOn').remove();
+  }
 
   // 他プレイヤーの棒人間を生成
   const players = multiState.players;
