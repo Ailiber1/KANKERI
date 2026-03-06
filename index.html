@@ -917,8 +917,9 @@ html, body {
 }
 /* 横向きスマホ: ロビー画面のスクロール対応 */
 @media (orientation: landscape) and (max-height: 500px) {
-  #lobby-screen { display: block !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; padding: 4px 0 !important; }
-  #lobby-screen .lobby-panel { padding: 6px 10px !important; width: min(400px, 85vw) !important; max-height: none !important; overflow-y: visible !important; margin: 4px auto 20px !important; }
+  html.lobby-active, body.lobby-active { overflow: auto !important; overflow-y: auto !important; height: auto !important; min-height: 100vh !important; }
+  #lobby-screen { position: relative !important; height: auto !important; min-height: 100vh !important; display: block !important; padding: 4px 0 !important; overflow: visible !important; }
+  #lobby-screen .lobby-panel { padding: 6px 10px !important; width: min(400px, 85vw) !important; max-height: none !important; overflow: visible !important; margin: 4px auto 20px !important; }
   #lobby-screen .lobby-room-id { font-size: 18px !important; margin-bottom: 0 !important; letter-spacing: 3px !important; }
   #lobby-screen .lobby-mode { font-size: 10px !important; margin-bottom: 4px !important; }
   #lobby-screen .lobby-stage-select { margin: 4px 0 !important; }
@@ -2968,6 +2969,14 @@ function showScreen(id) {
   if (screen) {
     screen.classList.add('active');
     gameState.currentScreen = id.replace('-screen', '');
+  }
+  // 横向きロビー画面時はbody/htmlスクロールを許可（iOS Safari対策）
+  if (id === 'lobby-screen') {
+    document.body.classList.add('lobby-active');
+    document.documentElement.classList.add('lobby-active');
+  } else {
+    document.body.classList.remove('lobby-active');
+    document.documentElement.classList.remove('lobby-active');
   }
 }
 
