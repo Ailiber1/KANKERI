@@ -2009,18 +2009,14 @@ function updateTeamAssignUI() {
   });
   runnerListEl.innerHTML = runnerHtml || '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:8px;">—</div>';
 
-  // ホストのみ: クリックでチーム切替（名前クリックで相手チームに移動）
+  // ホストのみ: チーム欄クリックで自分をそのチームに移動
   if (multiState.isHost) {
-    // 鬼チームのプレイヤーをクリック → ランナーに移動
-    oniListEl.querySelectorAll('.team-slot').forEach(el => {
-      el.style.cursor = 'pointer';
-      el.onclick = () => movePlayerToTeam(parseInt(el.dataset.idx), 'runner');
-    });
-    // ランナーチームのプレイヤーをクリック → 鬼に移動
-    runnerListEl.querySelectorAll('.team-slot').forEach(el => {
-      el.style.cursor = 'pointer';
-      el.onclick = () => movePlayerToTeam(parseInt(el.dataset.idx), 'oni');
-    });
+    // 鬼チーム欄をクリック → 自分を鬼チームに移動
+    oniListEl.style.cursor = 'pointer';
+    oniListEl.onclick = () => movePlayerToTeam(multiState.playerIndex, 'oni');
+    // ランナーチーム欄をクリック → 自分をランナーチームに移動
+    runnerListEl.style.cursor = 'pointer';
+    runnerListEl.onclick = () => movePlayerToTeam(multiState.playerIndex, 'runner');
   }
 }
 
