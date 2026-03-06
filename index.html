@@ -8642,17 +8642,26 @@ function buildTempleObjects(g) {
 // --- CAN ---
 function createCan(g) {
   const canGroup = new THREE.Group();
-  // Can body（少し大きめ）
-  const canGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.35, 16);
+  // Can body（視認しやすいサイズ・色）
+  const canGeo = new THREE.CylinderGeometry(0.18, 0.16, 0.45, 16);
   g.geometries.push(canGeo);
   const canMat = new THREE.MeshStandardMaterial({
-    color: 0xeeeeee, metalness: 0.9, roughness: 0.15,
-    emissive: 0x00ffaa, emissiveIntensity: 0.8
+    color: 0xcccccc, metalness: 0.85, roughness: 0.2,
+    emissive: 0x00ffaa, emissiveIntensity: 0.6
   });
   g.materials.push(canMat);
   const canMesh = new THREE.Mesh(canGeo, canMat);
   canMesh.castShadow = true;
   canGroup.add(canMesh);
+
+  // 缶のラベル（赤い帯で目立たせる）
+  const labelGeo = new THREE.CylinderGeometry(0.185, 0.165, 0.2, 16);
+  g.geometries.push(labelGeo);
+  const labelMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+  g.materials.push(labelMat);
+  const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+  labelMesh.position.y = 0.02;
+  canGroup.add(labelMesh);
 
   // === 光柱ビーム（遠くからでも目立つ垂直の光） ===
   const beamGeo = new THREE.CylinderGeometry(0.3, 0.8, 20, 16, 1, true);
@@ -12488,7 +12497,8 @@ function updateGamePhases(g, dt) {
       }
 
       // 缶が未回収の場合: 鬼は捕獲不可 + 回収強制 + 長期未回収で捕虜解放
-      if (!g.can.isAtHome && !g.can.isFlying) {
+      // チーム戦では鬼プレイヤーが手動で回収するため自動回収しない
+      if (!g.can.isAtHome && !g.can.isFlying && g._multiMode !== 'team') {
         g._canRecoveryTimer = (g._canRecoveryTimer || 0) + dt;
         // 少なくとも1体の鬼がrecoveryに向かうよう強制
         const anyRecovery = g.onis.some(o => o.state === 'recovery');
@@ -12520,7 +12530,7 @@ function updateGamePhases(g, dt) {
             o.chasedPlayer = null;
           }
         }
-      } else {
+      } else if (g._multiMode !== 'team') {
         g._canRecoveryTimer = 0;
       }
 
