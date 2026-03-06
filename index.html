@@ -12571,12 +12571,12 @@ function confirmCanPlacement(g) {
   // Move to kick phase — 缶のすぐ近くにスポーン（8方向を近い順に試す）
   g.gamePhase = 'kick';
 
-  // マルチプレイ（ホスト）: 缶の位置とフェーズを即座に同期（フェーズ変更後に呼ぶ）
-  if (g._isMultiplayer && multiState.isHost && multiState.roomId) {
+  // マルチプレイ: 缶の位置とフェーズを同期（代表ランナーまたはホスト）
+  if (g._isMultiplayer && multiState.roomId) {
     db.ref('rooms/' + multiState.roomId + '/canState').set({
       position: { x: Math.round(pos.x * 100) / 100, y: Math.round(canY * 100) / 100, z: Math.round(pos.z * 100) / 100 }
     });
-    syncGameState(g);
+    if (multiState.isHost) syncGameState(g);
   }
   const spawnDirs = [
     [0, 1.5], [1.1, 1.1], [1.5, 0], [1.1, -1.1],
@@ -13624,15 +13624,26 @@ function showCanPlacementUI(g) {
   g.camera.position.set(0, 20, 10);
   g.camera.lookAt(0, 0, 0);
 
-  // マルチプレイ: 鬼プレイヤーまたは非ホストは待機メッセージを表示
-  if (g._isMultiplayer && (g._isOniPlayer || !multiState.isHost)) {
-    const msg = g._isOniPlayer
-      ? 'ランナーが缶を蹴るのを待っています…'
-      : 'ホストが缶の配置を選んでいます…';
-    opts.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:16px;font-size:14px;">' + msg + '</div>';
-    if (confirmBtn) confirmBtn.style.display = 'none';
-    wrap.style.display = 'block';
-    return;
+  // マルチプレイ: 缶配置の代表者を決定
+  // チーム戦: ランナーチーム(teamB)の中で最小indexが代表
+  // 非チーム戦: ホストが代表
+  if (g._isMultiplayer) {
+    let isRepresentative = false;
+    if (g._multiMode === 'team') {
+      const runners = (g._teamB || []).slice().sort((a, b) => a - b);
+      isRepresentative = runners.length > 0 && runners[0] === multiState.playerIndex;
+    } else {
+      isRepresentative = multiState.isHost;
+    }
+    if (!isRepresentative) {
+      const msg = g._isOniPlayer
+        ? 'ランナーが缶を蹴るのを待っています…'
+        : '代表ランナーが缶の配置を選んでいます…';
+      opts.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:16px;font-size:14px;">' + msg + '</div>';
+      if (confirmBtn) confirmBtn.style.display = 'none';
+      wrap.style.display = 'block';
+      return;
+    }
   }
 
   opts.innerHTML = '';
