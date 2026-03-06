@@ -1200,11 +1200,11 @@ html, body {
       <div class="role-select-buttons">
         <button class="role-btn role-btn-runner active" data-role="runner">
           <span class="role-icon">🏃</span>
-          <span class="role-name">ランナー</span>
+          <span class="role-name" data-i18n-ja="ランナー" data-i18n-en="RUNNER">ランナー</span>
         </button>
         <button class="role-btn role-btn-oni" data-role="oni">
           <span class="role-icon">👹</span>
-          <span class="role-name">鬼</span>
+          <span class="role-name" data-i18n-ja="鬼" data-i18n-en="ONI">鬼</span>
         </button>
       </div>
       <div class="team-assign-grid">
@@ -2005,6 +2005,9 @@ function updateTeamAssignUI() {
   multiState._teamA = teamA;
   multiState._teamB = teamB;
 
+  const isJa = gameState.language === 'ja';
+  const youLabel = isJa ? ' (あなた)' : ' (You)';
+
   // 鬼チームリスト
   let oniHtml = '';
   teamA.forEach(idx => {
@@ -2013,7 +2016,7 @@ function updateTeamAssignUI() {
     const isMe = idx === multiState.playerIndex;
     oniHtml += '<div class="team-slot oni' + (isMe ? ' me' : '') + '">';
     oniHtml += '👹 ' + escapeHTML(p.username || 'Player');
-    if (isMe) oniHtml += ' (あなた)';
+    if (isMe) oniHtml += youLabel;
     oniHtml += '</div>';
   });
   oniListEl.innerHTML = oniHtml || '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:8px;">—</div>';
@@ -2026,10 +2029,19 @@ function updateTeamAssignUI() {
     const isMe = idx === multiState.playerIndex;
     runnerHtml += '<div class="team-slot runner' + (isMe ? ' me' : '') + '">';
     runnerHtml += '🏃 ' + escapeHTML(p.username || 'Player');
-    if (isMe) runnerHtml += ' (あなた)';
+    if (isMe) runnerHtml += youLabel;
     runnerHtml += '</div>';
   });
   runnerListEl.innerHTML = runnerHtml || '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:8px;">—</div>';
+
+  // 言語に応じたラベル更新
+  const labelEl = document.querySelector('.team-assign-label');
+  if (labelEl) labelEl.textContent = isJa ? '⚔ ロールを選択' : '⚔ Choose Your Role';
+  document.querySelectorAll('.team-column-title.oni').forEach(el => { el.textContent = isJa ? '👹 鬼チーム' : '👹 ONI Team'; });
+  document.querySelectorAll('.team-column-title.runner').forEach(el => { el.textContent = isJa ? '🏃 ランナーチーム' : '🏃 Runner Team'; });
+  document.querySelectorAll('#team-assign-section .role-name').forEach(el => {
+    if (el.dataset.i18nJa) el.textContent = isJa ? el.dataset.i18nJa : el.dataset.i18nEn;
+  });
 
   // ロール選択ボタンの状態を自分のロールに合わせる
   const myRole = players[multiState.playerIndex] && players[multiState.playerIndex].selectedRole;
