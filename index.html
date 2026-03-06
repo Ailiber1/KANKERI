@@ -800,10 +800,10 @@ html, body {
   pointer-events: auto; cursor: pointer; user-select: none;
 }
 #oni-status-label {
-  position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
-  font-size: 14px; font-family: 'Noto Sans JP', sans-serif;
-  color: #ffffff; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,68,68,0.4);
-  padding: 6px 18px; border-radius: 6px; white-space: nowrap;
+  position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; font-family: 'Noto Sans JP', sans-serif;
+  color: #ffffff; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,68,68,0.4);
+  padding: 5px 14px; border-radius: 6px; white-space: nowrap;
   text-shadow: 0 0 4px rgba(255,68,68,0.3);
   pointer-events: none; transition: background 0.2s, border-color 0.2s;
 }
@@ -13606,6 +13606,8 @@ function startGame(stageNum, mode) {
         G.playerFig.mat.color.setHex(0xff2222);
         G.playerFig.mat.emissive.setHex(0xff2222);
         G._isOniPlayer = true;
+        // 自分の棒人間にも鬼ビジュアル（目の発光・ツノ）を追加
+        addOniEyeGlow(G, G.playerFig);
         // 鬼プレイヤー: AI鬼は生成しない
         G.onis.forEach(oni => {
           if (oni.fig && oni.fig.group) G.scene.remove(oni.fig.group);
@@ -14046,15 +14048,12 @@ function updateOniPlayerHUD(g, dt) {
  */
 function checkReticleOnRunner(g) {
   if (!g._isOniPlayer) return false;
-  const camera = g.camera;
-  if (!camera) return false;
 
-  // スクリーンスペース判定: 各ランナーの画面上の位置が画面中央付近かチェック
-  // レイキャストだと棒人間のメッシュが小さく遠距離で当たりにくいため
+  // ビジョンコーン判定: 赤いセンサー扇形（8m、±60度）にランナーが入っているか
   const teamB = g._teamB || [];
   let bestIdx = -1;
   let bestDist = Infinity;
-  const _v = new THREE.Vector3();
+  const oniRotY = g.playerFig.group.rotation.y;
 
   Object.keys(multiState.remotePlayers).forEach(k => {
     const idx = parseInt(k);
@@ -14062,19 +14061,20 @@ function checkReticleOnRunner(g) {
     if (!rp || !rp.fig || rp.captured) return;
     if (!teamB.includes(idx)) return;
 
-    // 3D距離チェック（20m以内）
-    const worldDist = g.player.position.distanceTo(rp.fig.group.position);
-    if (worldDist > 20) return;
+    // 3D距離チェック（ビジョンコーン半径8m以内）
+    const dx = rp.fig.group.position.x - g.player.position.x;
+    const dz = rp.fig.group.position.z - g.player.position.z;
+    const worldDist = Math.sqrt(dx * dx + dz * dz);
+    if (worldDist > 8) return;
 
-    // プレイヤーの胸あたり（y+0.8）をスクリーン座標に変換
-    _v.copy(rp.fig.group.position);
-    _v.y += 0.8;
-    _v.project(camera);
+    // 角度チェック（鬼の正面±60度以内 = ビジョンコーンの範囲）
+    const angleToTarget = Math.atan2(dx, dz);
+    let angleDiff = angleToTarget - oniRotY;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    if (Math.abs(angleDiff) > Math.PI / 3) return; // ±60度
 
-    // NDC座標で画面中央からの距離（±0.15 = 約画面の15%以内）
-    const screenDist = Math.sqrt(_v.x * _v.x + _v.y * _v.y);
-    // カメラの前方にいるか（z < 1）
-    if (_v.z < 1 && screenDist < 0.15 && worldDist < bestDist) {
+    if (worldDist < bestDist) {
       bestDist = worldDist;
       bestIdx = idx;
     }
@@ -14521,6 +14521,24 @@ function initMultiplayerSync(g) {
       g._multiListeners.push({ ref: lockAllRef, event: 'child_added', fn: onLockAll });
     }
 
+    // ホスト（鬼）: チーム戦ではランナーが缶を制御するため、canStateを受信する必要がある
+    if (g._multiMode === 'team') {
+      const canRefHost = roomRef.child('canState');
+      const onCanHost = canRefHost.on('value', (snap) => {
+        const canData = snap.val();
+        if (!canData || !g || g.disposed || !g.can) return;
+        if (canData.position) {
+          g.can.group.position.set(canData.position.x || 0, canData.position.y || 0, canData.position.z || 0);
+        }
+        if (canData.isAtHome !== undefined) g.can.isAtHome = canData.isAtHome;
+        if (canData.isFlying !== undefined) g.can.isFlying = canData.isFlying;
+        if (canData.homePos && g.can.homePos) {
+          g.can.homePos.set(canData.homePos.x || 0, canData.homePos.y || 0, canData.homePos.z || 0);
+        }
+      });
+      g._multiListeners.push({ ref: canRefHost, event: 'value', fn: onCanHost });
+    }
+
     // ホスト: Co-opリトライ信号を受信（非ホストがリトライボタンを押した場合）
     const advRefHost = roomRef.child('coopAdvance');
     let advInitialHost = true;
@@ -14689,6 +14707,36 @@ function initMultiplayerSync(g) {
         }
       });
       g._multiListeners.push({ ref: lockRef, event: 'value', fn: onLock });
+    }
+
+    // ランナー: 鬼にロックオンされたら「見つかった！」通知を表示
+    if (!g._isOniPlayer && g._multiMode === 'team') {
+      const lockAllRef = roomRef.child('lockOn');
+      const onLockRunner = lockAllRef.on('child_added', (snap) => {
+        const lockData = snap.val();
+        if (!lockData || !g || g.disposed) return;
+        // 自分がターゲットか
+        if (lockData.targetIndex === multiState.playerIndex && lockData.validated) {
+          showCenterAlert('👁 見つかった！', '鬼に発見された！逃げろ！', 3000);
+          SoundManager.playGameSE('found');
+        }
+      });
+      g._multiListeners.push({ ref: lockAllRef, event: 'child_added', fn: onLockRunner });
+      // validated が後から true になるケースも監視
+      const onLockChange = lockAllRef.on('child_changed', (snap) => {
+        const lockData = snap.val();
+        if (!lockData || !g || g.disposed) return;
+        if (lockData.targetIndex === multiState.playerIndex && lockData.validated) {
+          if (!g._notifiedLockTarget) {
+            g._notifiedLockTarget = true;
+            showCenterAlert('👁 見つかった！', '鬼に発見された！逃げろ！', 3000);
+            SoundManager.playGameSE('found');
+            // 次のロックオンで再通知できるようにリセット
+            setTimeout(() => { g._notifiedLockTarget = false; }, 5000);
+          }
+        }
+      });
+      g._multiListeners.push({ ref: lockAllRef, event: 'child_changed', fn: onLockChange });
     }
 
     // 非ホスト: Co-opステージ遷移を受信
