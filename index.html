@@ -749,7 +749,7 @@ html, body {
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
   #hud-minimap { width: 70px; height: 70px; top: auto; left: auto; bottom: calc(210px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); }
-  #hud-action-prompt { font-size: 13px; padding: 6px 14px; bottom: 90px; }
+  #hud-action-prompt { font-size: 13px; padding: 6px 14px; bottom: auto; top: 50%; transform: translateX(-50%) translateY(-50%); }
   #hud-peek-prompt { font-size: 12px; padding: 4px 12px; bottom: 130px; }
   #kick-gauge-wrap { min-width: 240px; padding: 14px 18px; }
   #kick-gauge-title { font-size: 18px; margin-bottom: 10px; }
@@ -8641,15 +8641,15 @@ function createCan(g) {
   canGroup.add(canMesh);
 
   // === 光柱ビーム（遠くからでも目立つ垂直の光） ===
-  const beamGeo = new THREE.CylinderGeometry(0.15, 0.4, 6, 16, 1, true);
+  const beamGeo = new THREE.CylinderGeometry(0.2, 0.6, 15, 16, 1, true);
   g.geometries.push(beamGeo);
   const beamMat = new THREE.MeshBasicMaterial({
-    color: 0x00ff88, transparent: true, opacity: 0.2,
+    color: 0x00ff88, transparent: true, opacity: 0.3,
     side: THREE.DoubleSide, depthWrite: false
   });
   g.materials.push(beamMat);
   const beam = new THREE.Mesh(beamGeo, beamMat);
-  beam.position.y = 3.0;
+  beam.position.y = 7.5;
   canGroup.add(beam);
 
   // === 地面の発光サークル（大きく明るい） ===
@@ -12513,6 +12513,8 @@ function updateGamePhases(g, dt) {
 }
 
 function checkOniSpawn(g) {
+  // チーム戦: AI鬼は追加しない（プレイヤーが鬼を担当）
+  if (g._multiMode === 'team') return;
   // Score Attack: oniAddAt[i]秒 = 経過時間でスポーン（カウントアップ）
   // 通常モード: oniAddAt[i]秒 = 残り時間でスポーン（カウントダウン）
   const maxOniLimit = g._effectiveMaxOni || g.config.maxOni;
@@ -13468,16 +13470,18 @@ function startGame(stageNum, mode) {
   G._effectiveMaxOni = effectiveMaxOni; // checkOniSpawnで参照
 
   // Create initial oni — spawn at map edge (findSafeSpawnでビル内回避)
-  // マルチプレイ: 全クライアントでOniを描画するが、AI更新はホストのみ
-  for (let i = 0; i < effectiveInitialOni; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = config.size / 2 - 3; // マップ端付近
-    const baseX = Math.cos(angle) * dist;
-    const baseZ = Math.sin(angle) * dist;
-    const safe = findSafeSpawn(G, baseX, baseZ);
-    const oni = createOni(G, safe.x, safe.z);
-    oni.state = 'patrol'; // Will walk to can during hide phase
-    G.onis.push(oni);
+  // チーム戦: プレイヤーが鬼を担当するのでAI鬼は生成しない
+  if (mode !== 'multi_team') {
+    for (let i = 0; i < effectiveInitialOni; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = config.size / 2 - 3; // マップ端付近
+      const baseX = Math.cos(angle) * dist;
+      const baseZ = Math.sin(angle) * dist;
+      const safe = findSafeSpawn(G, baseX, baseZ);
+      const oni = createOni(G, safe.x, safe.z);
+      oni.state = 'patrol'; // Will walk to can during hide phase
+      G.onis.push(oni);
+    }
   }
 
   // モバイル難易度調整: 鬼AIの速度を10%低下、視界距離を10%縮小
@@ -14298,48 +14302,82 @@ function handleOniPlayerInput(g, key) {
 // ============================================================
 
 /**
- * addOniEyeGlow — チーム戦の鬼フィギュアに赤い目の発光を追加
- * ランナーから見て鬼が赤いセンサー光を発しているように見せる
+ * addOniEyeGlow — チーム戦の鬼フィギュアに赤い目の発光＋レーザーセンサーを追加
+ * ストーリーモードの鬼と同様のビジュアル（赤い目 + vision cone + 目の発光ライト）
  */
 function addOniEyeGlow(g, fig) {
-  // figの最初の子がhead（SphereGeometry）
   const head = fig.group.children[0]; // head mesh
   if (!head) return;
-  const headRadius = 0.17; // child size
+  const headRadius = 0.17;
 
+  // === 赤い目（ストーリーモードの鬼と同じ構造） ===
   const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
   g.materials.push(eyeGlowMat);
-  const eyeOuterGeo = new THREE.SphereGeometry(0.04, 10, 10);
-  const eyePupilGeo = new THREE.SphereGeometry(0.025, 8, 8);
+  const eyeOuterGeo = new THREE.SphereGeometry(0.045, 12, 12);
+  const eyePupilGeo = new THREE.SphereGeometry(0.03, 10, 10);
   g.geometries.push(eyeOuterGeo, eyePupilGeo);
 
-  // 左目（赤発光）
-  const leftOuter = new THREE.Mesh(eyeOuterGeo, new THREE.MeshBasicMaterial({ color: 0x880000 }));
-  g.materials.push(leftOuter.material);
-  leftOuter.scale.set(1.2, 0.7, 0.6);
-  leftOuter.position.set(-0.05, 0.03, headRadius * 0.85);
-  leftOuter.rotation.z = 0.2;
+  // 左目
+  const leftOuterMat = new THREE.MeshBasicMaterial({ color: 0xcc0000 });
+  g.materials.push(leftOuterMat);
+  const leftOuter = new THREE.Mesh(eyeOuterGeo, leftOuterMat);
+  leftOuter.scale.set(1.3, 0.7, 0.6);
+  leftOuter.position.set(-0.06, 0.035, headRadius * 0.82);
+  leftOuter.rotation.z = 0.25;
   head.add(leftOuter);
   const leftPupil = new THREE.Mesh(eyePupilGeo, eyeGlowMat);
   leftPupil.position.set(0, 0, 0.015);
   leftOuter.add(leftPupil);
 
-  // 右目（赤発光）
-  const rightOuter = new THREE.Mesh(eyeOuterGeo, new THREE.MeshBasicMaterial({ color: 0x880000 }));
-  g.materials.push(rightOuter.material);
-  rightOuter.scale.set(1.2, 0.7, 0.6);
-  rightOuter.position.set(0.05, 0.03, headRadius * 0.85);
-  rightOuter.rotation.z = -0.2;
+  // 右目
+  const rightOuterMat = new THREE.MeshBasicMaterial({ color: 0xcc0000 });
+  g.materials.push(rightOuterMat);
+  const rightOuter = new THREE.Mesh(eyeOuterGeo, rightOuterMat);
+  rightOuter.scale.set(1.3, 0.7, 0.6);
+  rightOuter.position.set(0.06, 0.035, headRadius * 0.82);
+  rightOuter.rotation.z = -0.25;
   head.add(rightOuter);
   const rightPupil = new THREE.Mesh(eyePupilGeo, eyeGlowMat);
   rightPupil.position.set(0, 0, 0.015);
   rightOuter.add(rightPupil);
 
-  // 赤い発光ライト
-  const eyeLight = new THREE.PointLight(0xff0000, 0.8, 2.0);
+  // 目の発光ライト
+  const eyeLight = new THREE.PointLight(0xff0000, 0.8, 2.5);
   eyeLight.position.set(0, 0.04, headRadius * 0.9);
   head.add(eyeLight);
   fig.eyeLight = eyeLight;
+
+  // === 赤いvision cone（レーザーセンサー） — ストーリーモードの鬼と同じ ===
+  const coneGeo = new THREE.CircleGeometry(8, 16, -Math.PI / 3, Math.PI * 2 / 3);
+  g.geometries.push(coneGeo);
+  const coneMat = new THREE.MeshBasicMaterial({
+    color: 0xff3333, transparent: true, opacity: 0.12,
+    side: THREE.DoubleSide, depthWrite: false
+  });
+  g.materials.push(coneMat);
+  const cone = new THREE.Mesh(coneGeo, coneMat);
+  cone.rotation.x = -Math.PI / 2;
+  cone.position.y = 0.05;
+  fig.group.add(cone);
+  fig.visionCone = cone;
+
+  // === 目からの赤いレーザービーム（前方に伸びる光線） ===
+  const laserGeo = new THREE.CylinderGeometry(0.015, 0.005, 5, 6);
+  g.geometries.push(laserGeo);
+  const laserMat = new THREE.MeshBasicMaterial({
+    color: 0xff0000, transparent: true, opacity: 0.4
+  });
+  g.materials.push(laserMat);
+  // 左目レーザー
+  const laserL = new THREE.Mesh(laserGeo, laserMat);
+  laserL.rotation.x = Math.PI / 2;
+  laserL.position.set(-0.06, 0.035, headRadius + 2.5);
+  head.add(laserL);
+  // 右目レーザー
+  const laserR = new THREE.Mesh(laserGeo, laserMat);
+  laserR.rotation.x = Math.PI / 2;
+  laserR.position.set(0.06, 0.035, headRadius + 2.5);
+  head.add(laserR);
 }
 
 /**
