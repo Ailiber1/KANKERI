@@ -506,7 +506,7 @@ html, body {
 
 /* Notification toast */
 .notification {
-  position: fixed; top: 20px; left: 50%;
+  position: fixed; top: 90px; left: 50%;
   transform: translateX(-50%) translateY(-100px);
   background: var(--bg-panel);
   border: 1px solid #5599ff;
@@ -14057,9 +14057,10 @@ function updateOniPlayerHUD(g, dt) {
       statusLabel.style.borderColor = 'rgba(255,200,0,0.7)';
       statusLabel.style.display = 'block';
     } else if (op.canCarrying) {
-      statusLabel.textContent = '📦 缶を運搬中 — ホームへ戻せ';
-      statusLabel.style.background = 'rgba(0,0,0,0.5)';
-      statusLabel.style.borderColor = 'rgba(255,68,68,0.4)';
+      var homeDist2 = g.can && g.can.homePos ? Math.round(g.player.position.distanceTo(g.can.homePos)) : 0;
+      statusLabel.textContent = '📦 缶を運搬中 → 定位置へ ' + homeDist2 + 'm';
+      statusLabel.style.background = 'rgba(180,0,0,0.6)';
+      statusLabel.style.borderColor = 'rgba(255,100,100,0.6)';
       statusLabel.style.display = 'block';
     } else {
       statusLabel.style.display = 'none';
@@ -14083,33 +14084,46 @@ function updateOniPlayerHUD(g, dt) {
     mobAction.style.display = 'none';
   }
 
-  // 缶方向矢印
+  // 缶方向矢印（運搬中は定位置への方向を表示）
   if (g.can) {
-    const canPos = g.can.group.position;
     const pPos = g.player.position;
-    const dx = canPos.x - pPos.x;
-    const dz = canPos.z - pPos.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    const angle = Math.atan2(dx, dz) - (g.player.rotation || 0);
-
-    const arrowEl = document.getElementById('oni-can-arrow');
-    const distEl = document.getElementById('oni-can-dist');
-    if (arrowEl) arrowEl.style.transform = 'rotate(' + (-angle * 180 / Math.PI) + 'deg)';
-    if (distEl) distEl.textContent = '缶まで ' + dist.toFixed(0) + 'm';
+    var targetPos, labelText;
+    if (op.canCarrying && g.can.homePos) {
+      targetPos = g.can.homePos;
+      var hdx = targetPos.x - pPos.x;
+      var hdz = targetPos.z - pPos.z;
+      var hdist = Math.sqrt(hdx * hdx + hdz * hdz);
+      var hangle = Math.atan2(hdx, hdz) - (g.player.rotation || 0);
+      labelText = '定位置まで ' + hdist.toFixed(0) + 'm';
+      const arrowEl = document.getElementById('oni-can-arrow');
+      const distEl = document.getElementById('oni-can-dist');
+      if (arrowEl) arrowEl.style.transform = 'rotate(' + (-hangle * 180 / Math.PI) + 'deg)';
+      if (distEl) { distEl.textContent = labelText; distEl.style.color = '#ff6666'; }
+    } else {
+      const canPos = g.can.group.position;
+      const dx = canPos.x - pPos.x;
+      const dz = canPos.z - pPos.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const angle = Math.atan2(dx, dz) - (g.player.rotation || 0);
+      const arrowEl = document.getElementById('oni-can-arrow');
+      const distEl = document.getElementById('oni-can-dist');
+      if (arrowEl) arrowEl.style.transform = 'rotate(' + (-angle * 180 / Math.PI) + 'deg)';
+      if (distEl) { distEl.textContent = '缶まで ' + dist.toFixed(0) + 'm'; distEl.style.color = ''; }
+    }
 
     // 缶タッチ/缶拾いボタン表示
     const touchBtn = document.getElementById('oni-can-touch-btn');
     const pickupBtn = document.getElementById('oni-pickup-btn');
     const canAtHome = g.can.isAtHome;
-    const nearCan = dist < 2.5;
+    const canPos2 = g.can.group.position;
+    const canDist2 = pPos.distanceTo(canPos2);
+    const nearCan = canDist2 < 2.5;
 
     if (touchBtn) {
-      // 缶が定位置 + ロックオン対象あり + 近い + 硬直なし
       touchBtn.style.display = (nearCan && canAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0)
         ? 'block' : 'none';
     }
     if (pickupBtn) {
-      // 缶が定位置でない（蹴り飛ばされた） + 近い
       pickupBtn.style.display = (nearCan && !canAtHome && !op.canCarrying)
         ? 'block' : 'none';
     }
@@ -14339,6 +14353,66 @@ function oniPickupCan(g) {
   g._oniPlayer.canCarrying = true;
   showNotification('缶を拾った！定位置に戻せ！');
   SoundManager.playGameSE('kick');
+
+  // 定位置マーカーを作成（光の柱 + リング）
+  createHomeMarker(g);
+}
+
+/**
+ * createHomeMarker — 缶の定位置に光の柱マーカーを表示
+ */
+function createHomeMarker(g) {
+  if (g._homeMarker) return;
+  if (!g.can || !g.can.homePos) return;
+  const hp = g.can.homePos;
+  const markerGroup = new THREE.Group();
+  markerGroup.position.set(hp.x, 0, hp.z);
+
+  // 光の柱（半透明シリンダー）
+  var pillarGeo = new THREE.CylinderGeometry(0.3, 0.3, 12, 16, 1, true);
+  var pillarMat = new THREE.MeshBasicMaterial({
+    color: 0xff4444, transparent: true, opacity: 0.15,
+    side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  var pillar = new THREE.Mesh(pillarGeo, pillarMat);
+  pillar.position.y = 6;
+  markerGroup.add(pillar);
+
+  // 地面のリング
+  var ringGeo = new THREE.RingGeometry(0.8, 1.2, 32);
+  var ringMat = new THREE.MeshBasicMaterial({
+    color: 0xff4444, transparent: true, opacity: 0.5,
+    side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  var ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.05;
+  markerGroup.add(ring);
+
+  // 内側リング（パルス用）
+  var innerRingGeo = new THREE.RingGeometry(0.3, 0.6, 32);
+  var innerRingMat = new THREE.MeshBasicMaterial({
+    color: 0xff6666, transparent: true, opacity: 0.7,
+    side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  var innerRing = new THREE.Mesh(innerRingGeo, innerRingMat);
+  innerRing.rotation.x = -Math.PI / 2;
+  innerRing.position.y = 0.06;
+  markerGroup.add(innerRing);
+
+  g.scene.add(markerGroup);
+  g._homeMarker = { group: markerGroup, pillar: pillar, ring: ring, innerRing: innerRing, time: 0 };
+  g.materials.push(pillarMat, ringMat, innerRingMat);
+}
+
+/**
+ * removeHomeMarker — 定位置マーカーを削除
+ */
+function removeHomeMarker(g) {
+  if (!g._homeMarker) return;
+  g.scene.remove(g._homeMarker.group);
+  g._homeMarker.group.traverse(function(c) { if (c.geometry) c.geometry.dispose(); });
+  g._homeMarker = null;
 }
 
 /**
@@ -14356,6 +14430,16 @@ function updateOniCanCarry(g) {
     pPos.z + Math.cos(rotY) * 1.2
   );
 
+  // 定位置マーカーをアニメーション
+  if (g._homeMarker) {
+    g._homeMarker.time += 0.016;
+    var t = g._homeMarker.time;
+    var pulse = 0.3 + Math.sin(t * 3) * 0.2;
+    g._homeMarker.pillar.material.opacity = 0.1 + Math.sin(t * 2) * 0.05;
+    g._homeMarker.innerRing.material.opacity = pulse;
+    g._homeMarker.innerRing.scale.set(1 + Math.sin(t * 4) * 0.2, 1 + Math.sin(t * 4) * 0.2, 1);
+  }
+
   // 定位置に近いか？（2m以内で自動設置）
   const homePos = g.can.homePos;
   const homeDist = Math.sqrt((pPos.x - homePos.x) ** 2 + (pPos.z - homePos.z) ** 2);
@@ -14366,6 +14450,7 @@ function updateOniCanCarry(g) {
     g.can.isAtHome = true;
     showNotification('缶を定位置に戻した！');
     SoundManager.playGameSE('place');
+    removeHomeMarker(g);
 
     // Firebase同期
     if (multiState.isHost && multiState.roomId) {
