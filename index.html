@@ -14692,51 +14692,66 @@ function initMultiplayerSync(g) {
     g._multiListeners.push({ ref: canRef, event: 'value', fn: onCan });
 
     // 非ホスト鬼: ロックオン検証結果を受信
-    if (g._isOniPlayer) {
-      const lockRef = roomRef.child('lockOn/' + multiState.playerIndex);
-      const onLock = lockRef.on('value', (snap) => {
-        const lockData = snap.val();
-        if (!lockData || !g || g.disposed || !g._oniPlayer) return;
-        if (lockData.validated === true && g._oniPlayer.lockedTarget < 0) {
-          g._oniPlayer.lockedTarget = lockData.targetIndex;
-          g._oniPlayer.lockValidated = true;
-          const remote = multiState.remotePlayers[lockData.targetIndex];
-          const targetName = remote ? (remote.username || 'Player') : 'Player';
-          showCenterAlert('👁 見つけた！', targetName + '！', 2000);
-          SoundManager.playGameSE('found');
-        }
-      });
-      g._multiListeners.push({ ref: lockRef, event: 'value', fn: onLock });
-    }
-
-    // ランナー: 鬼にロックオンされたら「見つかった！」通知を表示
-    if (!g._isOniPlayer && g._multiMode === 'team') {
+    // チーム戦: 全プレイヤーがlockOnを監視（通知 + 鬼の自ロックオン受信）
+    if (g._multiMode === 'team') {
       const lockAllRef = roomRef.child('lockOn');
-      const onLockRunner = lockAllRef.on('child_added', (snap) => {
+      g._notifiedLocks = {}; // 重複通知防止用
+      const handleLockNotify = function(snap) {
+        const oniIdx = parseInt(snap.key);
         const lockData = snap.val();
-        if (!lockData || !g || g.disposed) return;
-        // 自分がターゲットか
-        if (lockData.targetIndex === multiState.playerIndex && lockData.validated) {
-          showCenterAlert('👁 見つかった！', '鬼に発見された！逃げろ！', 3000);
-          SoundManager.playGameSE('found');
+        if (!lockData || !lockData.validated || !g || g.disposed) return;
+        const targetIdx = lockData.targetIndex;
+        const lockKey = oniIdx + '_' + targetIdx;
+        if (g._notifiedLocks[lockKey]) return; // 重複防止
+        g._notifiedLocks[lockKey] = true;
+        setTimeout(function() { delete g._notifiedLocks[lockKey]; }, 5000);
+
+        // ターゲット名を取得
+        var targetName;
+        if (targetIdx === multiState.playerIndex) {
+          targetName = multiState.players[multiState.playerIndex] ? multiState.players[multiState.playerIndex].username : 'あなた';
+        } else {
+          var rp = multiState.remotePlayers[targetIdx];
+          targetName = rp ? (rp.username || 'Player') : 'Player';
         }
-      });
-      g._multiListeners.push({ ref: lockAllRef, event: 'child_added', fn: onLockRunner });
-      // validated が後から true になるケースも監視
-      const onLockChange = lockAllRef.on('child_changed', (snap) => {
-        const lockData = snap.val();
-        if (!lockData || !g || g.disposed) return;
-        if (lockData.targetIndex === multiState.playerIndex && lockData.validated) {
-          if (!g._notifiedLockTarget) {
-            g._notifiedLockTarget = true;
+        // 鬼名を取得
+        var oniName;
+        if (oniIdx === multiState.playerIndex) {
+          oniName = multiState.players[multiState.playerIndex] ? multiState.players[multiState.playerIndex].username : 'あなた';
+        } else {
+          var op = multiState.remotePlayers[oniIdx];
+          oniName = op ? (op.username || 'Player') : 'Player';
+        }
+
+        if (g._isOniPlayer) {
+          // === 鬼チーム ===
+          if (oniIdx === multiState.playerIndex) {
+            // 自分が発見した → 自分のロックオンを設定
+            if (g._oniPlayer && g._oniPlayer.lockedTarget < 0) {
+              g._oniPlayer.lockedTarget = targetIdx;
+              g._oniPlayer.lockValidated = true;
+            }
+            showCenterAlert('👁 見つけた！', targetName + '！', 2000);
+          } else {
+            // 仲間の鬼が発見した → 通知のみ（缶は踏めない）
+            showCenterAlert('👁 ' + oniName + 'が発見！', targetName + '！', 2000);
+          }
+        } else {
+          // === ランナーチーム ===
+          if (targetIdx === multiState.playerIndex) {
+            // 自分が見つかった
             showCenterAlert('👁 見つかった！', '鬼に発見された！逃げろ！', 3000);
-            SoundManager.playGameSE('found');
-            // 次のロックオンで再通知できるようにリセット
-            setTimeout(() => { g._notifiedLockTarget = false; }, 5000);
+          } else {
+            // 味方が見つかった
+            showCenterAlert('👁 ' + targetName + 'が見つかった！', '', 2000);
           }
         }
-      });
-      g._multiListeners.push({ ref: lockAllRef, event: 'child_changed', fn: onLockChange });
+        SoundManager.playGameSE('found');
+      };
+      var onLockAdd = lockAllRef.on('child_added', handleLockNotify);
+      g._multiListeners.push({ ref: lockAllRef, event: 'child_added', fn: onLockAdd });
+      var onLockChg = lockAllRef.on('child_changed', handleLockNotify);
+      g._multiListeners.push({ ref: lockAllRef, event: 'child_changed', fn: onLockChg });
     }
 
     // 非ホスト: Co-opステージ遷移を受信
