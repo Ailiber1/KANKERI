@@ -2186,12 +2186,9 @@ async function hostStartGame() {
       oniCount: 1
     }
   };
-  // チーム戦: ラウンド情報を初期化
+  // チーム戦: 初期化
   if (multiState.gameMode === 'team') {
-    updateData['teamBattle/currentRound'] = 1;
-    updateData['teamBattle/round1Score'] = 0;
-    updateData['teamBattle/round2Score'] = 0;
-    updateData['teamBattle/roundStartTime'] = firebase.database.ServerValue.TIMESTAMP;
+    updateData['teamBattle/startTime'] = firebase.database.ServerValue.TIMESTAMP;
   }
   await roomRef.update(updateData);
   // ステータス変更をリスナーが検知して全クライアントでstartMultiplayerGame()が呼ばれる
@@ -12640,9 +12637,9 @@ function endGame(g, playerWon, reason) {
   const oniHud = document.getElementById('oni-player-hud');
   if (oniHud) oniHud.style.display = 'none';
 
-  // チーム戦: ラウンド制処理
+  // チーム戦: 1ゲーム制（ラウンド制廃止）
   if (g._isMultiplayer && g._multiMode === 'team') {
-    return endTeamRound(g, playerWon);
+    return endTeamBattle(g, playerWon);
   }
 
   // マルチプレイ: ホストがルーム状態を更新
@@ -13378,8 +13375,7 @@ function startGame(stageNum, mode) {
         stageNameEl.textContent = 'CO-OP — Stage ' + stageNum + '/5 — ' + config.name;
       } else {
         const modeLabel = mode.includes('ffa') ? 'FFA' : 'TEAM';
-        const roundLabel = mode.includes('team') ? ' R' + (multiState._teamRound || 1) : '';
-        stageNameEl.textContent = modeLabel + roundLabel + ' — Stage ' + stageNum + ' — ' + config.name;
+        stageNameEl.textContent = modeLabel + ' — Stage ' + stageNum + ' — ' + config.name;
       }
     } else {
       stageNameEl.textContent = 'Stage ' + stageNum + ' — ' + config.name;
@@ -13514,7 +13510,7 @@ function startGame(stageNum, mode) {
       G._myTeamRole = teamA.includes(multiState.playerIndex) ? 'oni' : 'runner';
       G._teamA = teamA;
       G._teamB = teamB;
-      G._teamRound = 1;
+
 
       // 鬼ロールならプレイヤーの色を赤に
       if (G._myTeamRole === 'oni') {
@@ -13628,9 +13624,12 @@ function showCanPlacementUI(g) {
   g.camera.position.set(0, 20, 10);
   g.camera.lookAt(0, 0, 0);
 
-  // マルチプレイ非ホスト: 選択UIではなく待機メッセージを表示
-  if (g._isMultiplayer && !multiState.isHost) {
-    opts.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:16px;font-size:14px;">ホストが缶の配置を選んでいます…</div>';
+  // マルチプレイ: 鬼プレイヤーまたは非ホストは待機メッセージを表示
+  if (g._isMultiplayer && (g._isOniPlayer || !multiState.isHost)) {
+    const msg = g._isOniPlayer
+      ? 'ランナーが缶を蹴るのを待っています…'
+      : 'ホストが缶の配置を選んでいます…';
+    opts.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:16px;font-size:14px;">' + msg + '</div>';
     if (confirmBtn) confirmBtn.style.display = 'none';
     wrap.style.display = 'block';
     return;
@@ -13661,98 +13660,87 @@ function showCanPlacementUI(g) {
 }
 
 // ============================================================
-// SECTION: TEAM BATTLE ROUND (チーム戦ラウンド制)
+// SECTION: TEAM BATTLE RESULT (チーム戦結果)
 // ============================================================
 
 /**
- * endTeamRound — チーム戦のラウンド終了処理
- * ラウンド1終了→スコア計算→インターバル→ラウンド2
- * ラウンド2終了→スコア計算→最終結果
+ * endTeamBattle — チーム戦の結果表示（個人戦と同様の再戦方式）
+ * runnersWon: true=ランナー勝利（時間切れ）, false=鬼勝利（全員捕獲）
  */
-function endTeamRound(g, runnersWon) {
-  const round = g._teamRound || 1;
-  const timeLimit = g.config.timeLimit;
-  const remainTime = Math.max(0, g.gameTimer);
-  const totalRunners = (round === 1 ? (g._teamB || []) : (g._teamA || [])).length;
-
-  // スコア計算: 鬼チームのスコア
-  // 全員捕獲 → 残り時間 × 100、時間切れ → 捕獲人数 × 500
-  let roundScore = 0;
-  if (!runnersWon) {
-    // 全員捕獲: 残り時間をスコアに
-    roundScore = Math.round(remainTime * 100);
-  } else {
-    // 時間切れ: 捕獲人数 × 500
-    roundScore = g.capturedCount * 500;
-  }
-
-  // ホスト: スコアをFirebaseに保存
+function endTeamBattle(g, runnersWon) {
+  // ホスト: Firebase結果更新
   if (multiState.isHost && multiState.roomId) {
-    const scoreKey = round === 1 ? 'round1Score' : 'round2Score';
-    db.ref('rooms/' + multiState.roomId + '/teamBattle/' + scoreKey).set(roundScore);
+    db.ref('rooms/' + multiState.roomId).update({
+      status: 'result',
+      result: {
+        runnersWon: runnersWon,
+        endTime: firebase.database.ServerValue.TIMESTAMP
+      }
+    });
   }
 
-  if (round === 1) {
-    // ラウンド1終了 → インターバルへ
-    g._round1Score = roundScore;
-    showTeamRoundInterval(g, roundScore);
-  } else {
-    // ラウンド2終了 → 最終結果へ
-    g._round2Score = roundScore;
-    showTeamFinalResult(g);
-  }
-}
-
-/**
- * showTeamRoundInterval — ラウンド間インターバル（10秒）
- */
-function showTeamRoundInterval(g, round1Score) {
   const overlay = document.getElementById('result-overlay');
   const title = document.getElementById('result-title');
   const stats = document.getElementById('result-stats');
 
+  // チーム名取得
+  const oniNames = (g._teamA || []).map(i => {
+    const p = multiState.players[i];
+    return p ? escapeHTML(p.username || 'Player') : 'Player';
+  }).join(', ');
+  const runnerNames = (g._teamB || []).map(i => {
+    const p = multiState.players[i];
+    return p ? escapeHTML(p.username || 'Player') : 'Player';
+  }).join(', ');
+
+  // 自分が勝ったか
+  const myIdx = multiState.playerIndex;
+  const iAmOni = (g._teamA || []).includes(myIdx);
+  const iWon = iAmOni ? !runnersWon : runnersWon;
+
   if (title) {
-    title.textContent = 'ラウンド1 終了';
-    title.style.color = 'var(--neon-cyan)';
-    title.style.textShadow = '0 0 20px rgba(0,229,255,0.5)';
+    if (runnersWon) {
+      title.textContent = '🏃 チームランナー 勝利！';
+      title.style.color = '#4488ff';
+      title.style.textShadow = '0 0 20px rgba(68,136,255,0.5)';
+    } else {
+      title.textContent = '👹 チーム鬼 勝利！';
+      title.style.color = '#ff4444';
+      title.style.textShadow = '0 0 20px rgba(255,68,68,0.5)';
+    }
   }
   if (stats) {
-    const teamANames = (g._teamA || []).map(i => {
-      const p = multiState.players[i];
-      return p ? escapeHTML(p.username || 'Player') : 'Player';
-    }).join(', ');
-
+    const remainTime = Math.max(0, g.gameTimer).toFixed(1);
+    const capturedCount = g.capturedCount || 0;
+    const totalRunners = (g._teamB || []).length;
     stats.innerHTML = `
-      <span style="font-size:18px;color:#ff4444">鬼チーム: ${teamANames}</span><br>
-      <span style="font-size:14px;color:var(--text-dim)">スコア: <span style="color:var(--neon-yellow);font-size:20px">${round1Score}</span> pt</span><br>
+      <span style="font-size:16px;color:#ff4444">鬼チーム: ${oniNames}</span><br>
+      <span style="font-size:16px;color:#4488ff">ランナーチーム: ${runnerNames}</span><br>
       <br>
-      <span style="font-size:13px;color:var(--neon-cyan)">
-        ⚡ 次は攻守交代してラウンド2へ
-      </span>
+      <span style="font-size:14px;color:var(--text-dim)">捕獲: ${capturedCount}/${totalRunners}人 ｜ 残り時間: ${remainTime}秒</span><br>
+      <br>
+      <span style="font-size:20px;color:${iWon ? '#ffd700' : '#ff4444'}">${iWon ? 'あなたの勝利！' : 'あなたの敗北…'}</span>
     `;
   }
 
-  // 個人戦同様の再戦ボタン（リマッチ投票UI）を表示
+  // 個人戦と同様のリマッチ投票UI
   const rematchArea = document.getElementById('result-buttons-multi');
   const soloArea = document.getElementById('result-buttons-solo');
   const retryBtn = document.getElementById('btn-retry');
-  const titleBtn = document.getElementById('btn-title');
 
-  // ソロボタンを非表示、マルチボタンエリアを使用
   if (soloArea) soloArea.style.display = 'none';
   if (rematchArea) rematchArea.style.display = 'block';
   if (retryBtn) retryBtn.style.display = 'none';
 
-  // リマッチカウントダウン
   const countdownEl = document.getElementById('rematch-countdown');
   const statusEl = document.getElementById('rematch-status');
   const yesBtn = document.getElementById('btn-rematch-yes');
   const noBtn = document.getElementById('btn-rematch-no');
 
-  if (countdownEl) countdownEl.textContent = '再戦（攻守交代）しますか？';
+  if (countdownEl) countdownEl.textContent = '再戦しますか？';
   if (statusEl) statusEl.textContent = '';
   if (yesBtn) {
-    yesBtn.textContent = '⚔ ラウンド2へ';
+    yesBtn.textContent = '⚔ 再戦';
     yesBtn.style.display = '';
     yesBtn.disabled = false;
   }
@@ -13763,53 +13751,44 @@ function showTeamRoundInterval(g, round1Score) {
 
   if (overlay) overlay.style.display = 'flex';
 
-  // カウントダウンタイマー（30秒）
+  // 30秒カウントダウン
   let countdown = 30;
   const countdownTimer = setInterval(() => {
     countdown--;
     if (statusEl) statusEl.textContent = `残り ${countdown} 秒`;
     if (countdown <= 0) {
       clearInterval(countdownTimer);
-      // タイムアウト: タイトルへ戻る
       if (overlay) overlay.style.display = 'none';
       showScreen('title-screen');
     }
   }, 1000);
-  g._teamRound1CountdownTimer = countdownTimer;
 
-  // Firebase: リマッチ投票の仕組み
+  // Firebase: リマッチ投票
   if (multiState.isHost && multiState.roomId) {
-    db.ref('rooms/' + multiState.roomId + '/teamBattle/round2Votes').remove();
+    db.ref('rooms/' + multiState.roomId + '/teamBattle/rematchVotes').remove();
   }
 
-  // 「ラウンド2へ」ボタン
   const yesHandler = () => {
     if (yesBtn) { yesBtn.disabled = true; yesBtn.textContent = '待機中...'; }
-    // Firebase投票
     if (multiState.roomId) {
-      db.ref('rooms/' + multiState.roomId + '/teamBattle/round2Votes/' + multiState.playerIndex).set(true);
+      db.ref('rooms/' + multiState.roomId + '/teamBattle/rematchVotes/' + multiState.playerIndex).set(true);
     }
   };
-  // 「タイトルへ」ボタン
   const noHandler = () => {
     clearInterval(countdownTimer);
     if (overlay) overlay.style.display = 'none';
     if (multiState.roomId) {
-      db.ref('rooms/' + multiState.roomId + '/teamBattle/round2Votes/' + multiState.playerIndex).set(false);
+      db.ref('rooms/' + multiState.roomId + '/teamBattle/rematchVotes/' + multiState.playerIndex).set(false);
     }
     showScreen('title-screen');
   };
 
-  if (yesBtn) {
-    yesBtn.onclick = yesHandler;
-  }
-  if (noBtn) {
-    noBtn.onclick = noHandler;
-  }
+  if (yesBtn) yesBtn.onclick = yesHandler;
+  if (noBtn) noBtn.onclick = noHandler;
 
-  // Firebase: 全員投票完了を監視
+  // Firebase: 全員投票完了を監視 → 全員Yesならロビーに戻って再戦
   if (multiState.roomId) {
-    const votesRef = db.ref('rooms/' + multiState.roomId + '/teamBattle/round2Votes');
+    const votesRef = db.ref('rooms/' + multiState.roomId + '/teamBattle/rematchVotes');
     const voteListener = votesRef.on('value', snap => {
       const votes = snap.val();
       if (!votes) return;
@@ -13817,23 +13796,29 @@ function showTeamRoundInterval(g, round1Score) {
       const totalPlayers = pKeys.length;
       const voteKeys = Object.keys(votes);
 
-      // 全員投票した？
       if (voteKeys.length >= totalPlayers) {
         votesRef.off('value', voteListener);
         clearInterval(countdownTimer);
-        // 全員がYesならラウンド2開始
         const allYes = voteKeys.every(k => votes[k] === true);
         if (allYes) {
+          // 全員再戦 → ロビーへ戻る
           if (overlay) overlay.style.display = 'none';
           if (rematchArea) rematchArea.style.display = 'none';
-          startTeamRound2(g);
+          cleanupGame();
+          if (multiState.roomId) {
+            multiState.ready = false;
+            db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
+            db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
+            db.ref('rooms/' + multiState.roomId + '/teamBattle').remove();
+            showScreen('lobby-screen');
+            initLobbyListeners();
+            updateLobbyUI();
+          }
         } else {
-          // 誰かがNoならタイトルへ
           if (overlay) overlay.style.display = 'none';
           showScreen('title-screen');
         }
       } else {
-        // 途中経過表示
         const yesCount = voteKeys.filter(k => votes[k] === true).length;
         if (statusEl) statusEl.textContent = `${yesCount}/${totalPlayers} が再戦に同意 (残り ${countdown} 秒)`;
       }
@@ -13841,226 +13826,7 @@ function showTeamRoundInterval(g, round1Score) {
   }
 }
 
-/**
- * startTeamRound2 — ラウンド2開始（攻守交代）
- */
-function startTeamRound2(g) {
-  // ホスト: Firebaseの状態をリセット＆攻守交代
-  if (multiState.isHost && multiState.roomId) {
-    const roomRef = db.ref('rooms/' + multiState.roomId);
-    roomRef.child('capturedPlayers').remove();
-    roomRef.child('lockOn').remove();
-    roomRef.child('canState').remove();
-    roomRef.update({
-      'teamBattle/currentRound': 2,
-      status: 'playing'
-    });
-  }
 
-  // 攻守交代: teamAとteamBのロールを入替
-  const oldTeamA = g._teamA || [];
-  const oldTeamB = g._teamB || [];
-  g._teamA = oldTeamB; // 新鬼チーム
-  g._teamB = oldTeamA; // 新ランナーチーム
-  g._teamRound = 2;
-
-  // 自分のロールを再判定
-  const myIdx = multiState.playerIndex;
-  const wasOni = g._isOniPlayer;
-  g._myTeamRole = g._teamA.includes(myIdx) ? 'oni' : 'runner';
-  g._isOniPlayer = g._myTeamRole === 'oni';
-
-  // ゲーム状態をリセット
-  g.capturedCount = 0;
-  g.gameTimer = g.config.timeLimit;
-  g.gamePhase = 'kick'; // 缶配置フェーズから
-  g._playerCaptured = false;
-  g.player.captured = false;
-
-  // プレイヤーの色を切替
-  if (g._isOniPlayer) {
-    g.playerFig.mat.color.setHex(0xff2222);
-    g.playerFig.mat.emissive.setHex(0xff2222);
-  } else {
-    g.playerFig.mat.color.setHex(0x4488ff);
-    g.playerFig.mat.emissive.setHex(0x4488ff);
-  }
-
-  // リモートプレイヤーの色を更新
-  Object.keys(multiState.remotePlayers).forEach(k => {
-    const idx = parseInt(k);
-    const rp = multiState.remotePlayers[k];
-    if (!rp || !rp.fig) return;
-    rp.captured = false;
-    const isOni = g._teamA.includes(idx);
-    rp.fig.mat.color.setHex(isOni ? 0xff2222 : 0x4488ff);
-    rp.fig.mat.emissive.setHex(isOni ? 0xff2222 : 0x4488ff);
-  });
-
-  // AI鬼の管理
-  g.onis.forEach(oni => {
-    if (oni.fig && oni.fig.group) g.scene.remove(oni.fig.group);
-  });
-  g.onis = [];
-
-  if (g._isOniPlayer) {
-    initOniPlayerControls(g);
-  } else if (wasOni) {
-    // ランナーになった: 鬼HUDを非表示、鬼状態をクリア
-    const oniHud = document.getElementById('oni-player-hud');
-    if (oniHud) oniHud.style.display = 'none';
-    g._oniPlayer = null;
-    // スタミナバー復帰
-    const staminaWrap = document.getElementById('hud-stamina-wrap');
-    if (staminaWrap) staminaWrap.style.display = '';
-  }
-
-  // プレイヤー位置をリスポーン
-  const spawnPos = g._stageNum === 4 ? { x: 0, z: 5 } : { x: 0, z: -10 };
-  g.player.position.set(spawnPos.x, getGroundHeight(g, spawnPos.x, spawnPos.z), spawnPos.z);
-  g.playerFig.group.position.copy(g.player.position);
-
-  // 缶を定位置に戻す
-  if (g.can && g.can.homePos) {
-    g.can.group.position.copy(g.can.homePos);
-    g.can.isAtHome = true;
-    g.can.isFlying = false;
-  }
-
-  // ロックオン状態リセット
-  if (g._oniPlayer) {
-    g._oniPlayer.fatigue = 0;
-    g._oniPlayer.lockedTarget = -1;
-    g._oniPlayer.lockValidated = false;
-    g._oniPlayer.canCarrying = false;
-    g._oniPlayer.canTouchCooldown = 0;
-    g._oniPlayer.lockCooldown = 0;
-  }
-
-  // HUDステージ名更新
-  const stageNameEl = document.getElementById('hud-stage-name');
-  if (stageNameEl) {
-    stageNameEl.textContent = 'TEAM — R2 — ' + (g.config.name || 'Stage ' + g._stageNum);
-  }
-
-  showCenterAlert('⚔ ラウンド2', '攻守交代！', 3000);
-  SoundManager.playGameSE('start');
-
-  // 缶配置UIを再表示（ランナー1人目が配置）
-  showCanPlacementUI(g);
-}
-
-/**
- * showTeamFinalResult — チーム戦最終結果画面
- */
-function showTeamFinalResult(g) {
-  const r1 = g._round1Score || 0;
-  const r2 = g._round2Score || 0;
-
-  // ラウンド1の鬼チーム = g._teamB(ラウンド2開始時に入替済みなので逆)
-  // ラウンド1 鬼 = 現在のteamB、ラウンド2 鬼 = 現在のteamA
-  const round1OniTeam = g._teamB || []; // 元teamA
-  const round2OniTeam = g._teamA || []; // 元teamB
-  const round1OniNames = round1OniTeam.map(i => {
-    const p = multiState.players[i];
-    return p ? escapeHTML(p.username || 'Player') : 'Player';
-  }).join(', ');
-  const round2OniNames = round2OniTeam.map(i => {
-    const p = multiState.players[i];
-    return p ? escapeHTML(p.username || 'Player') : 'Player';
-  }).join(', ');
-
-  // 勝者判定 — 自分のチームが勝ったか負けたかで表示を変える
-  // ラウンド1の鬼チーム = round1OniTeam, ラウンド2の鬼チーム = round2OniTeam
-  // スコアが高い鬼チームが勝利（鬼として優秀 = 早く全員捕獲 or 多く捕獲）
-  let winningTeamLabel = '';
-  let iAmWinner = false;
-  let winColor = '';
-  const myIdx = multiState.playerIndex;
-
-  if (r1 > r2) {
-    // ラウンド1鬼チーム(round1OniTeam)の勝利
-    winningTeamLabel = round1OniNames;
-    iAmWinner = round1OniTeam.includes(myIdx);
-    winColor = '#ffd700';
-  } else if (r2 > r1) {
-    // ラウンド2鬼チーム(round2OniTeam)の勝利
-    winningTeamLabel = round2OniNames;
-    iAmWinner = round2OniTeam.includes(myIdx);
-    winColor = '#ffd700';
-  } else {
-    winningTeamLabel = '';
-    iAmWinner = false;
-    winColor = 'var(--neon-cyan)';
-  }
-
-  let winner = '';
-  if (r1 === r2) {
-    winner = '引き分け！';
-  } else if (iAmWinner) {
-    winner = 'あなたの勝利！';
-  } else {
-    winner = 'あなたの敗北…';
-    winColor = '#ff4444';
-  }
-
-  // ホスト: Firebase結果更新
-  if (multiState.isHost && multiState.roomId) {
-    db.ref('rooms/' + multiState.roomId).update({
-      status: 'result',
-      result: {
-        round1Score: r1, round2Score: r2,
-        winner: r1 > r2 ? 'round1' : (r2 > r1 ? 'round2' : 'draw'),
-        endTime: firebase.database.ServerValue.TIMESTAMP
-      }
-    });
-  }
-
-  const overlay = document.getElementById('result-overlay');
-  const title = document.getElementById('result-title');
-  const stats = document.getElementById('result-stats');
-
-  if (title) {
-    title.textContent = '🏆 ' + winner;
-    title.style.color = winColor;
-    title.style.textShadow = '0 0 30px rgba(255,215,0,0.7)';
-  }
-  if (stats) {
-    stats.innerHTML = `
-      <span style="font-size:16px;color:#ff4444">ラウンド1（鬼: ${round1OniNames}）</span><br>
-      <span style="font-size:22px;color:var(--neon-yellow)">${r1} pt</span><br>
-      <br>
-      <span style="font-size:16px;color:#4488ff">ラウンド2（鬼: ${round2OniNames}）</span><br>
-      <span style="font-size:22px;color:var(--neon-yellow)">${r2} pt</span><br>
-      <br>
-      <span style="font-size:14px;color:var(--text-dim)">
-        スコア = 全員捕獲: 残り秒×100 / 時間切れ: 捕獲人数×500
-      </span>
-    `;
-  }
-
-  // ボタン復帰: ロビーへ戻るのみ
-  const retryBtn = document.getElementById('btn-retry');
-  if (retryBtn) {
-    retryBtn.style.display = '';
-    retryBtn.textContent = 'ロビーへ戻る';
-    retryBtn.onclick = () => {
-      cleanupGame();
-      if (multiState.roomId) {
-        multiState.ready = false;
-        db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
-        db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
-        showScreen('lobby-screen');
-        initLobbyListeners();
-        updateLobbyUI();
-      }
-    };
-  }
-  const titleBtn = document.getElementById('btn-title');
-  if (titleBtn) titleBtn.style.display = '';
-
-  if (overlay) overlay.style.display = 'flex';
-}
 
 // ============================================================
 // SECTION: ONI PLAYER (鬼プレイヤー操作 — チーム戦)
@@ -14521,6 +14287,51 @@ function handleOniPlayerInput(g, key) {
 // ============================================================
 
 /**
+ * addOniEyeGlow — チーム戦の鬼フィギュアに赤い目の発光を追加
+ * ランナーから見て鬼が赤いセンサー光を発しているように見せる
+ */
+function addOniEyeGlow(g, fig) {
+  // figの最初の子がhead（SphereGeometry）
+  const head = fig.group.children[0]; // head mesh
+  if (!head) return;
+  const headRadius = 0.17; // child size
+
+  const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  g.materials.push(eyeGlowMat);
+  const eyeOuterGeo = new THREE.SphereGeometry(0.04, 10, 10);
+  const eyePupilGeo = new THREE.SphereGeometry(0.025, 8, 8);
+  g.geometries.push(eyeOuterGeo, eyePupilGeo);
+
+  // 左目（赤発光）
+  const leftOuter = new THREE.Mesh(eyeOuterGeo, new THREE.MeshBasicMaterial({ color: 0x880000 }));
+  g.materials.push(leftOuter.material);
+  leftOuter.scale.set(1.2, 0.7, 0.6);
+  leftOuter.position.set(-0.05, 0.03, headRadius * 0.85);
+  leftOuter.rotation.z = 0.2;
+  head.add(leftOuter);
+  const leftPupil = new THREE.Mesh(eyePupilGeo, eyeGlowMat);
+  leftPupil.position.set(0, 0, 0.015);
+  leftOuter.add(leftPupil);
+
+  // 右目（赤発光）
+  const rightOuter = new THREE.Mesh(eyeOuterGeo, new THREE.MeshBasicMaterial({ color: 0x880000 }));
+  g.materials.push(rightOuter.material);
+  rightOuter.scale.set(1.2, 0.7, 0.6);
+  rightOuter.position.set(0.05, 0.03, headRadius * 0.85);
+  rightOuter.rotation.z = -0.2;
+  head.add(rightOuter);
+  const rightPupil = new THREE.Mesh(eyePupilGeo, eyeGlowMat);
+  rightPupil.position.set(0, 0, 0.015);
+  rightOuter.add(rightPupil);
+
+  // 赤い発光ライト
+  const eyeLight = new THREE.PointLight(0xff0000, 0.8, 2.0);
+  eyeLight.position.set(0, 0.04, headRadius * 0.9);
+  head.add(eyeLight);
+  fig.eyeLight = eyeLight;
+}
+
+/**
  * initMultiplayerSync — マルチプレイ開始時にFirebaseリスナーを設定
  * 呼び出し元: startGame（マルチプレイモード時）
  */
@@ -14543,7 +14354,10 @@ function initMultiplayerSync(g) {
     } else {
       color = RUNNER_COLORS[idx % RUNNER_COLORS.length];
     }
+    const isOniTeam = g._multiMode === 'team' && teamA.includes(idx);
     const fig = createStickFigure(g, color, false);
+    // チーム戦の鬼プレイヤーに赤い目の発光を追加（ランナーから鬼を識別しやすくする）
+    if (isOniTeam) addOniEyeGlow(g, fig);
     fig.group.position.set(0, 0, -10 + idx * 3);
     g.scene.add(fig.group);
     multiState.remotePlayers[idx] = {
@@ -14803,23 +14617,7 @@ function initMultiplayerSync(g) {
     });
     g._multiListeners.push({ ref: advRef, event: 'value', fn: onAdv });
 
-    // 非ホスト: チーム戦ラウンド2開始を検知
-    if (g._multiMode === 'team') {
-      const roundRef = roomRef.child('teamBattle/currentRound');
-      const onRound = roundRef.on('value', (snap) => {
-        const roundNum = snap.val();
-        if (!roundNum || !g || g.disposed) return;
-        if (roundNum === 2 && g._teamRound === 1) {
-          // ラウンド1のスコアを取得してインターバル表示
-          roomRef.child('teamBattle/round1Score').once('value', (scoreSnap) => {
-            const r1Score = scoreSnap.val() || 0;
-            g._round1Score = r1Score;
-            showTeamRoundInterval(g, r1Score);
-          });
-        }
-      });
-      g._multiListeners.push({ ref: roundRef, event: 'value', fn: onRound });
-    }
+    // チーム戦: ラウンド制廃止のためラウンド2監視は不要
   }
 
   // ============================================
