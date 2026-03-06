@@ -14572,6 +14572,35 @@ function initMultiplayerSync(g) {
         }
       });
       g._multiListeners.push({ ref: canRefHost, event: 'value', fn: onCanHost });
+
+      // ホスト（鬼）: ランナーが制御するフェーズ遷移(kick→hide→seek)を受信
+      const stateRefHost = roomRef.child('gameState');
+      const onStateHost = stateRefHost.on('value', (snap) => {
+        const state = snap.val();
+        if (!state || !g || g.disposed) return;
+        if (state.gamePhase) {
+          const phaseOrder = { placement: 0, kick: 1, hide: 2, seek: 3, result: 4 };
+          const newO = phaseOrder[state.gamePhase];
+          const curO = phaseOrder[g.gamePhase];
+          // 前進のみ許可
+          if (newO !== undefined && curO !== undefined && newO > curO) {
+            g.gamePhase = state.gamePhase;
+            // hideフェーズ: phaseTimerをセット
+            if (state.gamePhase === 'hide' && state.hideTime) {
+              g.hideTime = state.hideTime;
+              g.phaseTimer = state.hideTime;
+              showHideCountdown(g, true);
+            }
+            if (state.gamePhase === 'seek') {
+              showHideCountdown(g, false);
+              showNotification('鬼が動き出した！');
+              SoundManager.playGameSE('notify');
+            }
+          }
+        }
+        if (state.gameTimer !== undefined) g.gameTimer = state.gameTimer;
+      });
+      g._multiListeners.push({ ref: stateRefHost, event: 'value', fn: onStateHost });
     }
 
     // ホスト: Co-opリトライ信号を受信（非ホストがリトライボタンを押した場合）
