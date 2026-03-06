@@ -695,25 +695,39 @@ html, body {
 }
 .lobby-stage-select { margin: 10px 0; }
 .lobby-stage-label { color: var(--text-secondary); font-size: 12px; margin-bottom: 4px; }
-/* チーム戦 — チーム分けUI */
+/* チーム戦 — ロール選択UI（MAZE-HUNT準拠） */
 .team-assign-section { margin: 12px 0; display: none; }
 .team-assign-label { color: var(--neon-pink); font-size: 13px; font-weight: bold; margin-bottom: 8px; text-align: center; }
+/* ロール選択ボタン */
+.role-select-buttons { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
+.role-btn {
+  flex: 1; max-width: 170px; padding: 8px 10px; border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 8px; background: rgba(0,0,0,0.5); cursor: pointer; text-align: center;
+  transition: all 0.2s; font-family: 'Share Tech Mono', monospace;
+}
+.role-btn .role-icon { font-size: 22px; display: block; margin-bottom: 2px; }
+.role-btn .role-name { font-size: 13px; font-weight: bold; display: block; letter-spacing: 2px; }
+.role-btn .role-desc { font-size: 10px; display: block; margin-top: 1px; }
+.role-btn-runner { color: #4488ff; }
+.role-btn-runner.active, .role-btn-runner:hover { border-color: #4488ff; background: rgba(68,136,255,0.1); box-shadow: 0 0 12px rgba(68,136,255,0.3); }
+.role-btn-oni { color: #ff3366; }
+.role-btn-oni.active, .role-btn-oni:hover { border-color: #ff3366; background: rgba(255,51,102,0.1); box-shadow: 0 0 12px rgba(255,51,102,0.3); }
+.role-btn:not(.active) { opacity: 0.5; }
+/* チーム表示エリア */
 .team-assign-grid { display: flex; gap: 8px; }
 .team-column {
   flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(85,153,255,0.15);
-  padding: 8px; min-height: 80px; cursor: pointer;
+  padding: 8px; min-height: 60px;
 }
-.team-column:hover { border-color: rgba(85,153,255,0.4); }
 .team-column-title { font-size: 11px; text-align: center; margin-bottom: 6px; letter-spacing: 1px; }
 .team-column-title.oni { color: #ff4444; }
 .team-column-title.runner { color: #4488ff; }
 .team-slot {
-  padding: 6px 8px; margin: 4px 0; font-size: 13px; text-align: center;
-  cursor: pointer; border-radius: 3px; transition: background 0.2s;
+  padding: 4px 8px; margin: 3px 0; font-size: 12px; text-align: center;
+  border-radius: 3px;
 }
 .team-slot.oni { background: rgba(255,34,34,0.2); color: #ff6666; border: 1px solid rgba(255,34,34,0.3); }
 .team-slot.runner { background: rgba(68,136,255,0.2); color: #6699ff; border: 1px solid rgba(68,136,255,0.3); }
-.team-slot:hover { filter: brightness(1.3); }
 .team-slot.me { font-weight: bold; }
 .lobby-btn-row { display: flex; gap: 10px; margin-top: 14px; }
 .lobby-btn-row .btn { flex: 1; }
@@ -1180,9 +1194,21 @@ html, body {
       <div class="lobby-slot-empty">接続中...</div>
     </div>
 
-    <!-- チーム戦用: チーム分けUI -->
+    <!-- チーム戦用: ロール選択 + チーム表示（MAZE-HUNT準拠） -->
     <div class="team-assign-section" id="team-assign-section">
-      <div class="team-assign-label">⚔ チーム分け</div>
+      <div class="team-assign-label">⚔ ロールを選択</div>
+      <div class="role-select-buttons">
+        <button class="role-btn role-btn-runner active" data-role="runner">
+          <span class="role-icon">🏃</span>
+          <span class="role-name">RUNNER</span>
+          <span class="role-desc">ランナー</span>
+        </button>
+        <button class="role-btn role-btn-oni" data-role="oni">
+          <span class="role-icon">👹</span>
+          <span class="role-name">ONI</span>
+          <span class="role-desc">鬼</span>
+        </button>
+      </div>
       <div class="team-assign-grid">
         <div class="team-column">
           <div class="team-column-title oni">👹 鬼チーム</div>
@@ -1745,6 +1771,8 @@ function showRoomError(msg) {
 function initLobbyListeners() {
   // ★リスナー重複防止: 既存リスナーをクリーンアップしてから再登録
   removeLobbyListeners();
+  // チーム戦: ロール選択ボタン初期化
+  initRoleSelectButtons();
 
   const roomRef = db.ref('rooms/' + multiState.roomId);
 
@@ -1927,7 +1955,8 @@ function updateLobbyUI() {
     // チーム戦: 両チームに最低1人ずつ必要
     let teamValid = true;
     if (multiState.gameMode === 'team') {
-      const { teamA, teamB } = getTeamAssignments();
+      const teamA = multiState._teamA || [];
+      const teamB = multiState._teamB || [];
       teamValid = teamA.length >= 1 && teamB.length >= 1;
     }
     startBtn.disabled = !allReady || pKeys.length < 2 || !teamValid;
@@ -1947,47 +1976,36 @@ function findHostIndex() {
 // SECTION: TEAM BATTLE — チーム分け管理
 // ============================================================
 
-/**
- * getTeamAssignments — 現在のチーム分けを取得/生成
- * Firebase teamBattle/teamA, teamB からロール情報を取得
- * 未設定時はプレイヤー数に応じて自動生成
- */
-function getTeamAssignments() {
-  const players = multiState.players;
-  const pKeys = Object.keys(players).map(Number).sort((a, b) => a - b);
-  // Firebaseから取得済みのチーム情報があればそれを使用
-  if (multiState._teamA && multiState._teamB) {
-    return { teamA: multiState._teamA, teamB: multiState._teamB };
-  }
-  // 未設定時: プレイヤー数に応じたデフォルト分け
-  const oniTeam = [];
-  const runnerTeam = [];
-  if (pKeys.length <= 2) {
-    // 1v1: 最初のプレイヤーが鬼
-    if (pKeys[0] !== undefined) oniTeam.push(pKeys[0]);
-    if (pKeys[1] !== undefined) runnerTeam.push(pKeys[1]);
-  } else if (pKeys.length === 3) {
-    // 1v2: 最初が鬼, 残りランナー
-    oniTeam.push(pKeys[0]);
-    runnerTeam.push(pKeys[1], pKeys[2]);
-  } else {
-    // 2v2
-    oniTeam.push(pKeys[0], pKeys[1]);
-    runnerTeam.push(pKeys[2], pKeys[3]);
-  }
-  return { teamA: oniTeam, teamB: runnerTeam };
-}
 
 /**
- * updateTeamAssignUI — チーム分けUIを更新
+ * updateTeamAssignUI — チーム分けUIを更新（MAZE-HUNT準拠）
+ * 各プレイヤーのselectedRoleからチーム表示を構築
  */
 function updateTeamAssignUI() {
   const oniListEl = document.getElementById('team-oni-list');
   const runnerListEl = document.getElementById('team-runner-list');
   if (!oniListEl || !runnerListEl) return;
 
-  const { teamA, teamB } = getTeamAssignments();
+  // 各プレイヤーのselectedRoleからチーム分けを構築
   const players = multiState.players;
+  const pKeys = Object.keys(players).map(Number).sort((a, b) => a - b);
+  const teamA = []; // 鬼
+  const teamB = []; // ランナー
+  pKeys.forEach((idx, i) => {
+    const p = players[idx];
+    if (!p) return;
+    if (p.selectedRole === 'oni') {
+      teamA.push(idx);
+    } else if (p.selectedRole === 'runner') {
+      teamB.push(idx);
+    } else {
+      // 未選択: デフォルト分け（前半=鬼, 後半=ランナー）
+      if (i < Math.ceil(pKeys.length / 2)) teamA.push(idx);
+      else teamB.push(idx);
+    }
+  });
+  multiState._teamA = teamA;
+  multiState._teamB = teamB;
 
   // 鬼チームリスト
   let oniHtml = '';
@@ -1995,8 +2013,8 @@ function updateTeamAssignUI() {
     const p = players[idx];
     if (!p) return;
     const isMe = idx === multiState.playerIndex;
-    oniHtml += '<div class="team-slot oni' + (isMe ? ' me' : '') + '" data-idx="' + idx + '">';
-    oniHtml += '<span style="opacity:0.7;font-size:11px;margin-right:4px;">#' + (idx + 1) + '</span>👹 ' + escapeHTML(p.username || 'Player');
+    oniHtml += '<div class="team-slot oni' + (isMe ? ' me' : '') + '">';
+    oniHtml += '👹 ' + escapeHTML(p.username || 'Player');
     if (isMe) oniHtml += ' (あなた)';
     oniHtml += '</div>';
   });
@@ -2008,81 +2026,42 @@ function updateTeamAssignUI() {
     const p = players[idx];
     if (!p) return;
     const isMe = idx === multiState.playerIndex;
-    runnerHtml += '<div class="team-slot runner' + (isMe ? ' me' : '') + '" data-idx="' + idx + '">';
-    runnerHtml += '<span style="opacity:0.7;font-size:11px;margin-right:4px;">#' + (idx + 1) + '</span>🏃 ' + escapeHTML(p.username || 'Player');
+    runnerHtml += '<div class="team-slot runner' + (isMe ? ' me' : '') + '">';
+    runnerHtml += '🏃 ' + escapeHTML(p.username || 'Player');
     if (isMe) runnerHtml += ' (あなた)';
     runnerHtml += '</div>';
   });
   runnerListEl.innerHTML = runnerHtml || '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:8px;">—</div>';
 
-  // 全プレイヤー: チーム欄クリックで自分をそのチームに移動
-  // 鬼チーム欄をクリック → 自分を鬼チームに移動
-  oniListEl.style.cursor = 'pointer';
-  oniListEl.onclick = () => movePlayerToTeam(multiState.playerIndex, 'oni');
-  // ランナーチーム欄をクリック → 自分をランナーチームに移動
-  runnerListEl.style.cursor = 'pointer';
-  runnerListEl.onclick = () => movePlayerToTeam(multiState.playerIndex, 'runner');
+  // ロール選択ボタンの状態を自分のロールに合わせる
+  const myRole = players[multiState.playerIndex] && players[multiState.playerIndex].selectedRole;
+  document.querySelectorAll('#team-assign-section .role-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.role === (myRole || 'runner'));
+  });
 }
 
 /**
- * movePlayerToTeam — プレイヤーをチーム間で移動（全プレイヤー可）
- * 片方のチームが0人になる移動は禁止
+ * initRoleSelectButtons — ロール選択ボタンの初期化（MAZE-HUNT準拠）
+ * 各プレイヤーが自分のロールを自由に選択し、Firebaseに書き込む
  */
-function movePlayerToTeam(playerIdx, targetRole) {
-  const { teamA, teamB } = getTeamAssignments();
-  // 既に目標チームにいる場合は何もしない
-  if (targetRole === 'oni' && teamA.includes(playerIdx)) return;
-  if (targetRole === 'runner' && teamB.includes(playerIdx)) return;
-  // 移動元チームが1人だけの場合、移動すると0人になるので禁止
-  const fromOni = teamA.includes(playerIdx);
-  if (fromOni && teamA.length <= 1) {
-    showNotification('鬼チームに最低1人必要です');
-    return;
-  }
-  if (!fromOni && teamB.length <= 1) {
-    showNotification('ランナーチームに最低1人必要です');
-    return;
-  }
-  // 現在のチームから削除
-  const aIdx = teamA.indexOf(playerIdx);
-  if (aIdx >= 0) teamA.splice(aIdx, 1);
-  const bIdx = teamB.indexOf(playerIdx);
-  if (bIdx >= 0) teamB.splice(bIdx, 1);
-  // 目標チームに追加
-  if (targetRole === 'oni') teamA.push(playerIdx);
-  else teamB.push(playerIdx);
-  // 未割り当てのプレイヤーを反対側に自動配置
-  const allPlayers = Object.keys(multiState.players).map(Number).sort((a, b) => a - b);
-  allPlayers.forEach(idx => {
-    if (!teamA.includes(idx) && !teamB.includes(idx)) {
-      if (targetRole === 'oni') teamB.push(idx);
-      else teamA.push(idx);
-    }
+function initRoleSelectButtons() {
+  document.querySelectorAll('#team-assign-section .role-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const role = btn.dataset.role;
+      // ボタンUI更新
+      document.querySelectorAll('#team-assign-section .role-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      // Firebaseに自分のselectedRoleを書き込み
+      if (multiState.roomId) {
+        db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/selectedRole').set(role);
+      }
+      // ローカル更新
+      if (multiState.players[multiState.playerIndex]) {
+        multiState.players[multiState.playerIndex].selectedRole = role;
+      }
+      updateTeamAssignUI();
+    });
   });
-  // Firebase更新（全プレイヤーが書き込み可）
-  saveTeamAssignment(teamA, teamB);
-}
-
-/**
- * saveTeamAssignment — チーム分けをFirebaseに保存
- */
-function saveTeamAssignment(teamA, teamB) {
-  if (!multiState.roomId) return;
-  multiState._teamA = teamA;
-  multiState._teamB = teamB;
-  const roomRef = db.ref('rooms/' + multiState.roomId);
-  roomRef.child('teamBattle').update({
-    teamA: teamA,
-    teamB: teamB
-  });
-  // 各プレイヤーのselectedRoleを更新
-  teamA.forEach(idx => {
-    roomRef.child('players/' + idx + '/selectedRole').set('oni');
-  });
-  teamB.forEach(idx => {
-    roomRef.child('players/' + idx + '/selectedRole').set('runner');
-  });
-  updateTeamAssignUI();
 }
 
 async function toggleReady() {
@@ -2109,13 +2088,15 @@ async function hostStartGame() {
 
   // チーム戦: チーム分けが有効か検証
   if (multiState.gameMode === 'team') {
-    const { teamA, teamB } = getTeamAssignments();
+    const teamA = multiState._teamA || [];
+    const teamB = multiState._teamB || [];
     if (teamA.length === 0 || teamB.length === 0) {
       showNotification('両チームに1人以上必要です');
       return;
     }
     // チーム分けを確定保存
-    saveTeamAssignment(teamA, teamB);
+    const roomRef2 = db.ref('rooms/' + multiState.roomId);
+    roomRef2.child('teamBattle').update({ teamA: teamA, teamB: teamB });
   }
 
   // ゲーム設定をFirebaseに保存
