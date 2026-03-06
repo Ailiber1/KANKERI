@@ -797,8 +797,9 @@ html, body {
 }
 #oni-reticle .reticle-label {
   font-size: 14px; font-family: 'Noto Sans JP', sans-serif;
-  background: rgba(255,34,34,0.7); padding: 4px 12px; border-radius: 4px;
-  white-space: nowrap;
+  color: #ffffff; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,68,68,0.6);
+  padding: 4px 12px; border-radius: 4px; white-space: nowrap;
+  text-shadow: 0 0 4px rgba(255,68,68,0.5);
 }
 #oni-reticle.locked {
   color: #ff2222; text-shadow: 0 0 30px rgba(255,0,0,0.8); font-size: 72px;
@@ -8640,11 +8641,11 @@ function buildTempleObjects(g) {
 function createCan(g) {
   const canGroup = new THREE.Group();
   // Can body（少し大きめ）
-  const canGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.25, 16);
+  const canGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.35, 16);
   g.geometries.push(canGeo);
   const canMat = new THREE.MeshStandardMaterial({
     color: 0xeeeeee, metalness: 0.9, roughness: 0.15,
-    emissive: 0x00ffaa, emissiveIntensity: 0.5
+    emissive: 0x00ffaa, emissiveIntensity: 0.8
   });
   g.materials.push(canMat);
   const canMesh = new THREE.Mesh(canGeo, canMat);
@@ -8652,15 +8653,15 @@ function createCan(g) {
   canGroup.add(canMesh);
 
   // === 光柱ビーム（遠くからでも目立つ垂直の光） ===
-  const beamGeo = new THREE.CylinderGeometry(0.2, 0.6, 15, 16, 1, true);
+  const beamGeo = new THREE.CylinderGeometry(0.3, 0.8, 20, 16, 1, true);
   g.geometries.push(beamGeo);
   const beamMat = new THREE.MeshBasicMaterial({
-    color: 0x00ff88, transparent: true, opacity: 0.3,
+    color: 0x00ff88, transparent: true, opacity: 0.4,
     side: THREE.DoubleSide, depthWrite: false
   });
   g.materials.push(beamMat);
   const beam = new THREE.Mesh(beamGeo, beamMat);
-  beam.position.y = 7.5;
+  beam.position.y = 10;
   canGroup.add(beam);
 
   // === 地面の発光サークル（大きく明るい） ===
@@ -14339,6 +14340,9 @@ function addOniEyeGlow(g, fig) {
   g.materials.push(coneMat);
   const cone = new THREE.Mesh(coneGeo, coneMat);
   cone.rotation.x = -Math.PI / 2;
+  // CircleGeometryの中心方向は+X。フィギュアの正面は+Z。
+  // Y軸で-90°回転して+X→+Zに合わせる
+  cone.rotation.y = -Math.PI / 2;
   cone.position.y = 0.05;
   fig.group.add(cone);
   fig.visionCone = cone;
@@ -14761,12 +14765,22 @@ function syncOniPositions(g) {
 
 function syncGameState(g) {
   if (!multiState.isHost || !multiState.active || !multiState.roomId || !g) return;
-  db.ref('rooms/' + multiState.roomId + '/gameState').set({
-    gamePhase: g.gamePhase,
-    gameTimer: Math.round(g.gameTimer * 10) / 10,
-    capturedCount: g.capturedCount,
-    hideTime: g.hideTime || 0
-  });
+  // チーム戦でホストが鬼の場合:
+  //   gamePhaseはランナー（非ホスト）が制御するため、ホストは上書きしない
+  //   gameTimer/capturedCountのみ同期（updateで部分更新）
+  if (g._multiMode === 'team' && g._isOniPlayer) {
+    db.ref('rooms/' + multiState.roomId + '/gameState').update({
+      gameTimer: Math.round(g.gameTimer * 10) / 10,
+      capturedCount: g.capturedCount
+    });
+  } else {
+    db.ref('rooms/' + multiState.roomId + '/gameState').set({
+      gamePhase: g.gamePhase,
+      gameTimer: Math.round(g.gameTimer * 10) / 10,
+      capturedCount: g.capturedCount,
+      hideTime: g.hideTime || 0
+    });
+  }
   // 缶の位置も同期（isAtHomeも含む）
   // チーム戦でホストが鬼の場合、缶のキック・飛行はランナー（非ホスト）が制御するため
   // ホストのローカル状態で上書きしない（缶がホームに戻るバグの原因）
