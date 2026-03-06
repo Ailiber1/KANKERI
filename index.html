@@ -790,11 +790,11 @@ html, body {
 #oni-player-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 35; }
 #oni-reticle {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-  font-size: 36px; color: rgba(255,68,68,0.4); text-shadow: 0 0 10px rgba(255,0,0,0.2);
-  transition: color 0.15s, text-shadow 0.15s;
+  font-size: 64px; color: rgba(255,68,68,0.5); text-shadow: 0 0 15px rgba(255,0,0,0.3);
+  transition: color 0.15s, text-shadow 0.15s, font-size 0.15s;
 }
 #oni-reticle.locked {
-  color: #ff2222; text-shadow: 0 0 20px rgba(255,0,0,0.8); font-size: 40px;
+  color: #ff2222; text-shadow: 0 0 30px rgba(255,0,0,0.8); font-size: 72px;
 }
 #oni-can-direction {
   position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
@@ -9143,7 +9143,17 @@ function createPlayerController(g) {
     if (jEl) jEl.style.display = 'block';
     if (bEl) bEl.style.display = 'flex';
     const mobActionEl = document.getElementById('mob-action');
-    if (mobActionEl) mobActionEl.style.display = 'flex';
+    if (mobActionEl) {
+      // チーム戦の鬼プレイヤー: 「蹴る」→「発見」に変更
+      if (g._isOniPlayer) {
+        mobActionEl.textContent = '発見！';
+        mobActionEl.style.background = 'rgba(255,34,34,0.4)';
+        mobActionEl.style.border = '2px solid rgba(255,68,68,0.7)';
+        mobActionEl.style.color = '#ff4444';
+        mobActionEl.style.boxShadow = '0 0 12px rgba(255,68,68,0.3)';
+      }
+      mobActionEl.style.display = 'flex';
+    }
     const mobMapEl = document.getElementById('mob-map');
     if (mobMapEl) mobMapEl.style.display = 'block';
 
@@ -9231,14 +9241,19 @@ function createPlayerController(g) {
     if (mapBtn) {
       mapBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (G) G.overheadView = !G.overheadView; });
     }
-    // KICKボタン: 缶を蹴る・物を蹴る
+    // KICKボタン: ランナー→缶を蹴る / 鬼→ロックオン（発見）
     const actionBtn = document.getElementById('mob-action');
     if (actionBtn) {
       actionBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        // F/Space相当の入力をシミュレート
-        ctrl.keys['KeyF'] = true;
-        setTimeout(() => { ctrl.keys['KeyF'] = false; }, 100);
+        if (g._isOniPlayer) {
+          // 鬼: ロックオン実行
+          attemptLockOn(g);
+        } else {
+          // ランナー: F/Space相当の入力をシミュレート
+          ctrl.keys['KeyF'] = true;
+          setTimeout(() => { ctrl.keys['KeyF'] = false; }, 100);
+        }
       });
     }
   }
@@ -13674,45 +13689,124 @@ function showTeamRoundInterval(g, round1Score) {
       const p = multiState.players[i];
       return p ? escapeHTML(p.username || 'Player') : 'Player';
     }).join(', ');
-    const teamBNames = (g._teamB || []).map(i => {
-      const p = multiState.players[i];
-      return p ? escapeHTML(p.username || 'Player') : 'Player';
-    }).join(', ');
 
     stats.innerHTML = `
       <span style="font-size:18px;color:#ff4444">鬼チーム: ${teamANames}</span><br>
       <span style="font-size:14px;color:var(--text-dim)">スコア: <span style="color:var(--neon-yellow);font-size:20px">${round1Score}</span> pt</span><br>
       <br>
-      <span style="font-size:14px;color:var(--neon-cyan)">
-        ⚡ 攻守交代 — ラウンド2へ
-      </span><br>
-      <span id="team-interval-timer" style="font-size:24px;color:var(--neon-pink)">10</span>
+      <span style="font-size:13px;color:var(--neon-cyan)">
+        ⚡ 次は攻守交代してラウンド2へ
+      </span>
     `;
   }
 
-  // ボタンを非表示（インターバル中は操作不可）
+  // 個人戦同様の再戦ボタン（リマッチ投票UI）を表示
+  const rematchArea = document.getElementById('result-buttons-multi');
+  const soloArea = document.getElementById('result-buttons-solo');
   const retryBtn = document.getElementById('btn-retry');
   const titleBtn = document.getElementById('btn-title');
+
+  // ソロボタンを非表示、マルチボタンエリアを使用
+  if (soloArea) soloArea.style.display = 'none';
+  if (rematchArea) rematchArea.style.display = 'block';
   if (retryBtn) retryBtn.style.display = 'none';
-  if (titleBtn) titleBtn.style.display = 'none';
+
+  // リマッチカウントダウン
+  const countdownEl = document.getElementById('rematch-countdown');
+  const statusEl = document.getElementById('rematch-status');
+  const yesBtn = document.getElementById('btn-rematch-yes');
+  const noBtn = document.getElementById('btn-rematch-no');
+
+  if (countdownEl) countdownEl.textContent = '再戦（攻守交代）しますか？';
+  if (statusEl) statusEl.textContent = '';
+  if (yesBtn) {
+    yesBtn.textContent = '⚔ ラウンド2へ';
+    yesBtn.style.display = '';
+    yesBtn.disabled = false;
+  }
+  if (noBtn) {
+    noBtn.textContent = 'タイトルへ';
+    noBtn.style.display = '';
+  }
 
   if (overlay) overlay.style.display = 'flex';
 
-  // カウントダウン
-  let countdown = 10;
-  const timerEl = document.getElementById('team-interval-timer');
-  const intervalId = setInterval(() => {
+  // カウントダウンタイマー（30秒）
+  let countdown = 30;
+  const countdownTimer = setInterval(() => {
     countdown--;
-    if (timerEl) timerEl.textContent = countdown;
+    if (statusEl) statusEl.textContent = `残り ${countdown} 秒`;
     if (countdown <= 0) {
-      clearInterval(intervalId);
+      clearInterval(countdownTimer);
+      // タイムアウト: タイトルへ戻る
       if (overlay) overlay.style.display = 'none';
-      // ボタンを復帰
-      if (retryBtn) retryBtn.style.display = '';
-      if (titleBtn) titleBtn.style.display = '';
-      startTeamRound2(g);
+      showScreen('title-screen');
     }
   }, 1000);
+  g._teamRound1CountdownTimer = countdownTimer;
+
+  // Firebase: リマッチ投票の仕組み
+  if (multiState.isHost && multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/teamBattle/round2Votes').remove();
+  }
+
+  // 「ラウンド2へ」ボタン
+  const yesHandler = () => {
+    if (yesBtn) { yesBtn.disabled = true; yesBtn.textContent = '待機中...'; }
+    // Firebase投票
+    if (multiState.roomId) {
+      db.ref('rooms/' + multiState.roomId + '/teamBattle/round2Votes/' + multiState.playerIndex).set(true);
+    }
+  };
+  // 「タイトルへ」ボタン
+  const noHandler = () => {
+    clearInterval(countdownTimer);
+    if (overlay) overlay.style.display = 'none';
+    if (multiState.roomId) {
+      db.ref('rooms/' + multiState.roomId + '/teamBattle/round2Votes/' + multiState.playerIndex).set(false);
+    }
+    showScreen('title-screen');
+  };
+
+  if (yesBtn) {
+    yesBtn.onclick = yesHandler;
+  }
+  if (noBtn) {
+    noBtn.onclick = noHandler;
+  }
+
+  // Firebase: 全員投票完了を監視
+  if (multiState.roomId) {
+    const votesRef = db.ref('rooms/' + multiState.roomId + '/teamBattle/round2Votes');
+    const voteListener = votesRef.on('value', snap => {
+      const votes = snap.val();
+      if (!votes) return;
+      const pKeys = Object.keys(multiState.players).map(Number);
+      const totalPlayers = pKeys.length;
+      const voteKeys = Object.keys(votes);
+
+      // 全員投票した？
+      if (voteKeys.length >= totalPlayers) {
+        votesRef.off('value', voteListener);
+        clearInterval(countdownTimer);
+        // 全員がYesならラウンド2開始
+        const allYes = voteKeys.every(k => votes[k] === true);
+        if (allYes) {
+          if (overlay) overlay.style.display = 'none';
+          if (rematchArea) rematchArea.style.display = 'none';
+          startTeamRound2(g);
+        } else {
+          // 誰かがNoならタイトルへ
+          if (overlay) overlay.style.display = 'none';
+          showScreen('title-screen');
+        }
+      } else {
+        // 途中経過表示
+        const yesCount = voteKeys.filter(k => votes[k] === true).length;
+        if (statusEl) statusEl.textContent = `${yesCount}/${totalPlayers} が再戦に同意 (残り ${countdown} 秒)`;
+      }
+    });
+  }
 }
 
 /**
@@ -13958,16 +14052,10 @@ function initOniPlayerControls(g) {
     lockCooldown: 0           // ロックオン失敗後のクールダウン
   };
 
-  // モバイル: ロックオンボタン
+  // モバイル: ロックオンボタン（mob-actionが「発見」に変わるので元のoni-lockon-btnは非表示のまま）
   const isMobile = 'ontouchstart' in window;
   const lockonBtn = document.getElementById('oni-lockon-btn');
-  if (lockonBtn && isMobile) {
-    lockonBtn.style.display = 'block';
-    lockonBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      attemptLockOn(g);
-    });
-  }
+  // oni-lockon-btnは非表示のまま（mob-actionで代替）
 
   // 缶タッチボタン（PC: Space、モバイル: タップ）
   const touchBtn = document.getElementById('oni-can-touch-btn');
