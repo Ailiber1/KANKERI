@@ -14585,15 +14585,20 @@ function initMultiplayerSync(g) {
           // 前進のみ許可
           if (newO !== undefined && curO !== undefined && newO > curO) {
             g.gamePhase = state.gamePhase;
-            // hideフェーズ: phaseTimerをセット
+            // kickフェーズ: 缶配置UIを非表示
+            if (state.gamePhase === 'kick') {
+              var cpWrap = document.getElementById('can-placement-wrap');
+              if (cpWrap) cpWrap.style.display = 'none';
+            }
+            // hideフェーズ: phaseTimerをセット（カウントダウンは鬼には表示しない）
             if (state.gamePhase === 'hide' && state.hideTime) {
               g.hideTime = state.hideTime;
               g.phaseTimer = state.hideTime;
-              showHideCountdown(g, true);
+              showCenterAlert('⏳ ランナーが隠れている…', Math.ceil(state.hideTime) + '秒', 3000);
             }
             if (state.gamePhase === 'seek') {
               showHideCountdown(g, false);
-              showNotification('鬼が動き出した！');
+              showNotification('探しに行け！');
               SoundManager.playGameSE('notify');
             }
           }
@@ -14694,11 +14699,19 @@ function initMultiplayerSync(g) {
             g.hideTime = state.hideTime;
             g.phaseTimer = state.hideTime; // 非ホスト: phaseTimerも設定
           }
-          showHideCountdown(g, true);
+          // 鬼には「隠れろ」ではなく待機メッセージ
+          if (g._isOniPlayer) {
+            showCenterAlert('⏳ ランナーが隠れている…', Math.ceil(state.hideTime) + '秒', 3000);
+          } else {
+            showHideCountdown(g, true);
+          }
         }
         // hide → seek: かくれんぼカウントダウンを非表示
         if (state.gamePhase === 'seek') {
           showHideCountdown(g, false);
+          if (g._isOniPlayer) {
+            showNotification('探しに行け！');
+          }
         }
         // 非ホスト: resultフェーズ → リザルト画面を表示
         if (state.gamePhase === 'result' && prevPhase !== 'result') {
