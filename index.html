@@ -733,6 +733,13 @@ html, body {
 .team-slot.me { font-weight: bold; }
 .lobby-btn-row { display: flex; gap: 10px; margin-top: 14px; }
 .lobby-btn-row .btn { flex: 1; }
+/* CPU追加/削除ボタン */
+#cpu-oni-controls { margin-top: 4px; display: flex; gap: 4px; }
+.team-slot.cpu { color: #ff8844; border-color: rgba(255,136,68,0.4); background: rgba(255,136,68,0.08); font-style: italic; }
+.btn-cpu-add { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: #ff4444; background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.4); border-radius: 4px; padding: 4px 8px; cursor: pointer; flex: 1; }
+.btn-cpu-add:hover { background: rgba(255,68,68,0.2); }
+.btn-cpu-remove { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text-dim); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 4px 8px; cursor: pointer; flex: 1; }
+.btn-cpu-remove:hover { background: rgba(255,255,255,0.1); }
 .lobby-chat { margin-top: 12px; max-height: 80px; overflow-y: auto; font-size: 12px; color: var(--text-secondary); }
 .lobby-chat-msg { padding: 2px 0; }
 .lobby-chat-msg .chat-name { color: var(--neon-cyan); }
@@ -1265,6 +1272,10 @@ html, body {
         <div class="team-column">
           <div class="team-column-title oni">👹 鬼チーム</div>
           <div id="team-oni-list"></div>
+          <div id="cpu-oni-controls" style="display:none;">
+            <button id="btn-add-cpu-oni" class="btn-cpu-add">＋ CPU（強）</button>
+            <button id="btn-remove-cpu-oni" class="btn-cpu-remove" style="display:none;">－ CPU削除</button>
+          </div>
         </div>
         <div class="team-column">
           <div class="team-column-title runner">🏃 ランナーチーム</div>
@@ -1825,6 +1836,8 @@ function initLobbyListeners() {
   removeLobbyListeners();
   // チーム戦: ロール選択ボタン初期化
   initRoleSelectButtons();
+  initCpuOniButtons();
+  multiState._cpuOniCount = 0;
 
   const roomRef = db.ref('rooms/' + multiState.roomId);
 
@@ -1842,6 +1855,14 @@ function initLobbyListeners() {
     }
   });
   multiState._listeners.push({ ref: playersRef, event: 'value', fn: onPlayers });
+
+  // CPU鬼数の同期（非ホストが受信）
+  const cpuRef = roomRef.child('cpuOniCount');
+  const onCpu = cpuRef.on('value', (snap) => {
+    multiState._cpuOniCount = snap.val() || 0;
+    updateTeamAssignUI();
+  });
+  multiState._listeners.push({ ref: cpuRef, event: 'value', fn: onCpu });
 
   // ルーム状態監視
   const statusRef = roomRef.child('status');
@@ -2073,7 +2094,22 @@ function updateTeamAssignUI() {
     if (isMe) oniHtml += youLabel;
     oniHtml += '</div>';
   });
+  // CPU鬼の表示
+  const cpuCount = multiState._cpuOniCount || 0;
+  for (let i = 0; i < cpuCount; i++) {
+    oniHtml += '<div class="team-slot oni cpu">🤖 CPU（強）</div>';
+  }
   oniListEl.innerHTML = oniHtml || '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:8px;">—</div>';
+
+  // CPU追加/削除ボタンの表示制御（ホストのみ）
+  const cpuControls = document.getElementById('cpu-oni-controls');
+  const addBtn = document.getElementById('btn-add-cpu-oni');
+  const removeBtn = document.getElementById('btn-remove-cpu-oni');
+  if (cpuControls) {
+    cpuControls.style.display = multiState.isHost ? 'flex' : 'none';
+    if (addBtn) addBtn.style.display = cpuCount < 3 ? '' : 'none';
+    if (removeBtn) removeBtn.style.display = cpuCount > 0 ? '' : 'none';
+  }
 
   // ランナーチームリスト
   let runnerHtml = '';
@@ -2127,6 +2163,34 @@ function initRoleSelectButtons() {
       }
     });
   });
+}
+
+// CPU鬼追加/削除ボタン
+function initCpuOniButtons() {
+  const addBtn = document.getElementById('btn-add-cpu-oni');
+  const removeBtn = document.getElementById('btn-remove-cpu-oni');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      const current = multiState._cpuOniCount || 0;
+      if (current >= 3) return;
+      multiState._cpuOniCount = current + 1;
+      if (multiState.roomId) {
+        db.ref('rooms/' + multiState.roomId + '/cpuOniCount').set(multiState._cpuOniCount);
+      }
+      updateTeamAssignUI();
+    });
+  }
+  if (removeBtn) {
+    removeBtn.addEventListener('click', () => {
+      const current = multiState._cpuOniCount || 0;
+      if (current <= 0) return;
+      multiState._cpuOniCount = current - 1;
+      if (multiState.roomId) {
+        db.ref('rooms/' + multiState.roomId + '/cpuOniCount').set(multiState._cpuOniCount);
+      }
+      updateTeamAssignUI();
+    });
+  }
 }
 
 async function toggleReady() {
@@ -13510,11 +13574,62 @@ function startGame(stageNum, mode) {
         G.playerFig.mat.color.setHex(0xff2222);
         G.playerFig.mat.emissive.setHex(0xff2222);
         G._isOniPlayer = true;
-        // 鬼プレイヤー: AI鬼は生成しない
+        // 既存のAI鬼を削除
         G.onis.forEach(oni => {
           if (oni.fig && oni.fig.group) G.scene.remove(oni.fig.group);
         });
         G.onis = [];
+        // CPU鬼を追加（ホストのみ生成、強レベル）
+        const cpuOniCount = multiState._cpuOniCount || 0;
+        G._cpuOniCount = cpuOniCount;
+        if (multiState.isHost && cpuOniCount > 0) {
+          for (let i = 0; i < cpuOniCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = G.config.size / 2 - 3;
+            const sx = Math.cos(angle) * dist;
+            const sz = Math.sin(angle) * dist;
+            const safe = findSafeSpawn(G, sx, sz);
+            const cpuOni = createOni(G, safe.x, safe.z);
+            // 強レベル: 速度+30%, 視野距離+30%, 視野角+20度
+            cpuOni.speed = 4.5;
+            cpuOni.chaseSpeed = 6.5;
+            cpuOni.canTouchSpeed = 7.5;
+            cpuOni.viewDist = 26;
+            cpuOni.viewAngle = 140 * Math.PI / 180;
+            cpuOni.fatigueRate = 2; // 疲労しにくい
+            cpuOni.state = 'patrol';
+            cpuOni._isCpuTeamOni = true; // チーム戦CPU鬼フラグ
+            G.onis.push(cpuOni);
+          }
+        }
+      } else {
+        // ランナー側もCPU鬼を生成（ホスト以外の場合も表示用）
+        const cpuOniCount = multiState._cpuOniCount || 0;
+        G._cpuOniCount = cpuOniCount;
+        // ランナー側のAI鬼は残す（既にソロ用で生成済み→削除して再生成）
+        G.onis.forEach(oni => {
+          if (oni.fig && oni.fig.group) G.scene.remove(oni.fig.group);
+        });
+        G.onis = [];
+        if (cpuOniCount > 0) {
+          for (let i = 0; i < cpuOniCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = G.config.size / 2 - 3;
+            const sx = Math.cos(angle) * dist;
+            const sz = Math.sin(angle) * dist;
+            const safe = findSafeSpawn(G, sx, sz);
+            const cpuOni = createOni(G, safe.x, safe.z);
+            cpuOni.speed = 4.5;
+            cpuOni.chaseSpeed = 6.5;
+            cpuOni.canTouchSpeed = 7.5;
+            cpuOni.viewDist = 26;
+            cpuOni.viewAngle = 140 * Math.PI / 180;
+            cpuOni.fatigueRate = 2;
+            cpuOni.state = 'patrol';
+            cpuOni._isCpuTeamOni = true;
+            G.onis.push(cpuOni);
+          }
+        }
       }
     }
 
@@ -13887,12 +14002,30 @@ function startTeamRound2(g) {
   });
 
   // AI鬼の管理
+  // 既存AI鬼を全削除
+  g.onis.forEach(oni => {
+    if (oni.fig && oni.fig.group) g.scene.remove(oni.fig.group);
+  });
+  g.onis = [];
+
+  // CPU鬼を再生成（ラウンド2でも同数）
+  const cpuOniCount = g._cpuOniCount || 0;
+  if (cpuOniCount > 0) {
+    for (let i = 0; i < cpuOniCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = g.config.size / 2 - 3;
+      const sx = Math.cos(angle) * dist;
+      const sz = Math.sin(angle) * dist;
+      const safe = findSafeSpawn(g, sx, sz);
+      const cpuOni = createOni(g, safe.x, safe.z);
+      cpuOni.speed = 4.5; cpuOni.chaseSpeed = 6.5; cpuOni.canTouchSpeed = 7.5;
+      cpuOni.viewDist = 26; cpuOni.viewAngle = 140 * Math.PI / 180;
+      cpuOni.fatigueRate = 2; cpuOni.state = 'patrol'; cpuOni._isCpuTeamOni = true;
+      g.onis.push(cpuOni);
+    }
+  }
+
   if (g._isOniPlayer) {
-    // 鬼になった: AI鬼を削除
-    g.onis.forEach(oni => {
-      if (oni.fig && oni.fig.group) g.scene.remove(oni.fig.group);
-    });
-    g.onis = [];
     initOniPlayerControls(g);
   } else if (wasOni) {
     // ランナーになった: 鬼HUDを非表示、鬼状態をクリア
