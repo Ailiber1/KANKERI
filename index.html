@@ -749,7 +749,7 @@ html, body {
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
   #hud-minimap { width: 70px; height: 70px; top: auto; left: auto; bottom: calc(210px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); }
-  #hud-action-prompt { font-size: 13px; padding: 6px 14px; bottom: auto; top: 50%; transform: translateX(-50%) translateY(-50%); }
+  #hud-action-prompt { font-size: 13px; padding: 6px 14px; bottom: auto; top: 30%; transform: translateX(-50%) translateY(-50%); }
   #hud-peek-prompt { font-size: 12px; padding: 4px 12px; bottom: 130px; }
   #kick-gauge-wrap { min-width: 240px; padding: 14px 18px; }
   #kick-gauge-title { font-size: 18px; margin-bottom: 10px; }
@@ -816,6 +816,10 @@ html, body {
   background: rgba(255,34,34,0.8); border: 2px solid #ff4444; padding: 10px 24px;
   border-radius: 8px; pointer-events: auto; cursor: pointer;
   animation: promptPulse 1.5s ease-in-out infinite;
+}
+/* スマホ: 鬼の缶タッチ/缶拾いボタンは非表示（mob-actionボタンで代替） */
+@media (pointer: coarse) {
+  #oni-can-touch-btn, #oni-pickup-btn { display: none !important; }
 }
 #oni-lockon-btn {
   position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); top: 35%; transform: translateY(-50%);
@@ -11774,11 +11778,24 @@ function updateCanPhysics(g, dt) {
       g.can.velocity.set(0, 0, 0);
       SoundManager.playGameSE('can_land');
 
+      // マルチプレイ: 缶の着地位置を全プレイヤーに同期
+      if (g._isMultiplayer && multiState.roomId) {
+        const cp = g.can.group.position;
+        db.ref('rooms/' + multiState.roomId + '/canState').set({
+          position: { x: Math.round(cp.x * 100) / 100, y: Math.round(cp.y * 100) / 100, z: Math.round(cp.z * 100) / 100 },
+          isAtHome: false,
+          isFlying: false,
+          status: 'landed'
+        });
+      }
+
       // Transition phases
       if (g.gamePhase === 'kick') {
         g.gamePhase = 'hide';
         g.phaseTimer = g.hideTime || 10;
         showHideCountdown(g, true);
+        // マルチプレイ: フェーズ変更を同期
+        if (g._isMultiplayer && multiState.isHost) syncGameState(g);
       }
     }
   }
@@ -11787,6 +11804,18 @@ function updateCanPhysics(g, dt) {
   const half = g.config.size / 2 - 1;
   g.can.group.position.x = Math.max(-half, Math.min(half, g.can.group.position.x));
   g.can.group.position.z = Math.max(-half, Math.min(half, g.can.group.position.z));
+
+  // マルチプレイ: 飛翔中も缶の位置を定期同期（4フレームに1回）
+  if (g._isMultiplayer && multiState.roomId && g.can.isFlying) {
+    g._canSyncFrame = (g._canSyncFrame || 0) + 1;
+    if (g._canSyncFrame % 4 === 0) {
+      const cp = g.can.group.position;
+      db.ref('rooms/' + multiState.roomId + '/canState').update({
+        position: { x: Math.round(cp.x * 100) / 100, y: Math.round(cp.y * 100) / 100, z: Math.round(cp.z * 100) / 100 },
+        isFlying: true
+      });
+    }
+  }
 }
 
 function freeAllCaptured(g) {
@@ -13679,7 +13708,7 @@ function showCanPlacementUI(g) {
 // ============================================================
 
 /**
- * endTeamBattle — チーム戦の結果表示（個人戦と同様の再戦方式）
+ * endTeamBattle — チーム戦の結果表示（FFAと同じstartRematchCountdownを使用）
  * runnersWon: true=ランナー勝利（時間切れ）, false=鬼勝利（全員捕獲）
  */
 function endTeamBattle(g, runnersWon) {
@@ -13692,6 +13721,8 @@ function endTeamBattle(g, runnersWon) {
         endTime: firebase.database.ServerValue.TIMESTAMP
       }
     });
+    // teamBattleデータをクリーンアップ
+    db.ref('rooms/' + multiState.roomId + '/teamBattle').remove();
   }
 
   const overlay = document.getElementById('result-overlay');
@@ -13738,110 +13769,15 @@ function endTeamBattle(g, runnersWon) {
     `;
   }
 
-  // 個人戦と同様のリマッチ投票UI
-  const rematchArea = document.getElementById('result-buttons-multi');
+  // FFAと同じリマッチ投票UIを使用（重複実装を排除）
   const soloArea = document.getElementById('result-buttons-solo');
-  const retryBtn = document.getElementById('btn-retry');
-
+  const multiButtons = document.getElementById('result-buttons-multi');
   if (soloArea) soloArea.style.display = 'none';
-  if (rematchArea) rematchArea.style.display = 'block';
-  if (retryBtn) retryBtn.style.display = 'none';
-
-  const countdownEl = document.getElementById('rematch-countdown');
-  const statusEl = document.getElementById('rematch-status');
-  const yesBtn = document.getElementById('btn-rematch-yes');
-  const noBtn = document.getElementById('btn-rematch-no');
-
-  if (countdownEl) countdownEl.textContent = '再戦しますか？';
-  if (statusEl) statusEl.textContent = '';
-  if (yesBtn) {
-    yesBtn.textContent = '⚔ 再戦';
-    yesBtn.style.display = '';
-    yesBtn.disabled = false;
-  }
-  if (noBtn) {
-    noBtn.textContent = 'タイトルへ';
-    noBtn.style.display = '';
-  }
+  if (multiButtons) multiButtons.style.display = 'block';
+  startRematchCountdown(g);
 
   if (overlay) overlay.style.display = 'flex';
-
-  // 30秒カウントダウン
-  let countdown = 30;
-  const countdownTimer = setInterval(() => {
-    countdown--;
-    if (statusEl) statusEl.textContent = `残り ${countdown} 秒`;
-    if (countdown <= 0) {
-      clearInterval(countdownTimer);
-      if (overlay) overlay.style.display = 'none';
-      showScreen('title-screen');
-    }
-  }, 1000);
-
-  // Firebase: リマッチ投票
-  if (multiState.isHost && multiState.roomId) {
-    db.ref('rooms/' + multiState.roomId + '/teamBattle/rematchVotes').remove();
-  }
-
-  const yesHandler = () => {
-    if (yesBtn) { yesBtn.disabled = true; yesBtn.textContent = '待機中...'; }
-    if (multiState.roomId) {
-      db.ref('rooms/' + multiState.roomId + '/teamBattle/rematchVotes/' + multiState.playerIndex).set(true);
-    }
-  };
-  const noHandler = () => {
-    clearInterval(countdownTimer);
-    if (overlay) overlay.style.display = 'none';
-    if (multiState.roomId) {
-      db.ref('rooms/' + multiState.roomId + '/teamBattle/rematchVotes/' + multiState.playerIndex).set(false);
-    }
-    showScreen('title-screen');
-  };
-
-  if (yesBtn) yesBtn.onclick = yesHandler;
-  if (noBtn) noBtn.onclick = noHandler;
-
-  // Firebase: 全員投票完了を監視 → 全員Yesならロビーに戻って再戦
-  if (multiState.roomId) {
-    const votesRef = db.ref('rooms/' + multiState.roomId + '/teamBattle/rematchVotes');
-    const voteListener = votesRef.on('value', snap => {
-      const votes = snap.val();
-      if (!votes) return;
-      const pKeys = Object.keys(multiState.players).map(Number);
-      const totalPlayers = pKeys.length;
-      const voteKeys = Object.keys(votes);
-
-      if (voteKeys.length >= totalPlayers) {
-        votesRef.off('value', voteListener);
-        clearInterval(countdownTimer);
-        const allYes = voteKeys.every(k => votes[k] === true);
-        if (allYes) {
-          // 全員再戦 → ロビーへ戻る
-          if (overlay) overlay.style.display = 'none';
-          if (rematchArea) rematchArea.style.display = 'none';
-          cleanupGame();
-          if (multiState.roomId) {
-            multiState.ready = false;
-            db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/ready').set(false);
-            db.ref('rooms/' + multiState.roomId + '/status').set('waiting');
-            db.ref('rooms/' + multiState.roomId + '/teamBattle').remove();
-            showScreen('lobby-screen');
-            initLobbyListeners();
-            updateLobbyUI();
-          }
-        } else {
-          if (overlay) overlay.style.display = 'none';
-          showScreen('title-screen');
-        }
-      } else {
-        const yesCount = voteKeys.filter(k => votes[k] === true).length;
-        if (statusEl) statusEl.textContent = `${yesCount}/${totalPlayers} が再戦に同意 (残り ${countdown} 秒)`;
-      }
-    });
-  }
 }
-
-
 
 // ============================================================
 // SECTION: ONI PLAYER (鬼プレイヤー操作 — チーム戦)
@@ -14302,57 +14238,58 @@ function handleOniPlayerInput(g, key) {
 // ============================================================
 
 /**
- * addOniEyeGlow — チーム戦の鬼フィギュアに赤い目の発光＋レーザーセンサーを追加
- * ストーリーモードの鬼と同様のビジュアル（赤い目 + vision cone + 目の発光ライト）
+ * addOniEyeGlow — チーム戦の鬼フィギュアにストーリーモードと同じビジュアルを追加
+ * 赤い目（外側+瞳孔）+ PointLight + 地面のvision cone（赤い扇形）
+ * createOni() と同じパラメータを使用
  */
 function addOniEyeGlow(g, fig) {
   const head = fig.group.children[0]; // head mesh
   if (!head) return;
   const headRadius = 0.17;
 
-  // === 赤い目（ストーリーモードの鬼と同じ構造） ===
-  const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-  g.materials.push(eyeGlowMat);
+  // === 赤い発光する目（createOniと同じ構造・サイズ） ===
+  const oniEyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+  g.materials.push(oniEyeGlowMat);
   const eyeOuterGeo = new THREE.SphereGeometry(0.045, 12, 12);
   const eyePupilGeo = new THREE.SphereGeometry(0.03, 10, 10);
   g.geometries.push(eyeOuterGeo, eyePupilGeo);
 
-  // 左目
-  const leftOuterMat = new THREE.MeshBasicMaterial({ color: 0xcc0000 });
+  // 左目（赤い外枠 + 黄色い瞳）
+  const leftOuterMat = new THREE.MeshBasicMaterial({ color: 0xff4400 });
   g.materials.push(leftOuterMat);
   const leftOuter = new THREE.Mesh(eyeOuterGeo, leftOuterMat);
   leftOuter.scale.set(1.3, 0.7, 0.6);
   leftOuter.position.set(-0.06, 0.035, headRadius * 0.82);
   leftOuter.rotation.z = 0.25;
   head.add(leftOuter);
-  const leftPupil = new THREE.Mesh(eyePupilGeo, eyeGlowMat);
+  const leftPupil = new THREE.Mesh(eyePupilGeo, oniEyeGlowMat);
   leftPupil.position.set(0, 0, 0.015);
   leftOuter.add(leftPupil);
 
   // 右目
-  const rightOuterMat = new THREE.MeshBasicMaterial({ color: 0xcc0000 });
+  const rightOuterMat = new THREE.MeshBasicMaterial({ color: 0xff4400 });
   g.materials.push(rightOuterMat);
   const rightOuter = new THREE.Mesh(eyeOuterGeo, rightOuterMat);
   rightOuter.scale.set(1.3, 0.7, 0.6);
   rightOuter.position.set(0.06, 0.035, headRadius * 0.82);
   rightOuter.rotation.z = -0.25;
   head.add(rightOuter);
-  const rightPupil = new THREE.Mesh(eyePupilGeo, eyeGlowMat);
+  const rightPupil = new THREE.Mesh(eyePupilGeo, oniEyeGlowMat);
   rightPupil.position.set(0, 0, 0.015);
   rightOuter.add(rightPupil);
 
-  // 目の発光ライト
-  const eyeLight = new THREE.PointLight(0xff0000, 0.8, 2.5);
+  // 目の発光ライト（createOniと同じ）
+  const eyeLight = new THREE.PointLight(0xffcc00, 0.6, 1.5);
   eyeLight.position.set(0, 0.04, headRadius * 0.9);
   head.add(eyeLight);
   fig.eyeLight = eyeLight;
 
-  // === 赤いvision cone（レーザーセンサー） — ストーリーモードの鬼と同じ ===
-  const coneGeo = new THREE.CircleGeometry(8, 16, -Math.PI / 3, Math.PI * 2 / 3);
+  // === vision cone（createOniと完全に同じ: 地面に赤い扇形） ===
+  const coneGeo = new THREE.CircleGeometry(10, 16, -Math.PI / 3, Math.PI * 2 / 3);
   g.geometries.push(coneGeo);
   const coneMat = new THREE.MeshBasicMaterial({
-    color: 0xff3333, transparent: true, opacity: 0.12,
-    side: THREE.DoubleSide, depthWrite: false
+    color: 0xff3333, transparent: true, opacity: 0.15,
+    side: THREE.DoubleSide
   });
   g.materials.push(coneMat);
   const cone = new THREE.Mesh(coneGeo, coneMat);
@@ -14360,24 +14297,6 @@ function addOniEyeGlow(g, fig) {
   cone.position.y = 0.05;
   fig.group.add(cone);
   fig.visionCone = cone;
-
-  // === 目からの赤いレーザービーム（前方に伸びる光線） ===
-  const laserGeo = new THREE.CylinderGeometry(0.015, 0.005, 5, 6);
-  g.geometries.push(laserGeo);
-  const laserMat = new THREE.MeshBasicMaterial({
-    color: 0xff0000, transparent: true, opacity: 0.4
-  });
-  g.materials.push(laserMat);
-  // 左目レーザー
-  const laserL = new THREE.Mesh(laserGeo, laserMat);
-  laserL.rotation.x = Math.PI / 2;
-  laserL.position.set(-0.06, 0.035, headRadius + 2.5);
-  head.add(laserL);
-  // 右目レーザー
-  const laserR = new THREE.Mesh(laserGeo, laserMat);
-  laserR.rotation.x = Math.PI / 2;
-  laserR.position.set(0.06, 0.035, headRadius + 2.5);
-  head.add(laserR);
 }
 
 /**
