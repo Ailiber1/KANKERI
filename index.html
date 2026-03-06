@@ -1995,6 +1995,17 @@ function updateLobbyUI() {
   if (readyBtn) {
     readyBtn.textContent = multiState.ready ? '準備取消' : '準備完了';
     readyBtn.style.display = multiState.isHost ? 'none' : 'block';
+    // チーム戦: 両チームに1人以上いないと準備完了できない
+    if (multiState.gameMode === 'team') {
+      const tA = multiState._teamA || [];
+      const tB = multiState._teamB || [];
+      const tValid = tA.length >= 1 && tB.length >= 1;
+      readyBtn.disabled = !tValid;
+      readyBtn.style.opacity = tValid ? '1' : '0.4';
+    } else {
+      readyBtn.disabled = false;
+      readyBtn.style.opacity = '1';
+    }
   }
   if (startBtn) {
     startBtn.style.display = multiState.isHost ? 'block' : 'none';
