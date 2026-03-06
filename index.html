@@ -14339,10 +14339,9 @@ function addOniEyeGlow(g, fig) {
   });
   g.materials.push(coneMat);
   const cone = new THREE.Mesh(coneGeo, coneMat);
-  cone.rotation.x = -Math.PI / 2;
-  // CircleGeometryの中心方向は+X。フィギュアの正面は+Z。
-  // Y軸で-90°回転して+X→+Zに合わせる
-  cone.rotation.y = -Math.PI / 2;
+  // CircleGeometryは+X方向が扇の中心。フィギュアの正面は+Z。
+  // Euler XYZ順: Rz→Ry→Rx。Rz(-PI/2)で+X→-Y、Rx(-PI/2)で-Y→+Z(正面)
+  cone.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
   cone.position.y = 0.05;
   fig.group.add(cone);
   fig.visionCone = cone;
@@ -14502,7 +14501,21 @@ function initMultiplayerSync(g) {
       const state = snap.val();
       if (!state || !g || g.disposed) return;
       const prevPhase = g.gamePhase;
-      if (state.gamePhase) g.gamePhase = state.gamePhase;
+      // フェーズ順序チェック: Firebase競合でフェーズが巻き戻るのを防止
+      // (ホストのgameTimer更新がリスナーを発火→古いgamePhaseで上書きされるバグ対策)
+      if (state.gamePhase) {
+        const phaseOrder = { placement: 0, kick: 1, hide: 2, seek: 3, result: 4 };
+        const newO = phaseOrder[state.gamePhase];
+        const curO = phaseOrder[g.gamePhase];
+        if (newO !== undefined && curO !== undefined) {
+          // 前進のみ許可（placementへの戻りはリマッチ用に許可）
+          if (newO >= curO || state.gamePhase === 'placement') {
+            g.gamePhase = state.gamePhase;
+          }
+        } else {
+          g.gamePhase = state.gamePhase;
+        }
+      }
       if (state.gameTimer !== undefined) g.gameTimer = state.gameTimer;
       if (state.capturedCount !== undefined) g.capturedCount = state.capturedCount;
       if (state.hideTime !== undefined) g.hideTime = state.hideTime;
