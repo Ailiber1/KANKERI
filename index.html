@@ -14720,6 +14720,8 @@ function initMultiplayerSync(g) {
         const oniIdx = parseInt(snap.key);
         const lockData = snap.val();
         if (!lockData || !lockData.validated || !g || g.disposed) return;
+        // seekフェーズ以外では通知しない（前回データの誤発火防止）
+        if (g.gamePhase !== 'seek') return;
         const targetIdx = lockData.targetIndex;
         const lockKey = oniIdx + '_' + targetIdx;
         if (g._notifiedLocks[lockKey]) return; // 重複防止
