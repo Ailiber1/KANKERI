@@ -13923,38 +13923,41 @@ function updateOniPlayerHUD(g, dt) {
   // AI自動検知 — ランナーが画面内に映っていたら自動ロックオン
   const reticle = document.getElementById('oni-reticle');
   const hasTarget = checkReticleOnRunner(g);
+  // レティクル(◎)はアクション可能時のみ表示
+  let canAction = false;
+  let statusText = '';
+  if (g.can) {
+    const canDist = g.player.position.distanceTo(g.can.group.position);
+    if (canDist < 2.5 && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
+      canAction = true;
+      statusText = '⚡ 缶を踏む（捕獲）';
+    } else if (canDist < 2.5 && !g.can.isAtHome && !op.canCarrying) {
+      canAction = true;
+      statusText = '📦 缶を拾う';
+    }
+  }
   if (reticle) {
     reticle.classList.toggle('locked', hasTarget);
+    reticle.style.display = canAction ? 'block' : 'none';
   }
 
-  // 鬼ステータスラベル（画面上部に表示、プレイの邪魔にならない位置）
+  // 鬼ステータスラベル（画面上部、アクション/ロック/運搬時のみ表示）
   const statusLabel = document.getElementById('oni-status-label');
   if (statusLabel) {
-    let label = '';
-    if (g.can) {
-      const canDist = g.player.position.distanceTo(g.can.group.position);
-      if (canDist < 2.5 && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
-        label = '⚡ 缶を踏む（タップで捕獲）';
-        statusLabel.style.background = 'rgba(200,0,0,0.7)';
-        statusLabel.style.borderColor = 'rgba(255,100,100,0.8)';
-      } else if (canDist < 2.5 && !g.can.isAtHome && !op.canCarrying) {
-        label = '📦 缶を拾う（タップ）';
-        statusLabel.style.background = 'rgba(200,0,0,0.7)';
-        statusLabel.style.borderColor = 'rgba(255,100,100,0.8)';
-      } else if (op.lockedTarget >= 0 && op.lockValidated) {
-        label = '🔒 ロック中 — 缶に近づけ！';
-        statusLabel.style.background = 'rgba(180,120,0,0.6)';
-        statusLabel.style.borderColor = 'rgba(255,200,0,0.7)';
-      } else if (op.canCarrying) {
-        label = '📦 缶を運搬中 — ホームへ戻せ';
-        statusLabel.style.background = 'rgba(0,0,0,0.5)';
-        statusLabel.style.borderColor = 'rgba(255,68,68,0.4)';
-      } else {
-        label = '';
-      }
-    }
-    if (label) {
-      statusLabel.textContent = label;
+    if (canAction) {
+      statusLabel.textContent = statusText;
+      statusLabel.style.background = 'rgba(200,0,0,0.7)';
+      statusLabel.style.borderColor = 'rgba(255,100,100,0.8)';
+      statusLabel.style.display = 'block';
+    } else if (op.lockedTarget >= 0 && op.lockValidated) {
+      statusLabel.textContent = '🔒 ロック中 — 缶に近づけ！';
+      statusLabel.style.background = 'rgba(180,120,0,0.6)';
+      statusLabel.style.borderColor = 'rgba(255,200,0,0.7)';
+      statusLabel.style.display = 'block';
+    } else if (op.canCarrying) {
+      statusLabel.textContent = '📦 缶を運搬中 — ホームへ戻せ';
+      statusLabel.style.background = 'rgba(0,0,0,0.5)';
+      statusLabel.style.borderColor = 'rgba(255,68,68,0.4)';
       statusLabel.style.display = 'block';
     } else {
       statusLabel.style.display = 'none';
