@@ -1924,7 +1924,13 @@ function updateLobbyUI() {
     const allReady = pKeys.length >= 2 && pKeys.every(k => {
       return parseInt(k) === multiState.playerIndex && multiState.isHost ? true : players[k].ready;
     });
-    startBtn.disabled = !allReady || pKeys.length < 2;
+    // チーム戦: 両チームに最低1人ずつ必要
+    let teamValid = true;
+    if (multiState.gameMode === 'team') {
+      const { teamA, teamB } = getTeamAssignments();
+      teamValid = teamA.length >= 1 && teamB.length >= 1;
+    }
+    startBtn.disabled = !allReady || pKeys.length < 2 || !teamValid;
     startBtn.style.opacity = startBtn.disabled ? '0.4' : '1';
   }
 }
