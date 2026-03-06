@@ -12480,7 +12480,11 @@ function updateGamePhases(g, dt) {
         g.gamePhase = 'seek';
         showHideCountdown(g, false);
         showOniWaitOverlay(null, false);
-        showNotification(g._isOniPlayer ? '探しに行け！' : '鬼が動き出した！');
+        if (g._isOniPlayer) {
+          showCenterAlert('缶を拾いに行け！', null, 3000);
+        } else {
+          showCenterAlert('鬼が動き出した！', null, 3000);
+        }
         SoundManager.playGameSE('notify');
         // マルチプレイ: seekフェーズへの遷移を同期
         if (g._isMultiplayer && multiState.roomId) {
@@ -14730,7 +14734,7 @@ function initMultiplayerSync(g) {
             if (state.gamePhase === 'seek') {
               showHideCountdown(g, false);
               showOniWaitOverlay(null, false);
-              showNotification('探しに行け！');
+              showCenterAlert('缶を拾いに行け！', null, 3000);
               SoundManager.playGameSE('notify');
             }
           }
@@ -14849,7 +14853,7 @@ function initMultiplayerSync(g) {
           showHideCountdown(g, false);
           showOniWaitOverlay(null, false);
           if (g._isOniPlayer) {
-            showNotification('探しに行け！');
+            showCenterAlert('缶を拾いに行け！', null, 3000);
           }
         }
         // 非ホスト: resultフェーズ → リザルト画面を表示
