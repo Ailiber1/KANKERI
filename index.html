@@ -14121,6 +14121,12 @@ function updateOniPlayerHUD(g, dt) {
       statusLabel.style.background = 'rgba(180,0,0,0.6)';
       statusLabel.style.borderColor = 'rgba(255,100,100,0.6)';
       statusLabel.style.display = 'block';
+    } else if (g.can && !g.can.isAtHome && !op.canCarrying && g.gamePhase === 'seek') {
+      // 缶が定位置にない＆まだ拾っていない → 拾え！表示
+      statusLabel.textContent = '🥫 缶を拾え！';
+      statusLabel.style.background = 'rgba(200,80,0,0.7)';
+      statusLabel.style.borderColor = 'rgba(255,180,0,0.8)';
+      statusLabel.style.display = 'block';
     } else {
       statusLabel.style.display = 'none';
     }
