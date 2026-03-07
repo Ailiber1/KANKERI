@@ -9266,20 +9266,26 @@ function createPlayerController(g) {
   if (isMobile) {
     const jEl = document.getElementById('mobile-joystick');
     const bEl = document.getElementById('mobile-buttons');
-    if (jEl) jEl.style.display = 'block';
-    if (bEl) bEl.style.display = 'flex';
+    if (jEl) jEl.style.setProperty('display', 'block', 'important');
+    if (bEl) bEl.style.setProperty('display', 'flex', 'important');
     const mobActionEl = document.getElementById('mob-action');
     if (mobActionEl) {
       // 鬼プレイヤー: mob-actionは非表示（レティクル◎で操作する）
       if (g._isOniPlayer) {
-        mobActionEl.style.display = 'none';
+        mobActionEl.style.setProperty('display', 'none', 'important');
       } else {
-        mobActionEl.style.display = 'flex';
+        mobActionEl.style.setProperty('display', 'flex', 'important');
       }
     }
     const mobMapEl = document.getElementById('mob-map');
     // 鬼プレイヤーにはマップを表示しない（ランナーの位置がわかってしまうため）
-    if (mobMapEl) mobMapEl.style.display = g._isOniPlayer ? 'none' : 'block';
+    if (mobMapEl) {
+      if (g._isOniPlayer) {
+        mobMapEl.style.setProperty('display', 'none', 'important');
+      } else {
+        mobMapEl.style.setProperty('display', 'block', 'important');
+      }
+    }
     const minimapEl = document.getElementById('hud-minimap');
     if (minimapEl && g._isOniPlayer) minimapEl.style.display = 'none';
 
@@ -13408,9 +13414,9 @@ function updateHUD(g) {
   var mobMapBtn = document.getElementById('mob-map');
   if (mobMapBtn) {
     if (g._isOniPlayer) {
-      mobMapBtn.style.display = 'none';
+      mobMapBtn.style.setProperty('display', 'none', 'important');
     } else if (g.player.isMobile) {
-      mobMapBtn.style.display = 'block';
+      mobMapBtn.style.setProperty('display', 'block', 'important');
     }
   }
 
