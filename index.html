@@ -11902,6 +11902,9 @@ function performCanKick(g, power, kickerName) {
 
 function updateCanPhysics(g, dt) {
   if (!g.can.isFlying) return;
+  // ★チーム戦の鬼は缶の物理をFirebaseから受信するため、ローカル物理計算をスキップ
+  // （鬼側で速度0の缶が即座に着地し、誤ったフェーズ遷移を引き起こすバグ防止）
+  if (g._isOniPlayer && g._multiMode === 'team') return;
 
   g.can.velocity.y -= 15 * dt; // Gravity
   g.can.group.position.x += g.can.velocity.x * dt;
@@ -11938,15 +11941,12 @@ function updateCanPhysics(g, dt) {
       }
 
       // Transition phases
-      if (g.gamePhase === 'kick') {
+      // ★チーム戦の鬼はFirebaseからフェーズ遷移を受信するため、ローカル遷移をスキップ
+      // （鬼は缶を蹴らないのでcanStateのisFlying=trueから誤って即座に着地→hide遷移するバグ防止）
+      if (g.gamePhase === 'kick' && !(g._isOniPlayer && g._multiMode === 'team')) {
         g.gamePhase = 'hide';
         g.phaseTimer = g.hideTime || 10;
-        // 鬼には「隠れろ」ではなく待機メッセージ
-        if (g._isOniPlayer) {
-          showOniWaitOverlay('ランナーが隠れています…', true);
-        } else {
-          showHideCountdown(g, true);
-        }
+        showHideCountdown(g, true);
         // マルチプレイ: フェーズ変更を同期（ホストでも代表ランナーでも書き込む）
         if (g._isMultiplayer && multiState.roomId) {
           db.ref('rooms/' + multiState.roomId + '/gameState').update({
@@ -15680,7 +15680,7 @@ function cleanupGame() {
   const ctrlOv = document.getElementById('controls-overlay');
   if (ctrlOv) ctrlOv.style.display = 'none';
   // チーム戦UI要素をすべてリセット（リマッチ時のラベル残存防止）
-  var teamUIIds = ['runner-found-alert', 'oni-search-alert', 'oni-status-label', 'oni-player-hud', 'can-cooldown-alert', 'oni-can-touch-btn', 'oni-pickup-btn'];
+  var teamUIIds = ['runner-found-alert', 'oni-search-alert', 'oni-status-label', 'oni-player-hud', 'can-cooldown-alert', 'oni-can-touch-btn', 'oni-pickup-btn', 'oni-wait-overlay'];
   teamUIIds.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
