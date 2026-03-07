@@ -1878,6 +1878,10 @@ function showRoomError(msg) {
 function initLobbyListeners() {
   // ★リスナー重複防止: 既存リスナーをクリーンアップしてから再登録
   removeLobbyListeners();
+  // ★チーム情報を初期化（リマッチ後の古いデータ残存防止）
+  multiState._teamA = [];
+  multiState._teamB = [];
+  if (!multiState._mySelectedRole) multiState._mySelectedRole = 'runner';
   // チーム戦: ロール選択ボタン初期化
   initRoleSelectButtons();
 
@@ -2277,6 +2281,9 @@ async function leaveLobby() {
   multiState.sessionId = null;
   multiState.players = {};
   multiState.ready = false;
+  multiState._teamA = [];
+  multiState._teamB = [];
+  multiState._mySelectedRole = null;
   showScreen('title-screen');
 }
 
@@ -2296,7 +2303,12 @@ function startMultiplayerGame() {
     pKeys.forEach(function(idx) {
       var p = players[idx];
       if (!p) return;
-      var role = (idx === multiState.playerIndex && myLocal) ? myLocal : p.selectedRole;
+      var role;
+      if (idx === multiState.playerIndex && myLocal) {
+        role = myLocal;
+      } else {
+        role = p.selectedRole || 'runner';
+      }
       if (role === 'oni') { tA.push(idx); } else { tB.push(idx); }
     });
     multiState._teamA = tA;
@@ -13296,6 +13308,10 @@ function resolveRematch() {
     multiState.isHost = (multiState.playerIndex === allReadyIndices[0]);
     roomRef.child('players/' + multiState.playerIndex + '/ready').set(false);
     multiState.ready = false;
+    // ★リマッチ時チーム情報を完全リセット（3回目以降の検出バグ防止）
+    multiState._teamA = [];
+    multiState._teamB = [];
+    multiState._mySelectedRole = null;
     cleanupGame();
     showScreen('lobby-screen');
     initLobbyListeners();
