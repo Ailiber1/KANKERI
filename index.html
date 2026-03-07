@@ -14550,7 +14550,7 @@ function updateOniCanCarry(g) {
     g._oniPlayer.canCarrying = false;
     g.can.group.position.copy(homePos);
     g.can.isAtHome = true;
-    showNotification('缶を定位置に戻した！');
+    showCenterAlert('ランナーを探せ！', '視界に捉えてロックオンしろ！', 3000);
     SoundManager.playGameSE('place');
     removeHomeMarker(g);
 
