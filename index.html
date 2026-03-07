@@ -2287,6 +2287,22 @@ async function hostChangeStage(stageNum) {
 }
 
 function startMultiplayerGame() {
+  // ゲーム開始直前にチーム分けを再計算（Firebase同期遅延でデータが欠損する問題を防止）
+  if (multiState.gameMode === 'team') {
+    var players = multiState.players || {};
+    var pKeys = Object.keys(players).map(Number).sort(function(a,b){return a-b;});
+    var tA = [], tB = [];
+    var myLocal = multiState._mySelectedRole;
+    pKeys.forEach(function(idx) {
+      var p = players[idx];
+      if (!p) return;
+      var role = (idx === multiState.playerIndex && myLocal) ? myLocal : p.selectedRole;
+      if (role === 'oni') { tA.push(idx); } else { tB.push(idx); }
+    });
+    multiState._teamA = tA;
+    multiState._teamB = tB;
+    console.log('[startMultiplayerGame] teamA=' + JSON.stringify(tA) + ' teamB=' + JSON.stringify(tB) + ' players=' + JSON.stringify(Object.keys(players)));
+  }
   // ロビーからゲームへ遷移（全クライアント共通）
   removeLobbyListeners();
   const stageNum = multiState.stage;
