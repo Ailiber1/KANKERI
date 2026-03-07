@@ -2234,12 +2234,9 @@ async function hostStartGame() {
       showNotification('両チームに1人以上必要です');
       return;
     }
-    // チーム分けを確定保存
-    const roomRef2 = db.ref('rooms/' + multiState.roomId);
-    roomRef2.child('teamBattle').update({ teamA: teamA, teamB: teamB });
   }
 
-  // ゲーム設定をFirebaseに保存
+  // ゲーム設定をFirebaseに保存（チーム分けもアトミックに同時書き込み）
   const roomRef = db.ref('rooms/' + multiState.roomId);
   const updateData = {
     status: 'playing',
@@ -2250,8 +2247,10 @@ async function hostStartGame() {
       oniCount: 1
     }
   };
-  // チーム戦: 初期化
+  // チーム戦: チーム分け + 開始時刻を同一updateで書き込み（非ホストが古いデータを読むのを防止）
   if (multiState.gameMode === 'team') {
+    updateData['teamBattle/teamA'] = teamA;
+    updateData['teamBattle/teamB'] = teamB;
     updateData['teamBattle/startTime'] = firebase.database.ServerValue.TIMESTAMP;
   }
   await roomRef.update(updateData);
@@ -13310,6 +13309,9 @@ function resolveRematch() {
       var newHostIdx = readyIndices[0];
       roomRef.child('host').set(newHostIdx);
       roomRef.update({ status: 'waiting' });
+      // ★前回のチーム分けデータとロックオンデータをクリア（ロール交換時の古いデータ残存防止）
+      roomRef.child('teamBattle').remove();
+      roomRef.child('lockOn').remove();
     }
     // ★全プレイヤー共通: ローカル状態の更新とロビー遷移
     var allReadyIndices = Object.keys(ready).map(Number).sort(function(a, b) { return a - b; });
