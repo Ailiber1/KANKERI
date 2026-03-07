@@ -11792,6 +11792,14 @@ function performCanKick(g, power, kickerName) {
   g.can.isAtHome = false;
   g._canRecoveryTimer = 0; // 回収タイマーリセット
 
+  // チーム戦: 蹴った瞬間にFirebase通知（鬼側に「缶を蹴られた！」表示）
+  if (g._multiMode === 'team' && multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/canState').update({
+      status: 'kicked', isAtHome: false, isFlying: true,
+      kickedBy: kicker, kickedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+
   // 鬼にペナルティタイマー開始（回収しないとペナルティ）
   g._oniRecoveryDeadline = 10; // 10秒以内に回収しないとペナルティ
 
@@ -14819,6 +14827,16 @@ function initMultiplayerSync(g) {
         if (canData.isFlying !== undefined) g.can.isFlying = canData.isFlying;
         if (canData.homePos && g.can.homePos) {
           g.can.homePos.set(canData.homePos.x || 0, canData.homePos.y || 0, canData.homePos.z || 0);
+        }
+        // 缶が蹴られた通知（鬼側に表示）
+        if (canData.status === 'kicked' && canData.kickedBy && canData.kickedAt) {
+          var kickTS = canData.kickedAt;
+          if (!g._lastKickTS || kickTS > g._lastKickTS) {
+            g._lastKickTS = kickTS;
+            showCenterAlert(canData.kickedBy + ' に缶を蹴られた！', '急いで缶を拾え！', 3000);
+            showOniSearchAlert(false);
+            SoundManager.playGameSE('notify');
+          }
         }
       });
       g._multiListeners.push({ ref: canRefHost, event: 'value', fn: onCanHost });
