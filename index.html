@@ -800,7 +800,7 @@ html, body {
   pointer-events: auto; cursor: pointer; user-select: none;
 }
 #oni-status-label {
-  position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: calc(50% - 60px); left: 50%; transform: translateX(-50%);
   font-size: 13px; font-family: 'Noto Sans JP', sans-serif;
   color: #ffffff; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,68,68,0.4);
   padding: 5px 14px; border-radius: 6px; white-space: nowrap;
@@ -14358,6 +14358,14 @@ function oniPickupCan(g) {
   showNotification('缶を拾った！定位置に戻せ！');
   SoundManager.playGameSE('kick');
 
+  // Firebase同期: 缶を鬼が運搬中であることを通知
+  if (multiState.roomId) {
+    db.ref('rooms/' + multiState.roomId + '/canState').update({
+      status: 'carrying',
+      carriedBy: multiState.playerIndex
+    });
+  }
+
   // 定位置マーカーを作成（光の柱 + リング）
   createHomeMarker(g);
 }
@@ -14372,20 +14380,31 @@ function createHomeMarker(g) {
   const markerGroup = new THREE.Group();
   markerGroup.position.set(hp.x, 0, hp.z);
 
-  // 光の柱（半透明シリンダー）
-  var pillarGeo = new THREE.CylinderGeometry(0.3, 0.3, 12, 16, 1, true);
+  // 光の柱（太く明るい）
+  var pillarGeo = new THREE.CylinderGeometry(0.6, 0.6, 15, 16, 1, true);
   var pillarMat = new THREE.MeshBasicMaterial({
-    color: 0xff4444, transparent: true, opacity: 0.15,
+    color: 0xff3333, transparent: true, opacity: 0.25,
     side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
   });
   var pillar = new THREE.Mesh(pillarGeo, pillarMat);
-  pillar.position.y = 6;
+  pillar.position.y = 7.5;
   markerGroup.add(pillar);
 
-  // 地面のリング
-  var ringGeo = new THREE.RingGeometry(0.8, 1.2, 32);
+  // 下向き矢印（コーン）— 上空から定位置を指す
+  var arrowGeo = new THREE.ConeGeometry(0.5, 1.2, 8);
+  var arrowMat = new THREE.MeshBasicMaterial({
+    color: 0xff2222, transparent: true, opacity: 0.9,
+    depthWrite: false
+  });
+  var arrow = new THREE.Mesh(arrowGeo, arrowMat);
+  arrow.rotation.x = Math.PI; // 下向き
+  arrow.position.y = 3.5;
+  markerGroup.add(arrow);
+
+  // 地面のリング（大きめ）
+  var ringGeo = new THREE.RingGeometry(1.0, 1.5, 32);
   var ringMat = new THREE.MeshBasicMaterial({
-    color: 0xff4444, transparent: true, opacity: 0.5,
+    color: 0xff4444, transparent: true, opacity: 0.6,
     side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
   });
   var ring = new THREE.Mesh(ringGeo, ringMat);
@@ -14394,9 +14413,9 @@ function createHomeMarker(g) {
   markerGroup.add(ring);
 
   // 内側リング（パルス用）
-  var innerRingGeo = new THREE.RingGeometry(0.3, 0.6, 32);
+  var innerRingGeo = new THREE.RingGeometry(0.3, 0.7, 32);
   var innerRingMat = new THREE.MeshBasicMaterial({
-    color: 0xff6666, transparent: true, opacity: 0.7,
+    color: 0xff6666, transparent: true, opacity: 0.8,
     side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
   });
   var innerRing = new THREE.Mesh(innerRingGeo, innerRingMat);
@@ -14405,8 +14424,8 @@ function createHomeMarker(g) {
   markerGroup.add(innerRing);
 
   g.scene.add(markerGroup);
-  g._homeMarker = { group: markerGroup, pillar: pillar, ring: ring, innerRing: innerRing, time: 0 };
-  g.materials.push(pillarMat, ringMat, innerRingMat);
+  g._homeMarker = { group: markerGroup, pillar: pillar, arrow: arrow, ring: ring, innerRing: innerRing, time: 0 };
+  g.materials.push(pillarMat, arrowMat, ringMat, innerRingMat);
 }
 
 /**
@@ -14434,14 +14453,31 @@ function updateOniCanCarry(g) {
     pPos.z + Math.cos(rotY) * 1.2
   );
 
+  // 缶位置をFirebaseに定期同期（運搬中はランナーに見えるように）
+  g._canSyncTimer = (g._canSyncTimer || 0) + 0.016;
+  if (g._canSyncTimer >= 0.15 && multiState.roomId) {
+    g._canSyncTimer = 0;
+    var cp = g.can.group.position;
+    db.ref('rooms/' + multiState.roomId + '/canState').update({
+      position: { x: Math.round(cp.x * 100) / 100, y: Math.round(cp.y * 100) / 100, z: Math.round(cp.z * 100) / 100 },
+      status: 'carrying',
+      carriedBy: multiState.playerIndex
+    });
+  }
+
   // 定位置マーカーをアニメーション
   if (g._homeMarker) {
     g._homeMarker.time += 0.016;
     var t = g._homeMarker.time;
     var pulse = 0.3 + Math.sin(t * 3) * 0.2;
-    g._homeMarker.pillar.material.opacity = 0.1 + Math.sin(t * 2) * 0.05;
-    g._homeMarker.innerRing.material.opacity = pulse;
-    g._homeMarker.innerRing.scale.set(1 + Math.sin(t * 4) * 0.2, 1 + Math.sin(t * 4) * 0.2, 1);
+    g._homeMarker.pillar.material.opacity = 0.15 + Math.sin(t * 2) * 0.1;
+    g._homeMarker.innerRing.material.opacity = 0.5 + pulse;
+    g._homeMarker.innerRing.scale.set(1 + Math.sin(t * 4) * 0.3, 1 + Math.sin(t * 4) * 0.3, 1);
+    // 矢印の上下浮遊
+    if (g._homeMarker.arrow) {
+      g._homeMarker.arrow.position.y = 3.5 + Math.sin(t * 3) * 0.5;
+      g._homeMarker.arrow.material.opacity = 0.7 + Math.sin(t * 4) * 0.3;
+    }
   }
 
   // 定位置に近いか？（2m以内で自動設置）
@@ -14457,10 +14493,11 @@ function updateOniCanCarry(g) {
     removeHomeMarker(g);
 
     // Firebase同期
-    if (multiState.isHost && multiState.roomId) {
+    if (multiState.roomId) {
       db.ref('rooms/' + multiState.roomId + '/canState').update({
         status: 'placed',
         position: { x: homePos.x, y: homePos.y, z: homePos.z },
+        isAtHome: true,
         carriedBy: -1
       });
     }
