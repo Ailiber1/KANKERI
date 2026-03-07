@@ -2249,8 +2249,8 @@ async function hostStartGame() {
   };
   // チーム戦: チーム分け + 開始時刻を同一updateで書き込み（非ホストが古いデータを読むのを防止）
   if (multiState.gameMode === 'team') {
-    updateData['teamBattle/teamA'] = teamA;
-    updateData['teamBattle/teamB'] = teamB;
+    updateData['teamBattle/teamA'] = multiState._teamA || [];
+    updateData['teamBattle/teamB'] = multiState._teamB || [];
     updateData['teamBattle/startTime'] = firebase.database.ServerValue.TIMESTAMP;
   }
   await roomRef.update(updateData);
