@@ -13254,26 +13254,8 @@ function updateHUD(g) {
   const actionEl = document.getElementById('hud-action-prompt');
   if (actionEl) {
     if (g._isOniPlayer && g._oniPlayer) {
-      // 鬼プレイヤー: モバイルではレティクル(◎)に統一、PC版のみテキストプロンプト表示
-      if (g.player.isMobile) {
-        actionEl.style.display = 'none';
-      } else {
-        const op = g._oniPlayer;
-        const canPos = g.can ? g.can.group.position : null;
-        const nearCan = canPos && g.player.position.distanceTo(canPos) < 2.5;
-        if (nearCan && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
-          actionEl.textContent = 'Space: 缶タッチ！（捕獲）';
-          actionEl.style.display = 'block';
-        } else if (nearCan && !g.can.isAtHome && !op.canCarrying) {
-          actionEl.textContent = 'Space: 缶を拾う';
-          actionEl.style.display = 'block';
-        } else if (op._reticleTarget >= 0 && op.lockedTarget < 0 && op.lockCooldown <= 0) {
-          actionEl.textContent = 'Space: ロックオン';
-          actionEl.style.display = 'block';
-        } else {
-          actionEl.style.display = 'none';
-        }
-      }
+      // 鬼プレイヤー: actionElは非表示、oni-status-labelに統一
+      actionEl.style.display = 'none';
     } else if (g.player.canKick && (g.gamePhase === 'seek' || g.gamePhase === 'hide') && !g.kickGaugeActive) {
       actionEl.textContent = g.player.isMobile ? 'KICKボタン: 缶を蹴る！' : 'F: 缶を蹴る！';
       actionEl.style.display = g.player.isMobile ? 'none' : 'block';
@@ -13679,7 +13661,7 @@ function startGame(stageNum, mode) {
         G.playerFig.mat.emissive.setHex(0xff2222);
         G._isOniPlayer = true;
         // 自分の棒人間にも鬼ビジュアル（目の発光・ツノ）を追加
-        addOniEyeGlow(G, G.playerFig);
+        addOniEyeGlow(G, G.playerFig, true);
         // 鬼プレイヤー: AI鬼は生成しない
         G.onis.forEach(oni => {
           if (oni.fig && oni.fig.group) G.scene.remove(oni.fig.group);
@@ -14037,12 +14019,13 @@ function updateOniPlayerHUD(g, dt) {
   let statusText = '';
   if (g.can) {
     const canDist = g.player.position.distanceTo(g.can.group.position);
+    var keyHint = g.player.isMobile ? '' : ' [Space]';
     if (canDist < 2.5 && g.can.isAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0) {
       canAction = true;
-      statusText = '⚡ 缶を踏む（捕獲）';
+      statusText = '⚡ 缶を踏む（捕獲）' + keyHint;
     } else if (canDist < 2.5 && !g.can.isAtHome && !op.canCarrying) {
       canAction = true;
-      statusText = '📦 缶を拾う';
+      statusText = '📦 缶を拾う' + keyHint;
     }
   }
   if (reticle) {
@@ -14132,11 +14115,12 @@ function updateOniPlayerHUD(g, dt) {
     const nearCan = canDist2 < 2.5;
 
     if (touchBtn) {
-      touchBtn.style.display = (nearCan && canAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0)
+      // モバイルのみ表示（PCではoni-status-labelに統一）
+      touchBtn.style.display = (g.player.isMobile && nearCan && canAtHome && op.lockedTarget >= 0 && op.lockValidated && op.canTouchCooldown <= 0)
         ? 'block' : 'none';
     }
     if (pickupBtn) {
-      pickupBtn.style.display = (nearCan && !canAtHome && !op.canCarrying)
+      pickupBtn.style.display = (g.player.isMobile && nearCan && !canAtHome && !op.canCarrying)
         ? 'block' : 'none';
     }
   }
@@ -14548,7 +14532,7 @@ function handleOniPlayerInput(g, key) {
  * 赤い目（外側+瞳孔）+ PointLight + 地面のvision cone（赤い扇形）
  * createOni() と同じパラメータを使用
  */
-function addOniEyeGlow(g, fig) {
+function addOniEyeGlow(g, fig, isSelf) {
   const head = fig.head; // createStickFigureの返り値のheadプロパティを使用
   if (!head) return;
   const headRadius = 0.17;
@@ -14605,10 +14589,13 @@ function addOniEyeGlow(g, fig) {
   head.add(rightHorn);
 
   // === vision cone（地面にワインレッドの半透明センサー扇形） ===
-  const coneGeo = new THREE.CircleGeometry(8, 16, -Math.PI / 3, Math.PI * 2 / 3);
+  // 自分のfig: 小さく薄く表示（TPS視点で画面を覆わないように）
+  var coneRadius = isSelf ? 5 : 8;
+  var coneOpacity = isSelf ? 0.04 : 0.08;
+  const coneGeo = new THREE.CircleGeometry(coneRadius, 16, -Math.PI / 3, Math.PI * 2 / 3);
   g.geometries.push(coneGeo);
   const coneMat = new THREE.MeshBasicMaterial({
-    color: 0x660022, transparent: true, opacity: 0.08,
+    color: 0x660022, transparent: true, opacity: coneOpacity,
     side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
   });
   g.materials.push(coneMat);
