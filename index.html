@@ -2319,8 +2319,6 @@ function startMultiplayerGame() {
       }
       multiState._teamA = tA;
       multiState._teamB = tB;
-      console.log('[ROLE-DEBUG] startMultiplayerGame: Firebase teamBattle raw=', JSON.stringify(tb));
-      console.log('[ROLE-DEBUG] startMultiplayerGame: tA=', JSON.stringify(tA), 'tB=', JSON.stringify(tB), 'myIdx=', multiState.playerIndex);
       // ロビーからゲームへ遷移
       removeLobbyListeners();
       var stageNum = multiState.stage;
@@ -13311,9 +13309,8 @@ function resolveRematch() {
       var newHostIdx = readyIndices[0];
       roomRef.child('host').set(newHostIdx);
       roomRef.update({ status: 'waiting' });
-      // ★前回のチーム分けデータとロックオンデータをクリア（ロール交換時の古いデータ残存防止）
-      roomRef.child('teamBattle').remove();
-      roomRef.child('lockOn').remove();
+      // ★teamBattleとlockOnはremoveしない（hostStartGameのatomic writeで上書きされる）
+      // remove()を使うと非同期でhostStartGameのupdate()と競合し、データが消えるバグの原因になる
     }
     // ★全プレイヤー共通: ローカル状態の更新とロビー遷移
     var allReadyIndices = Object.keys(ready).map(Number).sort(function(a, b) { return a - b; });
@@ -13407,9 +13404,14 @@ function updateHUD(g) {
   }
 
   // 鬼プレイヤーは「全体を見る」ボタンを非表示
-  if (g._isOniPlayer) {
-    var mobMapBtn = document.getElementById('mob-map');
-    if (mobMapBtn) mobMapBtn.style.display = 'none';
+  // 鬼プレイヤーは「全体を見る」ボタンを非表示、ランナーはモバイルのみ表示
+  var mobMapBtn = document.getElementById('mob-map');
+  if (mobMapBtn) {
+    if (g._isOniPlayer) {
+      mobMapBtn.style.display = 'none';
+    } else if (g.player.isMobile) {
+      mobMapBtn.style.display = 'block';
+    }
   }
 
   // Action prompt
@@ -13475,12 +13477,14 @@ function updateHUD(g) {
 }
 
 function updateMinimap(g) {
+  const minimapEl = document.getElementById('hud-minimap');
   // 鬼プレイヤーにはミニマップを表示しない
   if (g._isOniPlayer) {
-    const minimapEl = document.getElementById('hud-minimap');
     if (minimapEl) minimapEl.style.display = 'none';
     return;
   }
+  // ★ランナー: ミニマップを確実に表示（前ゲームで鬼だった場合のdisplay:noneをリセット）
+  if (minimapEl) minimapEl.style.display = 'block';
   const canvas = document.getElementById('minimap-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -13822,7 +13826,6 @@ function startGame(stageNum, mode) {
 
 
 
-      console.log('[ROLE-DEBUG] startGame: teamA=', JSON.stringify(teamA), 'teamB=', JSON.stringify(teamB), 'myIdx=', multiState.playerIndex, 'myTeamRole=', G._myTeamRole);
       // 鬼ロールならプレイヤーの色を赤に
       if (G._myTeamRole === 'oni') {
         G.playerFig.mat.color.setHex(0xff2222);
@@ -14311,13 +14314,7 @@ function updateOniPlayerHUD(g, dt) {
  * checkReticleOnRunner — レティクルがランナーに重なっているか判定
  */
 function checkReticleOnRunner(g) {
-  if (!g._isOniPlayer) {
-    if (!g._lastRoleLog || Date.now() - g._lastRoleLog > 3000) {
-      g._lastRoleLog = Date.now();
-      console.log('[ROLE-DEBUG] checkReticleOnRunner: _isOniPlayer=false, _myTeamRole=', g._myTeamRole, '_teamA=', JSON.stringify(g._teamA), '_teamB=', JSON.stringify(g._teamB));
-    }
-    return false;
-  }
+  if (!g._isOniPlayer) return false;
 
   // ビジョンコーン判定: 赤いセンサー扇形（8m、±60度）にランナーが入っているか
   // カメラの向き（cameraYaw）を基準にする（立ち止まっていても検知可能にする）
@@ -14327,22 +14324,6 @@ function checkReticleOnRunner(g) {
   // TPS: プレイヤーの前方 = カメラの反対方向
   // カメラオフセット(-sin(yaw), +cos(yaw)) → 前方(+sin(yaw), -cos(yaw))
   const oniRotY = Math.atan2(Math.sin(g.player.cameraYaw), -Math.cos(g.player.cameraYaw));
-
-  // デバッグ: 1秒ごとにリモートプレイヤーの状態をログ
-  if (!g._lastDetectLog || Date.now() - g._lastDetectLog > 1000) {
-    g._lastDetectLog = Date.now();
-    const remoteKeys = Object.keys(multiState.remotePlayers);
-    console.log('[ROLE-DEBUG] checkReticleOnRunner: isOni=true, teamB=', JSON.stringify(teamB), 'remoteKeys=', remoteKeys);
-    remoteKeys.forEach(k => {
-      const ri = parseInt(k);
-      const rrp = multiState.remotePlayers[ri];
-      if (!rrp || !rrp.fig) return;
-      const ddx = rrp.fig.group.position.x - g.player.position.x;
-      const ddz = rrp.fig.group.position.z - g.player.position.z;
-      const dd = Math.sqrt(ddx*ddx+ddz*ddz);
-      console.log('[ROLE-DEBUG]   remote[' + k + '] dist=' + dd.toFixed(1) + ' inTeamB=' + teamB.includes(ri) + ' captured=' + rrp.captured);
-    });
-  }
 
   Object.keys(multiState.remotePlayers).forEach(k => {
     const idx = parseInt(k);
