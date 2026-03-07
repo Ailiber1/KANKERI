@@ -2301,7 +2301,7 @@ function startMultiplayerGame() {
     });
     multiState._teamA = tA;
     multiState._teamB = tB;
-    console.log('[startMultiplayerGame] teamA=' + JSON.stringify(tA) + ' teamB=' + JSON.stringify(tB) + ' players=' + JSON.stringify(Object.keys(players)));
+
   }
   // ロビーからゲームへ遷移（全クライアント共通）
   removeLobbyListeners();
@@ -13782,7 +13782,7 @@ function startGame(stageNum, mode) {
       G._myTeamRole = teamA.includes(multiState.playerIndex) ? 'oni' : 'runner';
       G._teamA = teamA;
       G._teamB = teamB;
-      console.log('[TEAM] myIdx=' + multiState.playerIndex + ' teamA(oni)=' + JSON.stringify(teamA) + ' teamB(runner)=' + JSON.stringify(teamB) + ' myRole=' + G._myTeamRole);
+
 
 
       // 鬼ロールならプレイヤーの色を赤に
@@ -14276,10 +14276,7 @@ function checkReticleOnRunner(g) {
   // TPS: カメラが見ている方向 = cameraYaw + π = プレイヤーの正面
   const oniRotY = g.playerFig.group.rotation.y;
 
-  // デバッグ: 1秒ごとにログ出力
-  g._dbgReticleT = (g._dbgReticleT || 0) + 0.016;
-  var doLog = g._dbgReticleT >= 1.0;
-  if (doLog) g._dbgReticleT = 0;
+
 
   Object.keys(multiState.remotePlayers).forEach(k => {
     const idx = parseInt(k);
@@ -14298,8 +14295,6 @@ function checkReticleOnRunner(g) {
     let angleDiff = angleToTarget - oniRotY;
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-
-    if (doLog) console.log('[DETECT] idx=' + idx + ' teamB=' + JSON.stringify(teamB) + ' skipTeam=' + skipTeam + ' skipCap=' + skipCap + ' dist=' + worldDist.toFixed(1) + ' angle=' + (Math.abs(angleDiff)*180/Math.PI).toFixed(0) + '° oniRotY=' + oniRotY.toFixed(2));
 
     if (skipCap || skipTeam) return;
     if (worldDist > 8) return;
