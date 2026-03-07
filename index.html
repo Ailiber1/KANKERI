@@ -14237,15 +14237,16 @@ function updateOniPlayerHUD(g, dt) {
     op.lockedTarget = -1;
     op.lockValidated = false;
   }
-  // 自動検知ロジック: ランナーが視界内に一定時間(0.8秒)いたら自動発見（seekフェーズのみ・缶が定位置の時のみ）
+  // 自動検知ロジック: ランナーが視界内に一定時間いたら自動発見（seekフェーズのみ・缶が定位置の時のみ）
   if (g.gamePhase === 'seek' && hasTarget && op.lockedTarget < 0 && op.lockCooldown <= 0 && g.can && g.can.isAtHome) {
     op._autoDetectTimer = (op._autoDetectTimer || 0) + dt;
-    if (op._autoDetectTimer >= 0.8) {
+    if (op._autoDetectTimer >= 0.3) {
       op._autoDetectTimer = 0;
       attemptLockOn(g);
     }
   } else if (!hasTarget) {
-    op._autoDetectTimer = 0;
+    // ちらつき耐性: 一瞬視界から外れてもタイマーを完全リセットしない（0.15秒分だけ減算）
+    op._autoDetectTimer = Math.max(0, (op._autoDetectTimer || 0) - dt * 2);
   }
 
   // 鬼プレイヤー: mob-actionボタンを非表示（レティクル◎で操作する）
