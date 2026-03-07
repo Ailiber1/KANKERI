@@ -12568,6 +12568,7 @@ function updateGamePhases(g, dt) {
       break;
 
     case 'hide':
+      g._seekUICleared = false; // seek遷移時に1回だけUI消去するためのフラグリセット
       g.phaseTimer -= dt;
       updateKickGauge(g, dt); // Allow rescue kick during hide phase too
       const hideEl = document.getElementById('hide-countdown-time');
@@ -12628,6 +12629,12 @@ function updateGamePhases(g, dt) {
       break;
 
     case 'seek':
+      // seekフェーズ中はカウントダウン系UIを確実に非表示
+      if (!g._seekUICleared) {
+        g._seekUICleared = true;
+        showHideCountdown(g, false);
+        showOniWaitOverlay(null, false);
+      }
       // Score Attack: カウントアップ / 通常: カウントダウン
       if (g._isScoreAttack) {
         g.gameTimer += dt;
@@ -14250,23 +14257,33 @@ function checkReticleOnRunner(g) {
   let bestDist = Infinity;
   const oniRotY = g.player.cameraYaw !== undefined ? g.player.cameraYaw : g.playerFig.group.rotation.y;
 
+  // デバッグ: 1秒ごとにログ出力
+  g._dbgReticleT = (g._dbgReticleT || 0) + 0.016;
+  var doLog = g._dbgReticleT >= 1.0;
+  if (doLog) g._dbgReticleT = 0;
+
   Object.keys(multiState.remotePlayers).forEach(k => {
     const idx = parseInt(k);
     const rp = multiState.remotePlayers[idx];
-    if (!rp || !rp.fig || rp.captured) return;
-    if (!teamB.includes(idx)) return;
+    if (!rp || !rp.fig) return;
+    var skipCap = rp.captured;
+    var skipTeam = !teamB.includes(idx);
 
     // 3D距離チェック（ビジョンコーン半径8m以内）
     const dx = rp.fig.group.position.x - g.player.position.x;
     const dz = rp.fig.group.position.z - g.player.position.z;
     const worldDist = Math.sqrt(dx * dx + dz * dz);
-    if (worldDist > 8) return;
 
     // 角度チェック（鬼の正面±60度以内 = ビジョンコーンの範囲）
     const angleToTarget = Math.atan2(dx, dz);
     let angleDiff = angleToTarget - oniRotY;
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+    if (doLog) console.log('[DETECT] idx=' + idx + ' teamB=' + JSON.stringify(teamB) + ' skipTeam=' + skipTeam + ' skipCap=' + skipCap + ' dist=' + worldDist.toFixed(1) + ' angle=' + (Math.abs(angleDiff)*180/Math.PI).toFixed(0) + '° oniRotY=' + oniRotY.toFixed(2));
+
+    if (skipCap || skipTeam) return;
+    if (worldDist > 8) return;
     if (Math.abs(angleDiff) > Math.PI / 3) return; // ±60度
 
     if (worldDist < bestDist) {
