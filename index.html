@@ -800,13 +800,14 @@ html, body {
   pointer-events: auto; cursor: pointer; user-select: none;
 }
 #oni-status-label {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  position: absolute; top: 28%; left: 50%; transform: translate(-50%, -50%);
   font-size: 16px; font-family: 'Noto Sans JP', sans-serif;
   color: #ffffff; background: rgba(0,0,0,0.8); border: 1px solid rgba(255,68,68,0.5);
   padding: 8px 20px; border-radius: 8px; white-space: nowrap;
   text-shadow: 0 0 6px rgba(255,68,68,0.4);
   pointer-events: none; transition: background 0.2s, border-color 0.2s;
 }
+@media (max-height: 500px) { #oni-status-label { top: 18%; font-size: 13px; padding: 5px 14px; } }
 #oni-reticle.locked {
   color: #ff2222; text-shadow: 0 0 30px rgba(255,0,0,0.8); font-size: 72px;
 }
