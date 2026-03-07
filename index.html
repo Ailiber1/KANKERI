@@ -14498,16 +14498,35 @@ function validateLockOn(g, oniIdx, targetIdx) {
 
   // 3. レイキャスト遮蔽物チェック
   const ray = new THREE.Raycaster();
-  const dir = new THREE.Vector3().subVectors(tPos, oniPos).normalize();
-  ray.set(new THREE.Vector3(oniPos.x, oniPos.y + 1.5, oniPos.z), dir);
+  // レイは鬼の頭上からターゲットの胸高さへ（地面ヒット防止）
+  const rayOrigin = new THREE.Vector3(oniPos.x, oniPos.y + 1.5, oniPos.z);
+  const rayTarget = new THREE.Vector3(tPos.x, tPos.y + 1.0, tPos.z);
+  const dir = new THREE.Vector3().subVectors(rayTarget, rayOrigin).normalize();
+  ray.set(rayOrigin, dir);
   ray.far = dist;
+  // 鬼自身とターゲットの棒人間メッシュを除外
+  var oniGroup = g.playerFig ? g.playerFig.group : null;
+  var targetGroup = remote.fig ? remote.fig.group : null;
   const obstacles = [];
   g.scene.traverse(obj => {
-    if (obj.isMesh && !obj._remotePlayerIndex && obj.geometry) obstacles.push(obj);
+    if (!obj.isMesh || !obj.geometry) return;
+    // 鬼自身のフィギュアに属するメッシュを除外
+    if (oniGroup) { var p = obj; while (p) { if (p === oniGroup) return; p = p.parent; } }
+    // ターゲットのフィギュアに属するメッシュを除外
+    if (targetGroup) { var p2 = obj; while (p2) { if (p2 === targetGroup) return; p2 = p2.parent; } }
+    obstacles.push(obj);
   });
   const occHits = ray.intersectObjects(obstacles, false);
   // プレイヤーフィギュアでない壁があれば遮蔽
   const blocked = occHits.some(h => h.distance < dist - 0.5);
+  // ★デバッグ: レイキャスト結果を表示（原因特定後に削除）
+  var dbgEl2 = document.getElementById('oni-debug-panel');
+  if (dbgEl2) {
+    var txt = dbgEl2.textContent;
+    txt += '\nray: ' + occHits.length + ' hits, blocked=' + blocked;
+    if (occHits.length > 0) txt += '\n 1st@' + occHits[0].distance.toFixed(1) + 'vs' + dist.toFixed(1);
+    dbgEl2.textContent = txt;
+  }
   if (blocked) {
     rejectLockOn(g, oniIdx);
     return;
