@@ -9610,9 +9610,10 @@ function updatePlayer(g, dt) {
   if (ctrl.moveSpeed > 0.5) {
     ctrl.rotation = Math.atan2(moveX, moveZ);
   }
-  // 鬼プレイヤー: 停止中もカメラ方向に体を向ける（ビジョンコーン・検知判定のため）
+  // 鬼プレイヤー: 停止中もカメラが見ている方向に体を向ける
+  // TPS: カメラはプレイヤーの後ろにいるので、前方 = cameraYaw + π
   if (g._isOniPlayer && ctrl.moveSpeed <= 0.5) {
-    ctrl.rotation = ctrl.cameraYaw;
+    ctrl.rotation = ctrl.cameraYaw + Math.PI;
   }
 
   // Update figure
@@ -13765,6 +13766,7 @@ function startGame(stageNum, mode) {
       G._myTeamRole = teamA.includes(multiState.playerIndex) ? 'oni' : 'runner';
       G._teamA = teamA;
       G._teamB = teamB;
+      console.log('[TEAM] myIdx=' + multiState.playerIndex + ' teamA(oni)=' + JSON.stringify(teamA) + ' teamB(runner)=' + JSON.stringify(teamB) + ' myRole=' + G._myTeamRole);
 
 
       // 鬼ロールならプレイヤーの色を赤に
@@ -14255,7 +14257,8 @@ function checkReticleOnRunner(g) {
   const teamB = g._teamB || [];
   let bestIdx = -1;
   let bestDist = Infinity;
-  const oniRotY = g.player.cameraYaw !== undefined ? g.player.cameraYaw : g.playerFig.group.rotation.y;
+  // TPS: カメラが見ている方向 = cameraYaw + π = プレイヤーの正面
+  const oniRotY = g.playerFig.group.rotation.y;
 
   // デバッグ: 1秒ごとにログ出力
   g._dbgReticleT = (g._dbgReticleT || 0) + 0.016;
@@ -14358,10 +14361,10 @@ function validateLockOn(g, oniIdx, targetIdx) {
     return;
   }
 
-  // 2. 視線方向チェック（±30度）— カメラ向きを優先
+  // 2. 視線方向チェック（±30度）
   let oniRotY;
   if (oniIdx === multiState.playerIndex) {
-    oniRotY = g.player.cameraYaw !== undefined ? g.player.cameraYaw : g.playerFig.group.rotation.y;
+    oniRotY = g.playerFig.group.rotation.y;
   } else if (multiState.remotePlayers[oniIdx]) {
     oniRotY = multiState.remotePlayers[oniIdx].fig.group.rotation.y;
   } else {
