@@ -1822,6 +1822,7 @@ async function joinOrCreateRoom(roomId, mode) {
     deviceId: gameState.deviceId,
     sessionId: multiState.sessionId,
     role: 'runner',
+    selectedRole: 'runner',
     ready: false,
     joinedAt: firebase.database.ServerValue.TIMESTAMP
   });
@@ -1831,6 +1832,7 @@ async function joinOrCreateRoom(roomId, mode) {
 
   multiState.active = true;
   multiState.ready = false;
+  multiState._mySelectedRole = 'runner';
   closeModal('multi-modal');
   showScreen('lobby-screen');
   initLobbyListeners();
