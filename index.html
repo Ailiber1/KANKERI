@@ -9704,8 +9704,8 @@ function updatePlayer(g, dt) {
   // クールダウン減算 + ランナー向けクールダウン表示
   if (g._canKickCooldown > 0) g._canKickCooldown -= dt;
   var cdAlert = document.getElementById('can-cooldown-alert');
-  if (cdAlert && !g._isOniPlayer && g._multiMode === 'team') {
-    if (g._canKickCooldown > 0 && g.gamePhase === 'seek') {
+  if (cdAlert && !g._isOniPlayer) {
+    if (g._canKickCooldown > 0) {
       var cdSec = Math.ceil(g._canKickCooldown);
       document.getElementById('can-cooldown-timer').textContent = cdSec + '秒間は缶を蹴れない';
       cdAlert.style.display = 'block';
@@ -15079,16 +15079,18 @@ function initMultiplayerSync(g) {
           g.can.homePos.set(canData.homePos.x || 0, canData.homePos.y || 0, canData.homePos.z || 0);
         }
         // 缶配置直後のキッククールダウン（鬼が置いた直後3秒は蹴れない）
-        if (canData.status === 'placed' && canData.placedAt) {
-          var elapsed = (Date.now() - canData.placedAt) / 1000;
-          var remaining = 3.0 - elapsed;
-          if (remaining > 0.1) {
-            g._canKickCooldown = remaining;
-            // 即座にクールダウン表示開始
-            var cdA = document.getElementById('can-cooldown-alert');
-            if (cdA && !g._isOniPlayer) {
-              cdA.style.display = 'block';
-              document.getElementById('can-cooldown-timer').textContent = Math.ceil(remaining) + '秒間は缶を蹴れない';
+        console.log('[canState] status=' + canData.status + ' placedAt=' + canData.placedAt + ' isOni=' + g._isOniPlayer + ' mode=' + g._multiMode);
+        if (canData.status === 'placed') {
+          if (!g._isOniPlayer) {
+            // タイムスタンプがあれば残り時間計算、なければ固定3秒
+            var remaining2 = 3.0;
+            if (canData.placedAt) {
+              var elapsed2 = (Date.now() - canData.placedAt) / 1000;
+              remaining2 = Math.max(0, 3.0 - elapsed2);
+            }
+            if (remaining2 > 0.1) {
+              g._canKickCooldown = remaining2;
+              console.log('[canState] cooldown set to ' + remaining2);
             }
           }
         }
