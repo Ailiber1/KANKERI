@@ -14653,14 +14653,15 @@ function addOniEyeGlow(g, fig, isSelf) {
   head.add(rightHorn);
 
   // === vision cone（地面にワインレッドの半透明センサー扇形） ===
-  // 自分のfig: 小さく薄く表示（TPS視点で画面を覆わないように）
+  // 自分のfig: NormalBlendingで見やすく表示
   var coneRadius = isSelf ? 6 : 8;
-  var coneOpacity = isSelf ? 0.12 : 0.08;
+  var coneOpacity = isSelf ? 0.25 : 0.08;
   const coneGeo = new THREE.CircleGeometry(coneRadius, 16, -Math.PI / 3, Math.PI * 2 / 3);
   g.geometries.push(coneGeo);
   const coneMat = new THREE.MeshBasicMaterial({
-    color: 0x660022, transparent: true, opacity: coneOpacity,
-    side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+    color: isSelf ? 0xff2222 : 0x660022, transparent: true, opacity: coneOpacity,
+    side: THREE.DoubleSide, depthWrite: false,
+    blending: isSelf ? THREE.NormalBlending : THREE.AdditiveBlending
   });
   g.materials.push(coneMat);
   const cone = new THREE.Mesh(coneGeo, coneMat);
