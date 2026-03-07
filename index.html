@@ -800,11 +800,11 @@ html, body {
   pointer-events: auto; cursor: pointer; user-select: none;
 }
 #oni-status-label {
-  position: absolute; top: calc(50% - 60px); left: 50%; transform: translateX(-50%);
-  font-size: 13px; font-family: 'Noto Sans JP', sans-serif;
-  color: #ffffff; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,68,68,0.4);
-  padding: 5px 14px; border-radius: 6px; white-space: nowrap;
-  text-shadow: 0 0 4px rgba(255,68,68,0.3);
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 16px; font-family: 'Noto Sans JP', sans-serif;
+  color: #ffffff; background: rgba(0,0,0,0.8); border: 1px solid rgba(255,68,68,0.5);
+  padding: 8px 20px; border-radius: 8px; white-space: nowrap;
+  text-shadow: 0 0 6px rgba(255,68,68,0.4);
   pointer-events: none; transition: background 0.2s, border-color 0.2s;
 }
 #oni-reticle.locked {
@@ -3583,7 +3583,7 @@ const STAGE_CONFIGS = {
     startPhase: 0, cycleDuration: 60,
     canPositions: [
       { x: 0, z: 2, label: '① 砂場の中央', labelEn: '① Sandbox Center' },
-      { x: -10, z: -6, label: '② 滑り台の横', labelEn: '② Near Slide' },
+      { x: -6, z: -12, label: '② 街灯の近く', labelEn: '② Near Streetlight' },
       { x: 12, z: 8, label: '③ ベンチ付近', labelEn: '③ Near Bench' }
     ],
     waypoints: [
@@ -3616,7 +3616,7 @@ const STAGE_CONFIGS = {
     canPositions: [
       { x: 0, z: 8, label: '① 本殿前の広場', labelEn: '① Main Hall Plaza' },
       { x: -8, z: -18, label: '② 鳥居の横', labelEn: '② Near Torii Gate' },
-      { x: 18, z: 12, label: '③ 手水舎の裏', labelEn: '③ Behind Chozuya' }
+      { x: 15, z: 14, label: '③ 手水舎の裏', labelEn: '③ Behind Chozuya' }
     ],
     waypoints: [
       // 外周巡回（反時計回り）
@@ -14046,8 +14046,13 @@ function updateOniPlayerHUD(g, dt) {
     }
   }
   if (reticle) {
-    reticle.classList.toggle('locked', hasTarget);
-    reticle.style.display = canAction ? 'block' : 'none';
+    // PCではレティクル(◎)を非表示、モバイルのみ表示
+    if (g.player.isMobile) {
+      reticle.classList.toggle('locked', hasTarget);
+      reticle.style.display = canAction ? 'block' : 'none';
+    } else {
+      reticle.style.display = 'none';
+    }
   }
 
   // 鬼ステータスラベル（画面上部、アクション/ロック/運搬時のみ表示）
