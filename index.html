@@ -13664,6 +13664,7 @@ function startGame(stageNum, mode) {
     buildParkObjects(G);
   }
   createCan(G);
+  G._canKickCooldown = 0;
   createDayNightCycle(G);
 
   // Create player
@@ -15081,7 +15082,15 @@ function initMultiplayerSync(g) {
         if (canData.status === 'placed' && canData.placedAt) {
           var elapsed = (Date.now() - canData.placedAt) / 1000;
           var remaining = 3.0 - elapsed;
-          if (remaining > 0) g._canKickCooldown = remaining;
+          if (remaining > 0.1) {
+            g._canKickCooldown = remaining;
+            // 即座にクールダウン表示開始
+            var cdA = document.getElementById('can-cooldown-alert');
+            if (cdA && !g._isOniPlayer) {
+              cdA.style.display = 'block';
+              document.getElementById('can-cooldown-timer').textContent = Math.ceil(remaining) + '秒間は缶を蹴れない';
+            }
+          }
         }
       }
     });
