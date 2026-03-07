@@ -13308,6 +13308,12 @@ function updateHUD(g) {
     canDirEl.textContent = '缶 ' + arrows[idx] + ' ' + dist + 'm';
   }
 
+  // 鬼プレイヤーは「全体を見る」ボタンを非表示
+  if (g._isOniPlayer) {
+    var mobMapBtn = document.getElementById('mob-map');
+    if (mobMapBtn) mobMapBtn.style.display = 'none';
+  }
+
   // Action prompt
   const actionEl = document.getElementById('hud-action-prompt');
   if (actionEl) {
