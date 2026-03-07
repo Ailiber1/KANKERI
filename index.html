@@ -15653,6 +15653,12 @@ function cleanupGame() {
   if (capOv2) capOv2.style.display = 'none';
   const ctrlOv = document.getElementById('controls-overlay');
   if (ctrlOv) ctrlOv.style.display = 'none';
+  // チーム戦UI要素をすべてリセット（リマッチ時のラベル残存防止）
+  var teamUIIds = ['runner-found-alert', 'oni-search-alert', 'oni-status-label', 'oni-player-hud', 'can-cooldown-alert', 'oni-can-touch-btn', 'oni-pickup-btn'];
+  teamUIIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
 
   G = null;
 
