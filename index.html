@@ -1341,7 +1341,7 @@ html, body {
     <div id="hud-minimap"><canvas id="minimap-canvas" width="150" height="150"></canvas></div>
     <div id="danger-vignette"></div>
     <div id="kick-gauge-wrap" style="display:none;">
-      <div id="kick-gauge-title">缶を蹴れ！</div>
+      <div id="kick-gauge-title">缶を蹴ろ！</div>
       <div id="kick-gauge-track"><div id="kick-gauge-fill"></div><div id="kick-gauge-marker">▲</div></div>
       <div id="kick-gauge-hint"><span class="pc-only">F / Space</span><span class="mobile-only">タップ</span></div>
     </div>
@@ -11861,6 +11861,7 @@ function updateCanPhysics(g, dt) {
           db.ref('rooms/' + multiState.roomId + '/gameState').update({
             gamePhase: 'hide',
             hideTime: g.hideTime || 10,
+            hideStartTimestamp: firebase.database.ServerValue.TIMESTAMP,
             gameTimer: g.gameTimer
           });
         }
@@ -12750,7 +12751,7 @@ function confirmCanPlacement(g) {
     showNotification('ランナーが缶を蹴るのを待っています…');
     // 鬼は缶配置フェーズで待機 → ランナーがキックしたら同期で進行
   } else {
-    showNotification(g.player.isMobile ? '缶を蹴れ！ (KICKボタン)' : '缶を蹴れ！ (F)');
+    showNotification(g.player.isMobile ? '缶を蹴ろ！ (KICKボタン)' : '缶を蹴ろ！ (F)');
     startKickGauge(g);
   }
 }
@@ -14762,10 +14763,15 @@ function initMultiplayerSync(g) {
               var wtEl2 = document.getElementById('oni-wait-timer');
               if (wtEl2) wtEl2.textContent = '';
             }
-            // hideフェーズ: phaseTimerをセット（カウントダウンは鬼には表示しない）
+            // hideフェーズ: タイムスタンプから残り時間を正確に計算
             if (state.gamePhase === 'hide' && state.hideTime) {
               g.hideTime = state.hideTime;
-              g.phaseTimer = state.hideTime;
+              if (state.hideStartTimestamp) {
+                var elapsed = (Date.now() - state.hideStartTimestamp) / 1000;
+                g.phaseTimer = Math.max(0, state.hideTime - elapsed);
+              } else {
+                g.phaseTimer = state.hideTime;
+              }
               showOniWaitOverlay('ランナーが隠れています…', true);
             }
             if (state.gamePhase === 'seek') {
@@ -14876,7 +14882,13 @@ function initMultiplayerSync(g) {
           if (kickWrap) kickWrap.style.display = 'none';
           if (state.hideTime) {
             g.hideTime = state.hideTime;
-            g.phaseTimer = state.hideTime; // 非ホスト: phaseTimerも設定
+            // タイムスタンプから残り時間を正確に計算
+            if (state.hideStartTimestamp) {
+              var elapsed2 = (Date.now() - state.hideStartTimestamp) / 1000;
+              g.phaseTimer = Math.max(0, state.hideTime - elapsed2);
+            } else {
+              g.phaseTimer = state.hideTime;
+            }
           }
           // 鬼には「隠れろ」ではなく待機メッセージ
           if (g._isOniPlayer) {
@@ -14999,7 +15011,7 @@ function initMultiplayerSync(g) {
           // === ランナーチーム ===
           if (targetIdx === multiState.playerIndex) {
             // 自分が見つかった
-            showCenterAlert('👁 見つかった！', '缶を蹴れ！', 2500);
+            showCenterAlert('👁 見つかった！', '缶を蹴ろ！', 2500);
           } else {
             // 味方が見つかった
             showCenterAlert('👁 ' + targetName + 'が発見された', '', 2000);
