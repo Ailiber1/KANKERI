@@ -14313,8 +14313,9 @@ function checkReticleOnRunner(g) {
   const teamB = g._teamB || [];
   let bestIdx = -1;
   let bestDist = Infinity;
-  // TPS: カメラが見ている方向 = cameraYaw + π（体の向きではなくカメラ基準で検出）
-  const oniRotY = g.player.cameraYaw + Math.PI;
+  // TPS: プレイヤーの前方 = カメラの反対方向
+  // カメラオフセット(-sin(yaw), +cos(yaw)) → 前方(+sin(yaw), -cos(yaw))
+  const oniRotY = Math.atan2(Math.sin(g.player.cameraYaw), -Math.cos(g.player.cameraYaw));
 
 
 
@@ -14417,7 +14418,7 @@ function validateLockOn(g, oniIdx, targetIdx) {
   let oniRotY;
   if (oniIdx === multiState.playerIndex) {
     // 自分が鬼: カメラの向き基準（体の向きは移動時のみ更新されるため）
-    oniRotY = g.player.cameraYaw + Math.PI;
+    oniRotY = Math.atan2(Math.sin(g.player.cameraYaw), -Math.cos(g.player.cameraYaw));
   } else if (multiState.remotePlayers[oniIdx]) {
     oniRotY = multiState.remotePlayers[oniIdx].fig.group.rotation.y;
   } else {
