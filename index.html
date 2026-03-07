@@ -14237,6 +14237,12 @@ function updateOniPlayerHUD(g, dt) {
     op.lockedTarget = -1;
     op.lockValidated = false;
   }
+  // [DEBUG] 自動検知条件チェック（原因特定後に削除）
+  g._dbgAutoT = (g._dbgAutoT || 0) + dt;
+  if (g._dbgAutoT >= 2.0) {
+    g._dbgAutoT = 0;
+    console.log('[AUTO-DETECT] phase=' + g.gamePhase + ' hasTarget=' + hasTarget + ' locked=' + op.lockedTarget + ' cooldown=' + op.lockCooldown.toFixed(1) + ' isAtHome=' + (g.can ? g.can.isAtHome : 'noCan') + ' teamB=' + JSON.stringify(g._teamB) + ' cameraYaw=' + (g.player.cameraYaw || 0).toFixed(2));
+  }
   // 自動検知ロジック: ランナーが視界内に一定時間(0.8秒)いたら自動発見（seekフェーズのみ・缶が定位置の時のみ）
   if (g.gamePhase === 'seek' && hasTarget && op.lockedTarget < 0 && op.lockCooldown <= 0 && g.can && g.can.isAtHome) {
     op._autoDetectTimer = (op._autoDetectTimer || 0) + dt;
