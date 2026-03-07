@@ -14231,8 +14231,14 @@ function updateOniPlayerHUD(g, dt) {
     }
   }
 
-  // 自動検知ロジック: ランナーが視界内に一定時間(0.8秒)いたら自動発見（seekフェーズのみ）
-  if (g.gamePhase === 'seek' && hasTarget && op.lockedTarget < 0 && op.lockCooldown <= 0) {
+  // ★缶が定位置にない間（蹴り飛ばされた・運搬中）はロックオンを強制クリア
+  // 缶を踏む行為は缶が定位置にある時のみ有効なため
+  if (g.can && !g.can.isAtHome && op.lockedTarget >= 0) {
+    op.lockedTarget = -1;
+    op.lockValidated = false;
+  }
+  // 自動検知ロジック: ランナーが視界内に一定時間(0.8秒)いたら自動発見（seekフェーズのみ・缶が定位置の時のみ）
+  if (g.gamePhase === 'seek' && hasTarget && op.lockedTarget < 0 && op.lockCooldown <= 0 && g.can && g.can.isAtHome) {
     op._autoDetectTimer = (op._autoDetectTimer || 0) + dt;
     if (op._autoDetectTimer >= 0.8) {
       op._autoDetectTimer = 0;
@@ -14352,6 +14358,7 @@ function checkReticleOnRunner(g) {
  */
 function attemptLockOn(g) {
   if (!g._isOniPlayer || !g._oniPlayer) return;
+  if (!g.can || !g.can.isAtHome) return; // 缶が定位置にない間はロックオン不可
   const op = g._oniPlayer;
   if (op.lockCooldown > 0) return;
   if (op.lockedTarget >= 0) return; // 既にロックオン中
