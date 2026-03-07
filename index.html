@@ -2319,6 +2319,8 @@ function startMultiplayerGame() {
       }
       multiState._teamA = tA;
       multiState._teamB = tB;
+      console.log('[ROLE-DEBUG] startMultiplayerGame: Firebase teamBattle raw=', JSON.stringify(tb));
+      console.log('[ROLE-DEBUG] startMultiplayerGame: tA=', JSON.stringify(tA), 'tB=', JSON.stringify(tB), 'myIdx=', multiState.playerIndex);
       // ロビーからゲームへ遷移
       removeLobbyListeners();
       var stageNum = multiState.stage;
@@ -13820,6 +13822,7 @@ function startGame(stageNum, mode) {
 
 
 
+      console.log('[ROLE-DEBUG] startGame: teamA=', JSON.stringify(teamA), 'teamB=', JSON.stringify(teamB), 'myIdx=', multiState.playerIndex, 'myTeamRole=', G._myTeamRole);
       // 鬼ロールならプレイヤーの色を赤に
       if (G._myTeamRole === 'oni') {
         G.playerFig.mat.color.setHex(0xff2222);
@@ -14308,7 +14311,13 @@ function updateOniPlayerHUD(g, dt) {
  * checkReticleOnRunner — レティクルがランナーに重なっているか判定
  */
 function checkReticleOnRunner(g) {
-  if (!g._isOniPlayer) return false;
+  if (!g._isOniPlayer) {
+    if (!g._lastRoleLog || Date.now() - g._lastRoleLog > 3000) {
+      g._lastRoleLog = Date.now();
+      console.log('[ROLE-DEBUG] checkReticleOnRunner: _isOniPlayer=false, _myTeamRole=', g._myTeamRole, '_teamA=', JSON.stringify(g._teamA), '_teamB=', JSON.stringify(g._teamB));
+    }
+    return false;
+  }
 
   // ビジョンコーン判定: 赤いセンサー扇形（8m、±60度）にランナーが入っているか
   // カメラの向き（cameraYaw）を基準にする（立ち止まっていても検知可能にする）
@@ -14319,7 +14328,21 @@ function checkReticleOnRunner(g) {
   // カメラオフセット(-sin(yaw), +cos(yaw)) → 前方(+sin(yaw), -cos(yaw))
   const oniRotY = Math.atan2(Math.sin(g.player.cameraYaw), -Math.cos(g.player.cameraYaw));
 
-
+  // デバッグ: 1秒ごとにリモートプレイヤーの状態をログ
+  if (!g._lastDetectLog || Date.now() - g._lastDetectLog > 1000) {
+    g._lastDetectLog = Date.now();
+    const remoteKeys = Object.keys(multiState.remotePlayers);
+    console.log('[ROLE-DEBUG] checkReticleOnRunner: isOni=true, teamB=', JSON.stringify(teamB), 'remoteKeys=', remoteKeys);
+    remoteKeys.forEach(k => {
+      const ri = parseInt(k);
+      const rrp = multiState.remotePlayers[ri];
+      if (!rrp || !rrp.fig) return;
+      const ddx = rrp.fig.group.position.x - g.player.position.x;
+      const ddz = rrp.fig.group.position.z - g.player.position.z;
+      const dd = Math.sqrt(ddx*ddx+ddz*ddz);
+      console.log('[ROLE-DEBUG]   remote[' + k + '] dist=' + dd.toFixed(1) + ' inTeamB=' + teamB.includes(ri) + ' captured=' + rrp.captured);
+    });
+  }
 
   Object.keys(multiState.remotePlayers).forEach(k => {
     const idx = parseInt(k);
