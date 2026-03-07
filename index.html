@@ -14237,28 +14237,6 @@ function updateOniPlayerHUD(g, dt) {
     op.lockedTarget = -1;
     op.lockValidated = false;
   }
-  // [DEBUG] 自動検知条件チェック（原因特定後に削除）
-  g._dbgAutoT = (g._dbgAutoT || 0) + dt;
-  if (g._dbgAutoT >= 2.0) {
-    g._dbgAutoT = 0;
-    // remotePlayers の距離・角度を個別にログ
-    var oniRotY2 = g.player.cameraYaw + Math.PI;
-    var rpKeys = Object.keys(multiState.remotePlayers);
-    var rpInfo = rpKeys.map(function(k) {
-      var rp = multiState.remotePlayers[k];
-      if (!rp || !rp.fig) return k + ':noFig';
-      var dx = rp.fig.group.position.x - g.player.position.x;
-      var dz = rp.fig.group.position.z - g.player.position.z;
-      var dist = Math.sqrt(dx*dx + dz*dz);
-      var angleToT = Math.atan2(dx, dz);
-      var aDiff = angleToT - oniRotY2;
-      while (aDiff > Math.PI) aDiff -= Math.PI*2;
-      while (aDiff < -Math.PI) aDiff += Math.PI*2;
-      return k + ':d=' + dist.toFixed(1) + ',a=' + (aDiff*180/Math.PI).toFixed(0) + '°,cap=' + !!rp.captured + ',inB=' + (g._teamB||[]).includes(parseInt(k));
-    }).join(' | ');
-    console.log('[AUTO-DETECT] phase=' + g.gamePhase + ' hasTarget=' + hasTarget + ' locked=' + op.lockedTarget + ' cooldown=' + op.lockCooldown.toFixed(1) + ' isAtHome=' + (g.can ? g.can.isAtHome : 'noCan') + ' teamB=' + JSON.stringify(g._teamB) + ' yaw=' + (g.player.cameraYaw||0).toFixed(2) + ' oniRotY=' + oniRotY2.toFixed(2) + ' bodyRot=' + (g.playerFig.group.rotation.y||0).toFixed(2));
-    console.log('[RP-DETAIL] ' + rpInfo);
-  }
   // 自動検知ロジック: ランナーが視界内に一定時間(0.8秒)いたら自動発見（seekフェーズのみ・缶が定位置の時のみ）
   if (g.gamePhase === 'seek' && hasTarget && op.lockedTarget < 0 && op.lockCooldown <= 0 && g.can && g.can.isAtHome) {
     op._autoDetectTimer = (op._autoDetectTimer || 0) + dt;
