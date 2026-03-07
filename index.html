@@ -9692,7 +9692,9 @@ function updatePlayer(g, dt) {
   const canDx = ctrl.position.x - g.can.group.position.x;
   const canDz = ctrl.position.z - g.can.group.position.z;
   const canDist = Math.sqrt(canDx*canDx + canDz*canDz);
-  ctrl.canKick = canDist < 2.5 && g.can.isAtHome && !g.can.isFlying && !g._isOniPlayer && !g.player.captured;
+  // クールダウン減算
+  if (g._canKickCooldown > 0) g._canKickCooldown -= dt;
+  ctrl.canKick = canDist < 2.5 && g.can.isAtHome && !g.can.isFlying && !g._isOniPlayer && !g.player.captured && g._canKickCooldown <= 0;
 
   // Check interactable proximity
   ctrl.canHit = null;
@@ -14573,6 +14575,7 @@ function updateOniCanCarry(g) {
     g._oniPlayer.canCarrying = false;
     g.can.group.position.copy(homePos);
     g.can.isAtHome = true;
+    g._canKickCooldown = 3.0; // 3秒間ランナーは蹴れない
     showOniSearchAlert(true);
     SoundManager.playGameSE('place');
     removeHomeMarker(g);
@@ -14583,7 +14586,8 @@ function updateOniCanCarry(g) {
         status: 'placed',
         position: { x: homePos.x, y: homePos.y, z: homePos.z },
         isAtHome: true,
-        carriedBy: -1
+        carriedBy: -1,
+        placedAt: firebase.database.ServerValue.TIMESTAMP
       });
     }
   }
@@ -15053,6 +15057,12 @@ function initMultiplayerSync(g) {
         // homePos更新（代表ランナーが配置を決定した場合）
         if (canData.homePos && g.can.homePos) {
           g.can.homePos.set(canData.homePos.x || 0, canData.homePos.y || 0, canData.homePos.z || 0);
+        }
+        // 缶配置直後のキッククールダウン（鬼が置いた直後3秒は蹴れない）
+        if (canData.status === 'placed' && canData.placedAt) {
+          var elapsed = (Date.now() - canData.placedAt) / 1000;
+          var remaining = 3.0 - elapsed;
+          if (remaining > 0) g._canKickCooldown = remaining;
         }
       }
     });
