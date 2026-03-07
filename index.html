@@ -1881,7 +1881,11 @@ function initLobbyListeners() {
   // ★チーム情報を初期化（リマッチ後の古いデータ残存防止）
   multiState._teamA = [];
   multiState._teamB = [];
-  if (!multiState._mySelectedRole) multiState._mySelectedRole = 'runner';
+  // _mySelectedRoleが未設定ならFirebaseのデータまたはデフォルトrunnerを使用
+  if (!multiState._mySelectedRole) {
+    var myP = multiState.players[multiState.playerIndex];
+    multiState._mySelectedRole = (myP && myP.selectedRole) ? myP.selectedRole : 'runner';
+  }
   // チーム戦: ロール選択ボタン初期化
   initRoleSelectButtons();
 
@@ -2180,7 +2184,8 @@ function updateTeamAssignUI() {
  */
 function initRoleSelectButtons() {
   document.querySelectorAll('#team-assign-section .role-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    // ★リスナー重複防止: onclickで上書き（addEventListenerは累積する）
+    btn.onclick = function() {
       const role = btn.dataset.role;
       // ボタンUI更新
       document.querySelectorAll('#team-assign-section .role-btn').forEach(b => b.classList.remove('active'));
@@ -2195,7 +2200,7 @@ function initRoleSelectButtons() {
       if (multiState.roomId) {
         db.ref('rooms/' + multiState.roomId + '/players/' + multiState.playerIndex + '/selectedRole').set(role);
       }
-    });
+    };
   });
 }
 
@@ -13308,14 +13313,20 @@ function resolveRematch() {
     multiState.isHost = (multiState.playerIndex === allReadyIndices[0]);
     roomRef.child('players/' + multiState.playerIndex + '/ready').set(false);
     multiState.ready = false;
-    // ★リマッチ時チーム情報を完全リセット（3回目以降の検出バグ防止）
+    // ★リマッチ時チーム情報を完全リセット（ロール交換時のバグ防止）
     multiState._teamA = [];
     multiState._teamB = [];
-    multiState._mySelectedRole = null;
+    // Firebaseから現在のselectedRoleを復元（リマッチ後ボタン未押しでも正しいロールを維持）
+    var myPlayer = multiState.players[multiState.playerIndex];
+    multiState._mySelectedRole = (myPlayer && myPlayer.selectedRole) ? myPlayer.selectedRole : 'runner';
     cleanupGame();
     showScreen('lobby-screen');
     initLobbyListeners();
     updateLobbyUI();
+    // ロール選択ボタンのUIを現在のロールに合わせる
+    document.querySelectorAll('#team-assign-section .role-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.role === multiState._mySelectedRole);
+    });
   } else {
     // 人数不足 → タイトルに戻る
     if (myReady) {
@@ -13710,6 +13721,9 @@ function startGame(stageNum, mode) {
   }
   createCan(G);
   G._canKickCooldown = 0;
+  G._isOniPlayer = false; // ★明示的初期化（チーム戦ロール交換時のバグ防止）
+  G._myTeamRole = null;
+  G._oniPlayer = null;
   createDayNightCycle(G);
 
   // Create player
