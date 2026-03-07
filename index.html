@@ -3592,7 +3592,7 @@ const STAGE_CONFIGS = {
     startPhase: 0, cycleDuration: 60,
     canPositions: [
       { x: 0, z: 2, label: '① 砂場の中央', labelEn: '① Sandbox Center' },
-      { x: -6, z: -12, label: '② 街灯の近く', labelEn: '② Near Streetlight' },
+      { x: -3, z: -10, label: '② 街灯の近く', labelEn: '② Near Streetlight' },
       { x: 12, z: 5, label: '③ ベンチの前', labelEn: '③ In Front of Bench' }
     ],
     waypoints: [
@@ -3712,8 +3712,8 @@ const STAGE_CONFIGS = {
     startPhase: 3, cycleDuration: 999999, // 深夜固定（昼夜サイクルなし）
     canPositions: [
       { x: 0, z: 0, label: '① 校庭の中央', labelEn: '① School Grounds Center' },
-      { x: -5, z: 22, label: '② 校舎の正面玄関前', labelEn: '② Front of School' },
-      { x: 22, z: -12, label: '③ プール跡の横', labelEn: '③ Near Old Pool' }
+      { x: -5, z: 18, label: '② 校舎の正面玄関前', labelEn: '② Front of School' },
+      { x: 18, z: -12, label: '③ プール跡の横', labelEn: '③ Near Old Pool' }
     ],
     waypoints: [
       // メイン巡回（校庭の外周）
@@ -3844,7 +3844,7 @@ const STAGE_CONFIGS = {
     initialOni: 1, maxOni: 5, oniAddAt: [null, 60, 120, 180, 240],
     startPhase: 0, cycleDuration: 60,
     canPositions: [
-      { x: 0, z: -5, label: '① 枯山水の庭園中央', labelEn: '① Zen Garden Center' },
+      { x: 3, z: -7, label: '① 枯山水の庭園中央', labelEn: '① Zen Garden Center' },
       { x: -10, z: -15, label: '② 池の近く', labelEn: '② Near the Pond' },
       { x: 15, z: -20, label: '③ 参道の石灯籠付近', labelEn: '③ Near Stone Lanterns' }
     ],
@@ -11883,10 +11883,56 @@ function updateCanPhysics(g, dt) {
     }
   }
 
+  // 壁・障害物との衝突判定（g.collidersを使用）
+  if (g.colliders) {
+    var canP = g.can.group.position;
+    var canR = 0.15; // 缶の半径
+    for (var ci = 0; ci < g.colliders.length; ci++) {
+      var col = g.colliders[ci];
+      if (col.type === 'box') {
+        var overX = col.hw + canR - Math.abs(canP.x - col.x);
+        var overZ = col.hd + canR - Math.abs(canP.z - col.z);
+        if (overX > 0 && overZ > 0) {
+          // 押し出し＋跳ね返り
+          if (overX < overZ) {
+            var signX = (canP.x >= col.x) ? 1 : -1;
+            canP.x += signX * overX;
+            g.can.velocity.x *= -0.5; // 跳ね返り（減衰）
+            g.can.velocity.z *= 0.8;
+          } else {
+            var signZ = (canP.z >= col.z) ? 1 : -1;
+            canP.z += signZ * overZ;
+            g.can.velocity.z *= -0.5;
+            g.can.velocity.x *= 0.8;
+          }
+          SoundManager.playGameSE('can_bounce');
+        }
+      } else if (col.type === 'cylinder') {
+        var cdx = canP.x - col.x;
+        var cdz = canP.z - col.z;
+        var cdist = Math.sqrt(cdx * cdx + cdz * cdz);
+        if (cdist < col.r + canR && cdist > 0.01) {
+          var push = col.r + canR - cdist;
+          var nx = cdx / cdist;
+          var nz = cdz / cdist;
+          canP.x += nx * push;
+          canP.z += nz * push;
+          // 反射ベクトル: v' = v - 2(v·n)n
+          var dot = g.can.velocity.x * nx + g.can.velocity.z * nz;
+          g.can.velocity.x = (g.can.velocity.x - 2 * dot * nx) * 0.5;
+          g.can.velocity.z = (g.can.velocity.z - 2 * dot * nz) * 0.5;
+          SoundManager.playGameSE('can_bounce');
+        }
+      }
+    }
+  }
+
   // Boundary
-  const half = g.config.size / 2 - 1;
-  g.can.group.position.x = Math.max(-half, Math.min(half, g.can.group.position.x));
-  g.can.group.position.z = Math.max(-half, Math.min(half, g.can.group.position.z));
+  var half = g.config.size / 2 - 1;
+  if (g.can.group.position.x < -half) { g.can.group.position.x = -half; g.can.velocity.x *= -0.4; }
+  if (g.can.group.position.x > half) { g.can.group.position.x = half; g.can.velocity.x *= -0.4; }
+  if (g.can.group.position.z < -half) { g.can.group.position.z = -half; g.can.velocity.z *= -0.4; }
+  if (g.can.group.position.z > half) { g.can.group.position.z = half; g.can.velocity.z *= -0.4; }
 
   // マルチプレイ: 飛翔中も缶の位置を定期同期（4フレームに1回）
   if (g._isMultiplayer && multiState.roomId && g.can.isFlying) {
