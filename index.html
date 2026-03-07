@@ -9651,11 +9651,6 @@ function updatePlayer(g, dt) {
   if (ctrl.moveSpeed > 0.5) {
     ctrl.rotation = Math.atan2(moveX, moveZ);
   }
-  // 鬼プレイヤー: 停止中もカメラが見ている方向に体を向ける
-  // TPS: カメラはプレイヤーの後ろにいるので、前方 = cameraYaw + π
-  if (g._isOniPlayer && ctrl.moveSpeed <= 0.5) {
-    ctrl.rotation = ctrl.cameraYaw + Math.PI;
-  }
 
   // Update figure
   const fig = g.playerFig;
@@ -14311,8 +14306,8 @@ function checkReticleOnRunner(g) {
   const teamB = g._teamB || [];
   let bestIdx = -1;
   let bestDist = Infinity;
-  // TPS: カメラが見ている方向 = cameraYaw + π = プレイヤーの正面
-  const oniRotY = g.playerFig.group.rotation.y;
+  // TPS: カメラが見ている方向 = cameraYaw + π（体の向きではなくカメラ基準で検出）
+  const oniRotY = g.player.cameraYaw + Math.PI;
 
 
 
@@ -14413,7 +14408,8 @@ function validateLockOn(g, oniIdx, targetIdx) {
   // 2. 視線方向チェック（±30度）
   let oniRotY;
   if (oniIdx === multiState.playerIndex) {
-    oniRotY = g.playerFig.group.rotation.y;
+    // 自分が鬼: カメラの向き基準（体の向きは移動時のみ更新されるため）
+    oniRotY = g.player.cameraYaw + Math.PI;
   } else if (multiState.remotePlayers[oniIdx]) {
     oniRotY = multiState.remotePlayers[oniIdx].fig.group.rotation.y;
   } else {
