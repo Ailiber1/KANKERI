@@ -886,6 +886,11 @@ html, body {
 #oni-search-alert { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); text-align: center; z-index: 38; pointer-events: none; background: rgba(0,0,0,0.65); border: 1px solid rgba(255,140,0,0.5); border-radius: 8px; padding: 6px 18px; white-space: nowrap; }
 #oni-search-alert span { font-family: 'Noto Sans JP', sans-serif; font-size: 15px; color: #ffaa00; font-weight: bold; text-shadow: 0 0 8px rgba(255,170,0,0.5); animation: pulseAlert 1.2s ease infinite alternate; }
 @media (max-height: 500px) { #oni-search-alert { top: 10%; } #oni-search-alert span { font-size: 13px; } }
+#can-cooldown-alert { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); text-align: center; z-index: 38; pointer-events: none; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,68,68,0.5); border-radius: 8px; padding: 8px 20px; white-space: nowrap; }
+#can-cooldown-text { font-family: 'Noto Sans JP', sans-serif; font-size: 15px; color: #ff6666; font-weight: bold; text-shadow: 0 0 8px rgba(255,68,68,0.5); }
+#can-cooldown-timer { font-family: 'Share Tech Mono', monospace; font-size: 22px; color: #ffcc00; text-shadow: 0 0 10px rgba(255,200,0,0.5); margin-top: 2px; }
+@media (max-height: 500px) { #can-cooldown-alert { top: 10%; } #can-cooldown-text { font-size: 13px; } #can-cooldown-timer { font-size: 18px; } }
+@media (orientation: portrait) { #can-cooldown-alert { top: 12%; } }
 @media (orientation: portrait) { #oni-search-alert { top: 12%; } }
 #pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .pause-panel { max-width: 300px; width: 90%; padding: 30px; }
@@ -1391,6 +1396,10 @@ html, body {
       <div id="runner-found-sub">急いで缶を蹴ろ！</div>
     </div>
     <div id="oni-search-alert" style="display:none;"><span>🔍 ランナーを探せ！</span></div>
+    <div id="can-cooldown-alert" style="display:none;">
+      <div id="can-cooldown-text">⚠ 鬼が缶をセット！</div>
+      <div id="can-cooldown-timer"></div>
+    </div>
     <!-- Mobile controls -->
     <div id="mobile-joystick" class="mobile-only" style="display:none;"><div id="joystick-knob"></div></div>
     <button id="mob-map" class="mobile-only" style="display:none;">全体を見る</button>
@@ -9692,8 +9701,18 @@ function updatePlayer(g, dt) {
   const canDx = ctrl.position.x - g.can.group.position.x;
   const canDz = ctrl.position.z - g.can.group.position.z;
   const canDist = Math.sqrt(canDx*canDx + canDz*canDz);
-  // クールダウン減算
+  // クールダウン減算 + ランナー向けクールダウン表示
   if (g._canKickCooldown > 0) g._canKickCooldown -= dt;
+  var cdAlert = document.getElementById('can-cooldown-alert');
+  if (cdAlert && !g._isOniPlayer && g._multiMode === 'team') {
+    if (g._canKickCooldown > 0 && g.gamePhase === 'seek') {
+      var cdSec = Math.ceil(g._canKickCooldown);
+      document.getElementById('can-cooldown-timer').textContent = cdSec + '秒間は缶を蹴れない';
+      cdAlert.style.display = 'block';
+    } else {
+      cdAlert.style.display = 'none';
+    }
+  }
   ctrl.canKick = canDist < 2.5 && g.can.isAtHome && !g.can.isFlying && !g._isOniPlayer && !g.player.captured && g._canKickCooldown <= 0;
 
   // Check interactable proximity
