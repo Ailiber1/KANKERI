@@ -13409,7 +13409,6 @@ function updateHUD(g) {
     canDirEl.textContent = '缶 ' + arrows[idx] + ' ' + dist + 'm';
   }
 
-  // 鬼プレイヤーは「全体を見る」ボタンを非表示
   // 鬼プレイヤーは「全体を見る」ボタンを非表示、ランナーはモバイルのみ表示
   var mobMapBtn = document.getElementById('mob-map');
   if (mobMapBtn) {
@@ -13418,6 +13417,23 @@ function updateHUD(g) {
     } else if (g.player.isMobile) {
       mobMapBtn.style.setProperty('display', 'block', 'important');
     }
+  }
+  // ★デバッグ: ランナー側mob-map状態（原因特定後に削除）
+  if (!g._isOniPlayer) {
+    var dbgR = document.getElementById('runner-debug-panel');
+    if (!dbgR) {
+      dbgR = document.createElement('div');
+      dbgR.id = 'runner-debug-panel';
+      dbgR.style.cssText = 'position:fixed;top:4px;left:4px;background:rgba(0,0,0,0.8);color:#0f0;font-size:10px;padding:4px 8px;z-index:99999;font-family:monospace;pointer-events:none;white-space:pre;';
+      document.body.appendChild(dbgR);
+    }
+    var rd = [];
+    rd.push('isMobile=' + g.player.isMobile);
+    rd.push('mobMap=' + (mobMapBtn ? mobMapBtn.style.display : 'null'));
+    rd.push('computed=' + (mobMapBtn ? getComputedStyle(mobMapBtn).display : 'null'));
+    rd.push('class=' + (mobMapBtn ? mobMapBtn.className : 'null'));
+    rd.push('teamB=' + JSON.stringify(g._teamB));
+    dbgR.textContent = rd.join('\n');
   }
 
   // Action prompt
@@ -14251,6 +14267,34 @@ function updateOniPlayerHUD(g, dt) {
     op.lockedTarget = -1;
     op.lockValidated = false;
   }
+  // ★デバッグパネル: 検知条件を画面表示（原因特定後に削除）
+  var dbgEl = document.getElementById('oni-debug-panel');
+  if (!dbgEl) {
+    dbgEl = document.createElement('div');
+    dbgEl.id = 'oni-debug-panel';
+    dbgEl.style.cssText = 'position:fixed;top:4px;left:4px;background:rgba(0,0,0,0.8);color:#0f0;font-size:10px;padding:4px 8px;z-index:99999;font-family:monospace;pointer-events:none;white-space:pre;';
+    document.body.appendChild(dbgEl);
+  }
+  var dbgLines = [];
+  dbgLines.push('phase=' + g.gamePhase);
+  dbgLines.push('teamB=' + JSON.stringify(g._teamB));
+  dbgLines.push('hasTarget=' + hasTarget);
+  dbgLines.push('locked=' + op.lockedTarget);
+  dbgLines.push('isAtHome=' + (g.can ? g.can.isAtHome : 'null'));
+  dbgLines.push('isFlying=' + (g.can ? g.can.isFlying : 'null'));
+  dbgLines.push('cooldown=' + (op.lockCooldown > 0 ? op.lockCooldown.toFixed(1) : '0'));
+  dbgLines.push('autoTimer=' + (op._autoDetectTimer || 0).toFixed(2));
+  var rpKeys = Object.keys(multiState.remotePlayers || {});
+  dbgLines.push('remote=' + rpKeys.join(','));
+  rpKeys.forEach(function(k) {
+    var rp = multiState.remotePlayers[parseInt(k)];
+    if (rp && rp.fig) {
+      var d = g.player.position.distanceTo(rp.fig.group.position);
+      dbgLines.push('  p' + k + ' dist=' + d.toFixed(1) + ' cap=' + rp.captured);
+    }
+  });
+  dbgEl.textContent = dbgLines.join('\n');
+
   // 自動検知ロジック: ランナーが視界内に一定時間いたら自動発見（seekフェーズのみ・缶が定位置の時のみ）
   if (g.gamePhase === 'seek' && hasTarget && op.lockedTarget < 0 && op.lockCooldown <= 0 && g.can && g.can.isAtHome) {
     op._autoDetectTimer = (op._autoDetectTimer || 0) + dt;
