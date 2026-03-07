@@ -807,7 +807,7 @@ html, body {
   text-shadow: 0 0 6px rgba(255,68,68,0.4);
   pointer-events: none; transition: background 0.2s, border-color 0.2s;
 }
-@media (max-height: 500px) { #oni-status-label { top: 18%; font-size: 13px; padding: 5px 14px; } }
+@media (max-height: 500px) { #oni-status-label { top: 28%; font-size: 13px; padding: 5px 14px; } }
 #oni-reticle.locked {
   color: #ff2222; text-shadow: 0 0 30px rgba(255,0,0,0.8); font-size: 72px;
 }
@@ -886,11 +886,11 @@ html, body {
 @keyframes pulseAlert { from { transform: scale(1); } to { transform: scale(1.08); } }
 #oni-search-alert { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); text-align: center; z-index: 38; pointer-events: none; background: rgba(0,0,0,0.65); border: 1px solid rgba(255,140,0,0.5); border-radius: 8px; padding: 6px 18px; white-space: nowrap; }
 #oni-search-alert span { font-family: 'Noto Sans JP', sans-serif; font-size: 15px; color: #ffaa00; font-weight: bold; text-shadow: 0 0 8px rgba(255,170,0,0.5); animation: pulseAlert 1.2s ease infinite alternate; }
-@media (max-height: 500px) { #oni-search-alert { top: 10%; } #oni-search-alert span { font-size: 13px; } }
+@media (max-height: 500px) { #oni-search-alert { top: 22%; } #oni-search-alert span { font-size: 13px; } }
 #can-cooldown-alert { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); text-align: center; z-index: 38; pointer-events: none; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,68,68,0.5); border-radius: 8px; padding: 8px 20px; white-space: nowrap; }
 #can-cooldown-text { font-family: 'Noto Sans JP', sans-serif; font-size: 15px; color: #ff6666; font-weight: bold; text-shadow: 0 0 8px rgba(255,68,68,0.5); }
 #can-cooldown-timer { font-family: 'Share Tech Mono', monospace; font-size: 22px; color: #ffcc00; text-shadow: 0 0 10px rgba(255,200,0,0.5); margin-top: 2px; }
-@media (max-height: 500px) { #can-cooldown-alert { top: 10%; } #can-cooldown-text { font-size: 13px; } #can-cooldown-timer { font-size: 18px; } }
+@media (max-height: 500px) { #can-cooldown-alert { top: 22%; } #can-cooldown-text { font-size: 13px; } #can-cooldown-timer { font-size: 18px; } }
 @media (orientation: portrait) { #can-cooldown-alert { top: 12%; } }
 @media (orientation: portrait) { #oni-search-alert { top: 12%; } }
 #pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
@@ -2299,32 +2299,40 @@ async function hostChangeStage(stageNum) {
 }
 
 function startMultiplayerGame() {
-  // ゲーム開始直前にチーム分けを再計算（Firebase同期遅延でデータが欠損する問題を防止）
   if (multiState.gameMode === 'team') {
-    var players = multiState.players || {};
-    var pKeys = Object.keys(players).map(Number).sort(function(a,b){return a-b;});
-    var tA = [], tB = [];
-    var myLocal = multiState._mySelectedRole;
-    pKeys.forEach(function(idx) {
-      var p = players[idx];
-      if (!p) return;
-      var role;
-      if (idx === multiState.playerIndex && myLocal) {
-        role = myLocal;
-      } else {
-        role = p.selectedRole || 'runner';
+    // ★Firebaseからホストが確定したチーム分けを取得（ローカル計算は同期遅延でずれる）
+    var roomRef = db.ref('rooms/' + multiState.roomId + '/teamBattle');
+    roomRef.once('value').then(function(snap) {
+      var tb = snap.val() || {};
+      var tA = tb.teamA || [];
+      var tB = tb.teamB || [];
+      // Firebaseにデータがない場合はローカルから計算（フォールバック）
+      if (tA.length === 0 && tB.length === 0) {
+        var players = multiState.players || {};
+        var pKeys = Object.keys(players).map(Number).sort(function(a,b){return a-b;});
+        var myLocal = multiState._mySelectedRole;
+        pKeys.forEach(function(idx) {
+          var p = players[idx];
+          if (!p) return;
+          var role = (idx === multiState.playerIndex && myLocal) ? myLocal : (p.selectedRole || 'runner');
+          if (role === 'oni') { tA.push(idx); } else { tB.push(idx); }
+        });
       }
-      if (role === 'oni') { tA.push(idx); } else { tB.push(idx); }
+      multiState._teamA = tA;
+      multiState._teamB = tB;
+      // ロビーからゲームへ遷移
+      removeLobbyListeners();
+      var stageNum = multiState.stage;
+      var mode = 'multi_' + multiState.gameMode;
+      startGame(stageNum, mode);
     });
-    multiState._teamA = tA;
-    multiState._teamB = tB;
-
+  } else {
+    // チーム戦以外はそのまま開始
+    removeLobbyListeners();
+    var stageNum = multiState.stage;
+    var mode = 'multi_' + multiState.gameMode;
+    startGame(stageNum, mode);
   }
-  // ロビーからゲームへ遷移（全クライアント共通）
-  removeLobbyListeners();
-  const stageNum = multiState.stage;
-  const mode = 'multi_' + multiState.gameMode; // 'multi_ffa', 'multi_coop', 'multi_team'
-  startGame(stageNum, mode);
 }
 
 // URL ?room=XXXX で自動参加
