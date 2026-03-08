@@ -754,6 +754,7 @@ html, body {
   #hud-info-bar { top: 86px; left: 6px; }
   #hud-capture { font-size: 12px; padding: 3px 8px; }
   #hud-can-dir { font-size: 11px; padding: 3px 8px; }
+  #hud-ally-status { top: 108px; left: 6px; font-size: 10px; }
   #hud-minimap { width: 70px; height: 70px; top: auto; left: auto; bottom: calc(210px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); }
   #hud-action-prompt { font-size: 13px; padding: 6px 14px; bottom: auto; top: 30%; transform: translateX(-50%) translateY(-50%); }
   #hud-peek-prompt { font-size: 12px; padding: 4px 12px; bottom: 130px; }
@@ -789,6 +790,10 @@ html, body {
 #hud-info-bar { position: absolute; top: 96px; left: 12px; display: flex; gap: 16px; align-items: center; }
 #hud-capture { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ff3366; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
 #hud-can-dir { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #00e5ff; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; }
+#hud-ally-status { position: absolute; top: 120px; left: 12px; font-family: 'Share Tech Mono', monospace; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
+#hud-ally-status .ally-entry { padding: 2px 8px; border-radius: 3px; background: rgba(0,0,0,0.5); white-space: nowrap; }
+#hud-ally-status .ally-alive { color: #44ffaa; }
+#hud-ally-status .ally-captured { color: #ff4444; text-decoration: line-through; }
 #hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
 @keyframes promptPulse { 0%,100% { box-shadow: 0 0 8px rgba(85,153,255,0.3); } 50% { box-shadow: 0 0 20px rgba(85,153,255,0.6); } }
 #hud-peek-prompt { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #00e5ff; background: rgba(0,0,0,0.6); border: 1px solid rgba(0,229,255,0.4); padding: 6px 16px; border-radius: 6px; text-align: center; white-space: nowrap; }
@@ -1351,6 +1356,7 @@ html, body {
       <div id="hud-capture">捕獲: 0/0</div>
       <div id="hud-can-dir"></div>
     </div>
+    <div id="hud-ally-status" style="display:none;"></div>
     <div id="hud-action-prompt" style="display:none;"></div>
     <div id="hud-peek-prompt" style="display:none;"></div>
     <div id="hud-captured-overlay" style="display:none;">
@@ -10415,12 +10421,33 @@ function updateOni(g, oni, dt) {
       const dist = Math.sqrt(dx*dx + dz*dz);
       if (dist < 1.5 || oni._skipWaypoint) {
         oni._skipWaypoint = false;
-        // 30%の確率でランダムなウェイポイントにジャンプ（巡回パターンを予測しにくくする）
-        if (Math.random() < 0.3) {
-          oni.targetWaypoint = Math.floor(Math.random() * g.config.waypoints.length);
-        } else {
+        // Stage 4: 一定時間2Fに行っていなければ強制的に2F巡回開始
+        if (g._stageNum === 4 && (oni.floor || 0) === 0) {
+          oni._floorStayTimer = (oni._floorStayTimer || 0) + (oni._lastWpTime || 0);
+          oni._lastWpTime = 0;
+          // 30秒以上1Fにいたら東階段ウェイポイント(32)へ強制誘導
+          if (oni._floorStayTimer > 30) {
+            oni.targetWaypoint = 32; // 東階段入口
+            oni._floorStayTimer = 0;
+          } else {
+            oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
+          }
+        } else if (g._stageNum === 4 && (oni.floor || 0) === 1) {
+          // 2Fにいる間はフロアタイマーリセット
+          oni._floorStayTimer = 0;
           oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
+        } else {
+          // Stage 4以外: 30%でランダムジャンプ
+          if (Math.random() < 0.3) {
+            oni.targetWaypoint = Math.floor(Math.random() * g.config.waypoints.length);
+          } else {
+            oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
+          }
         }
+      }
+      // Stage 4: ウェイポイント間の経過時間を追跡
+      if (g._stageNum === 4) {
+        oni._lastWpTime = (oni._lastWpTime || 0) + dt;
       }
 
       // canGuard role: stay within range of can
@@ -13673,6 +13700,23 @@ function updateHUD(g) {
     let opacity = 0;
     if (minDist < 20) opacity = Math.max(0, (20 - minDist) / 20) * 0.5;
     vignetteEl.style.boxShadow = `inset 0 0 80px rgba(255,0,64,${opacity})`;
+  }
+
+  // 味方ステータス表示（ソロプレイ時のみ、CPU味方がいる場合）
+  const allyStatusEl = document.getElementById('hud-ally-status');
+  if (allyStatusEl && g.cpuAllies && g.cpuAllies.length > 0 && !g._isMultiplayer) {
+    allyStatusEl.style.display = 'flex';
+    let html = '';
+    for (const ally of g.cpuAllies) {
+      if (ally.captured) {
+        html += '<div class="ally-entry ally-captured">✖ ' + ally.name + '</div>';
+      } else {
+        html += '<div class="ally-entry ally-alive">● ' + ally.name + '</div>';
+      }
+    }
+    allyStatusEl.innerHTML = html;
+  } else if (allyStatusEl) {
+    allyStatusEl.style.display = 'none';
   }
 
   // Minimap
