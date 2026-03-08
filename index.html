@@ -1642,23 +1642,33 @@ function loadSavedUser() {
 }
 
 /** ストーリーモードのステージ解放状況をUIに反映 */
+const STAGE_ORIGINAL_NAMES = {
+  1: 'Stage 1 — 児童公園',
+  2: 'Stage 2 — 雨上がりの神社',
+  3: 'Stage 3 — ネオン商店街の裏路地',
+  4: 'Stage 4 — 廃校の校庭',
+  5: 'Stage 5 — 団地（真夏の公営住宅群）'
+};
 function updateStageSelectLock() {
   const sel = document.getElementById('story-stage-select');
   if (!sel) return;
   const cleared = gameState.clearedStages || [1];
-  const maxUnlocked = Math.max(...cleared) + 1; // クリア済み最大+1まで選択可
+  const maxUnlocked = Math.max(...cleared); // クリア済みステージまで選択可
   Array.from(sel.options).forEach(opt => {
     const v = parseInt(opt.value);
-    if (v > maxUnlocked) {
+    const origName = STAGE_ORIGINAL_NAMES[v] || ('Stage ' + v);
+    if (v > maxUnlocked + 1) {
+      // 未解放（クリア済み+1より先）: ロック + ???
       opt.disabled = true;
-      opt.textContent = opt.textContent.replace(/^🔓\s*/, '').replace(/^🔒\s*/, '');
-      opt.textContent = '🔒 ' + opt.textContent;
-    } else {
+      opt.textContent = '🔒 Stage ' + v + ' — ???';
+    } else if (v === maxUnlocked + 1) {
+      // 次の挑戦ステージ: 選択可能だが未クリア
       opt.disabled = false;
-      opt.textContent = opt.textContent.replace(/^🔓\s*/, '').replace(/^🔒\s*/, '');
-      if (cleared.includes(v)) {
-        opt.textContent = '✓ ' + opt.textContent;
-      }
+      opt.textContent = origName;
+    } else {
+      // クリア済み
+      opt.disabled = false;
+      opt.textContent = '✓ ' + origName;
     }
   });
   // 現在選択中がロックされていたらStage1に戻す
@@ -3645,8 +3655,8 @@ function initButtonHandlers() {
   document.getElementById('btn-story-start').addEventListener('click', () => {
     const stage = gameState.storySettings.stage;
     const cleared = gameState.clearedStages || [1];
-    const maxUnlocked = Math.max(...cleared) + 1;
-    if (stage > maxUnlocked) {
+    const maxUnlocked = Math.max(...cleared);
+    if (stage > maxUnlocked + 1) {
       showNotification('前のステージをクリアしてください');
       return;
     }
