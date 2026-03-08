@@ -14403,8 +14403,10 @@ function attemptLockOn(g) {
  * validateLockOn — ロックオン検証（ホストが実行）
  */
 function validateLockOn(g, oniIdx, targetIdx) {
-  const remote = multiState.remotePlayers[targetIdx];
-  if (!remote || !remote.fig) {
+  // ★ターゲット取得: ホスト自身がターゲットの場合はremotePlayersにいないのでローカルプレイヤーを使う
+  const targetIsLocal = (targetIdx === multiState.playerIndex);
+  const remoteTarget = targetIsLocal ? null : multiState.remotePlayers[targetIdx];
+  if (!targetIsLocal && (!remoteTarget || !remoteTarget.fig)) {
     rejectLockOn(g, oniIdx);
     return;
   }
@@ -14419,7 +14421,7 @@ function validateLockOn(g, oniIdx, targetIdx) {
     rejectLockOn(g, oniIdx);
     return;
   }
-  const tPos = remote.fig.group.position;
+  const tPos = targetIsLocal ? g.player.position : remoteTarget.fig.group.position;
   const dist = oniPos.distanceTo(tPos);
   if (dist > 20) {
     rejectLockOn(g, oniIdx);
@@ -14454,9 +14456,9 @@ function validateLockOn(g, oniIdx, targetIdx) {
   const dir = new THREE.Vector3().subVectors(rayTarget, rayOrigin).normalize();
   ray.set(rayOrigin, dir);
   ray.far = dist;
-  // 鬼自身とターゲットの棒人間メッシュを除外
-  var oniGroup = g.playerFig ? g.playerFig.group : null;
-  var targetGroup = remote.fig ? remote.fig.group : null;
+  // ★鬼・ターゲットのフィギュアメッシュを除外（ローカル/リモート両対応）
+  var oniGroup = (oniIdx === multiState.playerIndex) ? (g.playerFig ? g.playerFig.group : null) : (multiState.remotePlayers[oniIdx] && multiState.remotePlayers[oniIdx].fig ? multiState.remotePlayers[oniIdx].fig.group : null);
+  var targetGroup = targetIsLocal ? (g.playerFig ? g.playerFig.group : null) : (remoteTarget.fig ? remoteTarget.fig.group : null);
   const obstacles = [];
   g.scene.traverse(obj => {
     if (!obj.isMesh || !obj.geometry) return;
