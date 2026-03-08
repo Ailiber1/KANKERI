@@ -14156,25 +14156,29 @@ function initOniPlayerControls(g) {
     });
   }
 
-  // ★鬼スマホUI: 右下に縦並びで配置
-  //   上: レティクル◎（アクションボタン・発光）  下: ダッシュボタン
-  //   しゃがむボタンは非表示
+  // ★鬼スマホUI: 右下に縦並び配置
+  //   上: レティクル◎（常時表示、アクション可能時のみ発光）
+  //   下: ダッシュボタン（しゃがむは非表示）
   const isMobile = 'ontouchstart' in window;
   if (isMobile && reticleEl) {
-    // レティクル◎を右下（ダッシュボタンの上）に再配置
+    // レティクル◎を右下（ダッシュボタンの上）に再配置 — 常時表示・薄い状態
     reticleEl.style.position = 'absolute';
     reticleEl.style.top = 'auto';
     reticleEl.style.left = 'auto';
-    reticleEl.style.right = 'calc(30px + env(safe-area-inset-right, 0px))';
-    reticleEl.style.bottom = 'calc(100px + env(safe-area-inset-bottom, 0px))';
+    reticleEl.style.right = 'calc(18px + env(safe-area-inset-right, 0px))';
+    reticleEl.style.bottom = 'calc(95px + env(safe-area-inset-bottom, 0px))';
     reticleEl.style.transform = 'none';
-    reticleEl.style.fontSize = '64px';
-    // 発光エフェクト
-    reticleEl.style.color = 'rgba(255,68,68,0.8)';
-    reticleEl.style.textShadow = '0 0 20px rgba(255,0,0,0.6), 0 0 40px rgba(255,0,0,0.3)';
-    reticleEl.style.animation = 'oniReticleGlow 1.5s ease-in-out infinite';
+    reticleEl.style.fontSize = '56px';
+    reticleEl.style.color = 'rgba(255,68,68,0.35)';
+    reticleEl.style.textShadow = '0 0 8px rgba(255,0,0,0.15)';
+    reticleEl.style.animation = 'none';
+    reticleEl.style.display = 'block';
 
-    // mobile-buttonsコンテナ: 右下のデフォルト位置のまま維持（ダッシュのみ表示）
+    // ダッシュボタンを下に配置（レティクルと被らない位置）
+    var mobBtns = document.getElementById('mobile-buttons');
+    if (mobBtns) {
+      mobBtns.style.bottom = 'calc(20px + env(safe-area-inset-bottom, 0px))';
+    }
     // しゃがむボタンを非表示（鬼には不要）
     var crouchBtn = document.getElementById('mob-crouch');
     if (crouchBtn) crouchBtn.style.setProperty('display', 'none', 'important');
@@ -14265,10 +14269,17 @@ function updateOniPlayerHUD(g, dt) {
     }
   }
   if (reticle) {
-    // PCではレティクル(◎)を非表示、モバイルのみ表示
     if (g.player.isMobile) {
+      // スマホ: 常時表示、アクション可能時のみ発光
+      reticle.style.display = 'block';
       reticle.classList.toggle('locked', hasTarget);
-      reticle.style.display = canAction ? 'block' : 'none';
+      if (canAction) {
+        reticle.style.color = 'rgba(255,68,68,0.9)';
+        reticle.style.textShadow = '0 0 20px rgba(255,0,0,0.8), 0 0 40px rgba(255,0,0,0.4)';
+      } else {
+        reticle.style.color = 'rgba(255,68,68,0.35)';
+        reticle.style.textShadow = '0 0 8px rgba(255,0,0,0.15)';
+      }
     } else {
       reticle.style.display = 'none';
     }
