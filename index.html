@@ -3132,6 +3132,8 @@ function showNotification(msg) {
 }
 
 function showCenterAlert(mainText, subText, duration) {
+  // ★resultフェーズ中はアラートを表示しない（リザルト画面への重複防止）
+  if (G && G.gamePhase === 'result') return;
   duration = duration || 2500;
   const existing = document.querySelector('.center-alert');
   if (existing) existing.remove();
@@ -12922,9 +12924,13 @@ function togglePause(g) {
 }
 
 function endGame(g, playerWon, reason) {
+  if (g.gamePhase === 'result') return; // ★二重実行防止
   g.gamePhase = 'result';
   stopBGM();
   if (document.pointerLockElement) document.exitPointerLock();
+  // ★center-alertを即座にクリア（「缶を拾いに行け！」等がリザルト画面に残るのを防止）
+  var existingAlert = document.querySelector('.center-alert');
+  if (existingAlert) existingAlert.remove();
   // Hide captured overlay
   const capOv = document.getElementById('hud-captured-overlay');
   if (capOv) capOv.style.display = 'none';
@@ -15075,6 +15081,7 @@ function initMultiplayerSync(g) {
       const prevPhase = g.gamePhase;
       // フェーズ順序チェック: Firebase競合でフェーズが巻き戻るのを防止
       // (ホストのgameTimer更新がリスナーを発火→古いgamePhaseで上書きされるバグ対策)
+      var phaseActuallyChanged = false;
       if (state.gamePhase) {
         const phaseOrder = { placement: 0, kick: 1, hide: 2, seek: 3, result: 4 };
         const newO = phaseOrder[state.gamePhase];
@@ -15082,9 +15089,11 @@ function initMultiplayerSync(g) {
         if (newO !== undefined && curO !== undefined) {
           // 前進のみ許可（placementへの戻りはリマッチ用に許可）
           if (newO >= curO || state.gamePhase === 'placement') {
+            if (g.gamePhase !== state.gamePhase) phaseActuallyChanged = true;
             g.gamePhase = state.gamePhase;
           }
         } else {
+          if (g.gamePhase !== state.gamePhase) phaseActuallyChanged = true;
           g.gamePhase = state.gamePhase;
         }
       }
@@ -15092,8 +15101,8 @@ function initMultiplayerSync(g) {
       if (state.capturedCount !== undefined) g.capturedCount = state.capturedCount;
       if (state.hideTime !== undefined) g.hideTime = state.hideTime;
 
-      // フェーズ変更時: UIを自動更新（非ホスト）
-      if (state.gamePhase && state.gamePhase !== prevPhase) {
+      // ★フェーズが実際に変更された場合のみUIを更新（Firebase古いデータでの誤発火防止）
+      if (phaseActuallyChanged) {
         // placement → kick: 配置UIを非表示、キック待機メッセージ表示
         if (prevPhase === 'placement' && state.gamePhase !== 'placement') {
           const canWrap = document.getElementById('can-placement-wrap');
