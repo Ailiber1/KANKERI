@@ -3883,8 +3883,8 @@ const STAGE_CONFIGS = {
       {x:-15,z:33},{x:0,z:33},{x:15,z:33},
       // 体育倉庫周辺
       {x:-28,z:8},{x:-20,z:4},{x:-28,z:-5},
-      // プール周辺（フェンスの外側）
-      {x:15,z:-16},{x:25,z:-11},{x:28,z:-22},{x:18,z:-25},
+      // プール周辺（フェンスの外側 — 内部に入らないよう安全距離を確保）
+      {x:14,z:-16},{x:23,z:-10},{x:32,z:-18},{x:18,z:-26},
       // 校庭中央
       {x:0,z:5},{x:8,z:-5},{x:-8,z:-8},
       // ★正面玄関から校舎に入る（入口中央を確実に通過）
@@ -6674,10 +6674,10 @@ function buildSchoolObjects(g) {
   g.materials.push(fenceMat);
   const fenceH = 2.0;
   const poolFenceDefs = [
-    { x:23, z:-12, hw:7, hd:0.1 }, // 北辺
-    { x:23, z:-24, hw:7, hd:0.1 }, // 南辺
-    { x:16, z:-18, hw:0.1, hd:6 }, // 西辺
-    { x:30, z:-18, hw:0.1, hd:6 }, // 東辺
+    { x:23, z:-12, hw:7, hd:0.3 }, // 北辺（厚み増で鬼すり抜け防止）
+    { x:23, z:-24, hw:7, hd:0.3 }, // 南辺
+    { x:16, z:-18, hw:0.3, hd:6 }, // 西辺
+    { x:30, z:-18, hw:0.3, hd:6 }, // 東辺
   ];
   for (const pf of poolFenceDefs) {
     const pfGeo = new THREE.BoxGeometry(pf.hw * 2, fenceH, pf.hd * 2);
@@ -10417,6 +10417,47 @@ function updateOni(g, oni, dt) {
   // Track search timer
   oni.searchTimer += dt;
 
+  // === Stage 4/5: 強制フロア巡回タイマー（全状態で加算 — patrol以外でも動く）===
+  if (g._stageNum === 4) {
+    if ((oni.floor || 0) === 0) {
+      oni._floorStayTimer = (oni._floorStayTimer || 0) + dt;
+      if (oni._floorStayTimer > 15) { // 15秒で強制2F巡回
+        const inSchool = oni.position.x > -19.5 && oni.position.x < 19.5 && oni.position.z > 24;
+        oni.targetWaypoint = inSchool ? 33 : 24;
+        oni._floorStayTimer = 0;
+        oni._forceFloorPatrol = true;
+        // 現在の状態に関わらず強制的にpatrolに切り替え（WPに従わせる）
+        oni.state = 'patrol';
+        oni.stateTimer = 0;
+        oni.restTimer = 0;
+      }
+    } else {
+      oni._floorStayTimer = 0;
+    }
+    if (oni._forceFloorPatrol && (oni.floor || 0) === 0 && oni._floorStayTimer > 3) {
+      oni._forceFloorPatrol = false;
+    }
+  }
+  if (g._stageNum === 5) {
+    if (oni.position.y < 1.0) {
+      oni._floorStayTimer = (oni._floorStayTimer || 0) + dt;
+      if (oni._floorStayTimer > 20) { // 20秒で強制階段巡回
+        const stairStarts = [29, 35, 41, 47];
+        oni.targetWaypoint = stairStarts[Math.floor(Math.random() * stairStarts.length)];
+        oni._floorStayTimer = 0;
+        oni._forceFloorPatrol = true;
+        oni.state = 'patrol';
+        oni.stateTimer = 0;
+        oni.restTimer = 0;
+      }
+    } else {
+      oni._floorStayTimer = 0;
+      if (oni._forceFloorPatrol && oni.position.y < 0.5) {
+        oni._forceFloorPatrol = false;
+      }
+    }
+  }
+
   switch (oni.state) {
     case 'patrol': {
       const wp = g.config.waypoints[oni.targetWaypoint];
@@ -10438,44 +10479,7 @@ function updateOni(g, oni, dt) {
         }
       }
 
-      // Stage 4: 1Fに一定時間いたら強制的に2Fへ（毎フレーム判定）
-      if (g._stageNum === 4) {
-        if ((oni.floor || 0) === 0) {
-          oni._floorStayTimer = (oni._floorStayTimer || 0) + dt;
-          if (oni._floorStayTimer > 30) {
-            // 校舎内にいるかどうかで誘導先を分岐
-            const inSchool = oni.position.x > -19.5 && oni.position.x < 19.5 && oni.position.z > 24;
-            oni.targetWaypoint = inSchool ? 33 : 24; // 校舎外なら正面玄関(24)、校舎内なら東階段(33)
-            oni._floorStayTimer = 0;
-            oni._forceFloorPatrol = true; // canGuard制限を一時解除
-          }
-        } else {
-          // 2Fにいる → タイマーリセット
-          oni._floorStayTimer = 0;
-        }
-        // 1Fに戻ったらcanGuard制限を復活（2F巡回完了後）
-        if (oni._forceFloorPatrol && (oni.floor || 0) === 0 && oni._floorStayTimer > 3) {
-          oni._forceFloorPatrol = false;
-        }
-      }
-      // Stage 5: 地上に一定時間いたら階段室へ強制誘導（毎フレーム判定）
-      if (g._stageNum === 5) {
-        if (oni.position.y < 1.0) {
-          oni._floorStayTimer = (oni._floorStayTimer || 0) + dt;
-          if (oni._floorStayTimer > 25) {
-            const stairStarts = [29, 35, 41, 47];
-            oni.targetWaypoint = stairStarts[Math.floor(Math.random() * stairStarts.length)];
-            oni._floorStayTimer = 0;
-            oni._forceFloorPatrol = true;
-          }
-        } else {
-          oni._floorStayTimer = 0;
-          // 階段から降りたらcanGuard制限復活
-          if (oni._forceFloorPatrol && oni.position.y < 0.5) {
-            oni._forceFloorPatrol = false;
-          }
-        }
-      }
+      // ※ Stage 4/5の強制フロア巡回タイマーはswitch文の外で処理（全状態で加算するため）
 
       // canGuard role: stay within range of can
       // ただしStage 4/5で強制2F巡回中（_floorStayTimerリセット直後）はcanGuard制限を解除
@@ -10501,14 +10505,15 @@ function updateOni(g, oni, dt) {
       }
 
       // Check vision — chase closest visible target
-      if (canSeeAny) {
+      // 強制フロア巡回中は目的地（階段）に向かい続ける（途中で脱線しない）
+      if (canSeeAny && !oni._forceFloorPatrol) {
         oni.state = 'chase';
         oni.chasedPlayer = closestVisiblePos;
         oni.chaseTarget = closestVisibleTarget;
         oni.stateTimer = 0;
       }
       // Check footsound
-      if (loudestFootTarget && !canSeeAny) {
+      if (loudestFootTarget && !canSeeAny && !oni._forceFloorPatrol) {
         oni.stateTimer += dt;
         if (oni.stateTimer > 3) {
           oni.state = 'footSound';
@@ -12906,9 +12911,20 @@ function updateGamePhases(g, dt) {
               if (d < minD) { minD = d; closest = o; }
             }
             if (closest) {
-              closest.state = 'chase';
-              closest.chaseTarget = 'player';
-              closest.chasedPlayer = g.player.position.clone();
+              // Stage 4: 鬼とプレイヤーが異なるフロアの場合、階段へ誘導
+              const diffFloor4 = g._stageNum === 4 && (closest.floor || 0) !== (g.playerFloor || 0);
+              if (diffFloor4) {
+                // 1Fの鬼 → 2Fへ階段誘導
+                const inSchool = closest.position.x > -19.5 && closest.position.x < 19.5 && closest.position.z > 24;
+                closest.targetWaypoint = inSchool ? 33 : 24;
+                closest.state = 'patrol';
+                closest._forceFloorPatrol = true;
+                closest._floorStayTimer = 0;
+              } else {
+                closest.state = 'chase';
+                closest.chaseTarget = 'player';
+                closest.chasedPlayer = g.player.position.clone();
+              }
               closest.stateTimer = 0;
               closest.restTimer = 0; // 休憩中でも強制的に動かす
               closest.fatigue = Math.min(closest.fatigue, 50); // 疲労をリセットして即停止を防ぐ
