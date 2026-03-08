@@ -12854,6 +12854,10 @@ function updateGamePhases(g, dt) {
               closest.chaseTarget = 'player';
               closest.chasedPlayer = g.player.position.clone();
               closest.stateTimer = 0;
+              closest.restTimer = 0; // 休憩中でも強制的に動かす
+              closest.fatigue = Math.min(closest.fatigue, 50); // 疲労をリセットして即停止を防ぐ
+              closest._stuckCount = 0; // スタック状態もリセット
+              closest._skipWaypoint = false;
             }
           }
         }
@@ -14072,13 +14076,20 @@ function startGame(stageNum, mode) {
   };
   window.addEventListener('resize', G._resizeHandler);
 
-  // Visibility change (auto-pause) — マルチプレイ時はポーズしない（仕様書準拠）
+  // Visibility change + blur (auto-pause) — マルチプレイ時はポーズしない
   G._visHandler = () => {
     if (document.hidden && G.gamePhase !== 'result' && !G.paused && !G._isMultiplayer) {
       togglePause(G);
     }
   };
   document.addEventListener('visibilitychange', G._visHandler);
+  // ウィンドウからフォーカスが外れた場合もポーズ（タブ切り替え・DevTools等）
+  G._blurHandler = () => {
+    if (G && !G.disposed && G.gamePhase !== 'result' && !G.paused && !G._isMultiplayer) {
+      togglePause(G);
+    }
+  };
+  window.addEventListener('blur', G._blurHandler);
 
   // Pause/Resume/Quit buttons
   const resumeBtn = document.getElementById('btn-resume');
@@ -15986,6 +15997,7 @@ function cleanupGame() {
   if (G._mouseMove) document.removeEventListener('mousemove', G._mouseMove);
   if (G._resizeHandler) window.removeEventListener('resize', G._resizeHandler);
   if (G._visHandler) document.removeEventListener('visibilitychange', G._visHandler);
+  if (G._blurHandler) window.removeEventListener('blur', G._blurHandler);
 
   // Exit pointer lock
   if (document.pointerLockElement) document.exitPointerLock();
