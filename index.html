@@ -9375,8 +9375,17 @@ function createPlayerController(g) {
     const mapBtn = document.getElementById('mob-map');
     if (mapBtn && !mapBtn._mapInitDone) {
       mapBtn._mapInitDone = true;
-      mapBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (G && !G._isOniPlayer) G.overheadView = !G.overheadView; });
-      mapBtn.addEventListener('click', (e) => { e.preventDefault(); if (G && !G._isOniPlayer) G.overheadView = !G.overheadView; });
+      // touchstartとclickの二重発火防止：touchstartが来たらclickを無視
+      mapBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        mapBtn._touchFired = true;
+        if (G && !G._isOniPlayer) G.overheadView = !G.overheadView;
+      });
+      mapBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (mapBtn._touchFired) { mapBtn._touchFired = false; return; }
+        if (G && !G._isOniPlayer) G.overheadView = !G.overheadView;
+      });
     }
     // KICKボタン: ランナー→缶を蹴る / 鬼→缶を踏む・拾う
     const actionBtn = document.getElementById('mob-action');
