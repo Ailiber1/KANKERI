@@ -10238,13 +10238,13 @@ function updateOni(g, oni, dt) {
   if (oni.state === 'chase' || oni.state === 'canTouch') {
     oni.fatigue = Math.min(100, oni.fatigue + oni.fatigueRate * dt);
     if (oni.fatigue >= 100) {
-      oni.restTimer = 3;
+      oni.restTimer = 1.5; // 疲労回復は1.5秒（短縮: 元3秒→緊張感維持）
       oni.fatigue = 60;
       oni.state = 'patrol';
       return;
     }
   } else {
-    oni.fatigue = Math.max(0, oni.fatigue - 2 * dt);
+    oni.fatigue = Math.max(0, oni.fatigue - 3 * dt); // 回復速度UP（2→3）: 停止時間を減らす
   }
 
   // Speed modifier from fatigue
@@ -10415,7 +10415,12 @@ function updateOni(g, oni, dt) {
       const dist = Math.sqrt(dx*dx + dz*dz);
       if (dist < 1.5 || oni._skipWaypoint) {
         oni._skipWaypoint = false;
-        oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
+        // 30%の確率でランダムなウェイポイントにジャンプ（巡回パターンを予測しにくくする）
+        if (Math.random() < 0.3) {
+          oni.targetWaypoint = Math.floor(Math.random() * g.config.waypoints.length);
+        } else {
+          oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
+        }
       }
 
       // canGuard role: stay within range of can
@@ -10460,7 +10465,7 @@ function updateOni(g, oni, dt) {
 
       // --- Search behind covers: searcher role searches more often ---
       if (!canSeeAny && !loudestFootTarget) {
-        const searchInterval = oni.role === 'searcher' ? 6 : 12;
+        const searchInterval = oni.role === 'searcher' ? 5 : 8; // 探索頻度UP（searcher:6→5秒、patrol:12→8秒）
         if (oni.searchTimer > searchInterval) {
           // Find a nearby tall cover to search behind（範囲拡大: 25m）
           const coverCandidates = g.colliders.filter(c => {
@@ -10489,9 +10494,9 @@ function updateOni(g, oni, dt) {
             oni.state = 'search';
             oni.stateTimer = 0;
             oni.searchTimer = 0;
-            // Remember this cover (forget after 5 searches to allow re-visits)
+            // Remember this cover (forget after 8 searches to allow re-visits)
             oni.searchedCovers.push({ x: pick.x, z: pick.z });
-            if (oni.searchedCovers.length > 5) oni.searchedCovers.shift();
+            if (oni.searchedCovers.length > 8) oni.searchedCovers.shift();
           }
         }
       }
@@ -10562,18 +10567,18 @@ function updateOni(g, oni, dt) {
       );
       if (cDist < 2) {
         if (!canSeeChaseTarget && !canSeeAny) {
-          // ターゲットを見失った → 素早くpatrolen
+          // ターゲットを見失った → すぐに周辺を探索
           oni.stateTimer += dt;
-          if (oni.stateTimer > 2) {
+          if (oni.stateTimer > 1) { // 短縮（元2秒→1秒）
             oni.state = 'search';
             oni.stateTimer = 0;
-            oni._searchDest = { x: oni.chasedPlayer.x + (Math.random()-0.5)*6, z: oni.chasedPlayer.z + (Math.random()-0.5)*6 };
+            oni._searchDest = { x: oni.chasedPlayer.x + (Math.random()-0.5)*8, z: oni.chasedPlayer.z + (Math.random()-0.5)*8 };
             oni.chaseTarget = null;
           }
         } else {
           // 見えているが近すぎてcanTouch条件を満たさない → 回り込み
           oni.stateTimer += dt;
-          if (oni.stateTimer > 3) {
+          if (oni.stateTimer > 2) { // 短縮（元3秒→2秒）
             const angle = Math.atan2(oni.chasedPlayer.x - oni.position.x, oni.chasedPlayer.z - oni.position.z);
             oni.chasedPlayer = {
               x: oni.chasedPlayer.x + Math.sin(angle + Math.PI/2) * 3,
@@ -10604,7 +10609,7 @@ function updateOni(g, oni, dt) {
           // Capture the found target!
           capturePlayer(g, oni);
           oni.state = 'patrol';
-          oni.restTimer = 2; // Post-capture pause
+          oni.restTimer = 1; // Post-capture pause（短縮: 元2秒→1秒）
           oni.stateTimer = 0;
           oni.foundTarget = null;
           oni.chaseTarget = null;
@@ -10628,9 +10633,10 @@ function updateOni(g, oni, dt) {
         );
         if (dist < 2) {
           oni.stateTimer += dt;
-          if (oni.stateTimer > 3) {
-            oni.state = 'patrol';
+          if (oni.stateTimer > 1.5) { // 足音到着後の待機短縮（元3秒→1.5秒）
+            oni.state = 'search'; // patrolではなくsearchへ（周辺を探す）
             oni.stateTimer = 0;
+            oni._searchDest = { x: oni.targetPos.x + (Math.random()-0.5)*8, z: oni.targetPos.z + (Math.random()-0.5)*8 };
           }
         }
       }
@@ -10650,7 +10656,7 @@ function updateOni(g, oni, dt) {
         );
         if (dist < 2) {
           oni.stateTimer += dt;
-          if (oni.stateTimer > 3) {
+          if (oni.stateTimer > 1.5) { // ディストラクション待機短縮（元3秒→1.5秒）
             oni.state = 'patrol';
             oni.stateTimer = 0;
           }
@@ -10768,7 +10774,7 @@ function updateOni(g, oni, dt) {
         const sDist = Math.sqrt(sDx*sDx + sDz*sDz);
         if (sDist < 1.5) {
           // Arrived at peek position — look around briefly
-          if (oni.stateTimer > 2.5) {
+          if (oni.stateTimer > 1.5) { // 探索到着後の待機短縮（元2.5秒→1.5秒）
             oni.state = 'patrol';
             oni.stateTimer = 0;
             oni._searchDest = null;
@@ -10926,8 +10932,8 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   const movedDist = Math.sqrt((oni.position.x - prevX)**2 + (oni.position.z - prevZ)**2);
   if (movedDist < speed * dt * 0.1 && speed * dt > 0.05) {
     oni._stuckCount = (oni._stuckCount || 0) + 1;
-    // 0.7秒以上スタック → ウェイポイントをスキップ
-    if (oni._stuckCount > 42) {
+    // 0.5秒以上スタック → ウェイポイントをスキップ（短縮: 元0.7秒→0.5秒）
+    if (oni._stuckCount > 30) {
       oni._stuckCount = 0;
       oni._skipWaypoint = true;
     }
@@ -12764,7 +12770,7 @@ function updateGamePhases(g, dt) {
             g.onis[i].state = 'patrol';
           }
           // Score Attack: 即座に動き出す / 通常: 3秒待機
-          g.onis[i].restTimer = g._isScoreAttack ? 0 : 3;
+          g.onis[i].restTimer = g._isScoreAttack ? 0 : 1.5; // seek開始直後の待機短縮（元3秒→1.5秒）
           // 鬼の表示位置を実際の位置に同期（hide中にずれた分を修正）
           g.onis[i].fig.group.position.copy(g.onis[i].position);
         }
