@@ -1468,6 +1468,7 @@ html, body {
       <h2 id="result-title" style="font-family:'Cinzel Decorative',serif;text-align:center;margin-bottom:16px;font-size:28px;"></h2>
       <div id="result-stats" style="font-family:'Share Tech Mono',monospace;color:#ccc;line-height:2;"></div>
       <div id="result-buttons-solo" style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
+        <button id="btn-next-stage" class="btn btn-neon" style="width:100%;display:none;">次のステージへ ▶</button>
         <button id="btn-retry" class="btn btn-neon" data-i18n="BTN_RETRY" style="width:100%;">もう一度</button>
         <button id="btn-to-title" class="btn btn-neon" data-i18n="BTN_TITLE" style="width:100%;">タイトルへ</button>
       </div>
@@ -13238,6 +13239,23 @@ function endGame(g, playerWon, reason) {
   } else {
     if (soloButtons) soloButtons.style.display = 'flex';
     if (multiButtons) multiButtons.style.display = 'none';
+  }
+
+  // ストーリーモード: クリア時に「次のステージへ」ボタン表示
+  var nextStgBtn = document.getElementById('btn-next-stage');
+  if (nextStgBtn) {
+    nextStgBtn.style.display = 'none';
+    if (playerWon && g._gameMode === 'story' && g._stageNum < 5) {
+      var ns = g._stageNum + 1;
+      var nsName = typeof STAGE_CONFIGS !== 'undefined' && STAGE_CONFIGS[ns] ? STAGE_CONFIGS[ns].name : '';
+      nextStgBtn.textContent = '次のステージへ ▶ Stage ' + ns + (nsName ? ' — ' + nsName : '');
+      nextStgBtn.style.display = 'block';
+      nextStgBtn.onclick = function() {
+        cleanupGame();
+        gameState.storySettings.stage = ns;
+        startGame(ns, 'story');
+      };
+    }
   }
 
   if (overlay) overlay.style.display = 'flex';
