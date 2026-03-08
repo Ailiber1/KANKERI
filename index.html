@@ -14482,7 +14482,7 @@ function validateLockOn(g, oniIdx, targetIdx) {
   }
   // 通知
   showOniSearchAlert(false);
-  const targetName = remote.username || 'Player';
+  const targetName = targetIsLocal ? (multiState.players[targetIdx] ? multiState.players[targetIdx].username : 'Player') : (remoteTarget.username || 'Player');
   showCenterAlert('👁 見つけた！', targetName + '！', 2000);
   SoundManager.playGameSE('found');
 
