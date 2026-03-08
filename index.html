@@ -3961,14 +3961,22 @@ const STAGE_CONFIGS = {
       // 棟間通路（表→裏のショートカット）
       {x:-25,z:-15},{x:-25,z:15},
       {x:25,z:-15},{x:25,z:15},
-      // 階段室巡回（1棟L: 入口→3F→5F→降りる）
-      {x:-34,z:-4},{x:-34,z:-2},{x:-34,z:-1},{x:-34,z:0},{x:-34,z:1},{x:-34,z:-4},
-      // 階段室巡回（1棟R: 入口→3F→5F→降りる）
-      {x:-16,z:-4},{x:-16,z:-2},{x:-16,z:-1},{x:-16,z:0},{x:-16,z:1},{x:-16,z:-4},
-      // 階段室巡回（2棟L: 入口→3F→5F→降りる）
-      {x:16,z:-4},{x:16,z:-2},{x:16,z:-1},{x:16,z:0},{x:16,z:1},{x:16,z:-4},
-      // 階段室巡回（2棟R: 入口→3F→5F→降りる）
-      {x:34,z:-4},{x:34,z:-2},{x:34,z:-1},{x:34,z:0},{x:34,z:1},{x:34,z:-4},
+      // ★建物南面を経由して各階段室へ（建物壁に引っかからない安全経路）
+      {x:-34,z:-18},
+      // 階段室巡回（1棟L: アプローチ→入口→3F→5F→降りる→離脱）
+      {x:-34,z:-8},{x:-34,z:-4},{x:-34,z:-2},{x:-34,z:-1},{x:-34,z:0},{x:-34,z:1},{x:-34,z:-4},{x:-34,z:-8},
+      // 1棟R方面へ移動
+      {x:-16,z:-18},
+      // 階段室巡回（1棟R: アプローチ→入口→3F→5F→降りる→離脱）
+      {x:-16,z:-8},{x:-16,z:-4},{x:-16,z:-2},{x:-16,z:-1},{x:-16,z:0},{x:-16,z:1},{x:-16,z:-4},{x:-16,z:-8},
+      // 2棟L方面へ移動
+      {x:16,z:-18},
+      // 階段室巡回（2棟L: アプローチ→入口→3F→5F→降りる→離脱）
+      {x:16,z:-8},{x:16,z:-4},{x:16,z:-2},{x:16,z:-1},{x:16,z:0},{x:16,z:1},{x:16,z:-4},{x:16,z:-8},
+      // 2棟R方面へ移動
+      {x:34,z:-18},
+      // 階段室巡回（2棟R: アプローチ→入口→3F→5F→降りる→離脱）
+      {x:34,z:-8},{x:34,z:-4},{x:34,z:-2},{x:34,z:-1},{x:34,z:0},{x:34,z:1},{x:34,z:-4},{x:34,z:-8},
       // 外周（size=100、フェンスは±50）
       {x:-48,z:-48},{x:48,z:-48},{x:48,z:48},{x:-48,z:48}
     ],
@@ -10441,9 +10449,12 @@ function updateOni(g, oni, dt) {
   if (g._stageNum === 5) {
     if (oni.position.y < 1.0) {
       oni._floorStayTimer = (oni._floorStayTimer || 0) + dt;
-      if (oni._floorStayTimer > 20) { // 20秒で強制階段巡回
-        const stairStarts = [29, 35, 41, 47];
-        oni.targetWaypoint = stairStarts[Math.floor(Math.random() * stairStarts.length)];
+      if (oni._floorStayTimer > 15) { // 15秒で強制階段巡回
+        // 4箇所の階段を順番に巡回（WPインデックス: 建物南面→アプローチ地点）
+        const stairStarts = [29, 38, 47, 56];
+        const idx = (oni._nextStairIdx || 0) % 4;
+        oni.targetWaypoint = stairStarts[idx];
+        oni._nextStairIdx = idx + 1;
         oni._floorStayTimer = 0;
         oni._forceFloorPatrol = true;
         oni.state = 'patrol';
@@ -10924,18 +10935,18 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   let moveZ = (dz / dist) * moveSpeed;
 
   // 壁スライディング: スタック時に壁に沿って移動する
-  if (oni._stuckCount > 15) {
+  if (oni._stuckCount > 10) {
     // 移動方向に対して垂直方向（壁に沿う方向）を計算
     const perpX = -dz / dist;
     const perpZ = dx / dist;
-    // スタック開始時にスライド方向を決定、1秒で反転
+    // スタック開始時にスライド方向を決定
     if (!oni._stuckSide) oni._stuckSide = Math.random() < 0.5 ? 1 : -1;
-    if (oni._stuckCount > 75) oni._stuckSide = -oni._stuckSide;
-    if (oni._stuckCount > 135) oni._stuckCount = 15; // リセットして再試行
-    // 壁に沿う方向の成分を増やし、壁に向かう成分を減らす
-    const slideRatio = Math.min((oni._stuckCount - 15) / 30, 1.0); // 0→1
-    moveX = moveX * (1 - slideRatio * 0.7) + perpX * moveSpeed * slideRatio * oni._stuckSide;
-    moveZ = moveZ * (1 - slideRatio * 0.7) + perpZ * moveSpeed * slideRatio * oni._stuckSide;
+    // 0.5秒ごとに方向反転（片側がダメなら逆を試す）
+    if (oni._stuckCount % 30 === 0 && oni._stuckCount > 10) oni._stuckSide = -oni._stuckSide;
+    // 壁に沿う方向の成分を大きくし、壁に向かう成分を小さくする
+    const slideRatio = Math.min((oni._stuckCount - 10) / 15, 1.0); // 素早く最大スライドに
+    moveX = moveX * (1 - slideRatio * 0.9) + perpX * moveSpeed * slideRatio * oni._stuckSide;
+    moveZ = moveZ * (1 - slideRatio * 0.9) + perpZ * moveSpeed * slideRatio * oni._stuckSide;
     // 速度を維持
     const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
     if (len > 0.001) { moveX *= moveSpeed / len; moveZ *= moveSpeed / len; }
@@ -10993,14 +11004,46 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
   const movedDist = Math.sqrt((oni.position.x - prevX)**2 + (oni.position.z - prevZ)**2);
   if (movedDist < speed * dt * 0.1 && speed * dt > 0.05) {
     oni._stuckCount = (oni._stuckCount || 0) + 1;
-    // 0.5秒以上スタック → ウェイポイントをスキップ（短縮: 元0.7秒→0.5秒）
-    if (oni._stuckCount > 30) {
+    oni._totalStuckCount = (oni._totalStuckCount || 0) + 1;
+    // 段階的なスタック回復:
+    // 0.5秒(30f) → WP+1スキップ
+    // 1.0秒(60f) → WP+3スキップ（壁の反対側も同じ障害物の場合に対応）
+    // 1.5秒(90f) → ランダムWPにジャンプ（完全にリセット）
+    if (oni._stuckCount > 90) {
       oni._stuckCount = 0;
+      oni._stuckSide = 0;
+      oni._forceFloorPatrol = false; // 強制巡回も解除
+      // 現在地から遠いWPにランダムジャンプ
+      const wps = g.config.waypoints;
+      let bestIdx = 0, bestDist = 0;
+      for (let i = 0; i < wps.length; i++) {
+        const d = Math.sqrt((wps[i].x - oni.position.x)**2 + (wps[i].z - oni.position.z)**2);
+        if (d > bestDist) { bestDist = d; bestIdx = i; }
+      }
+      oni.targetWaypoint = bestIdx;
+    } else if (oni._stuckCount > 60) {
+      oni._stuckCount = 30; // 壁スライド維持
+      // 3つ先のWPにスキップ
+      const skip = (g._stageNum === 4 || g._stageNum === 5) ? 3 : 3;
+      oni.targetWaypoint = (oni.targetWaypoint + skip) % g.config.waypoints.length;
+    } else if (oni._stuckCount > 30) {
+      oni._stuckCount = 15; // 壁スライド維持
       oni._skipWaypoint = true;
+    }
+    // 3秒以上(180f)の累積スタック → 鬼を少し後退させる（壁から離す）
+    if (oni._totalStuckCount > 180) {
+      oni._totalStuckCount = 0;
+      // 現在の移動方向と逆に1m押し戻す
+      const backX = oni.position.x - (targetX - oni.position.x) * 0.3;
+      const backZ = oni.position.z - (targetZ - oni.position.z) * 0.3;
+      const half2 = g.config.size / 2 - 1;
+      oni.position.x = Math.max(-half2, Math.min(half2, backX));
+      oni.position.z = Math.max(-half2, Math.min(half2, backZ));
     }
   } else {
     oni._stuckCount = 0;
     oni._stuckSide = 0;
+    oni._totalStuckCount = 0;
   }
 
   // Ground height
