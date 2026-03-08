@@ -14165,12 +14165,12 @@ function initOniPlayerControls(g) {
     reticleEl.style.position = 'absolute';
     reticleEl.style.top = 'auto';
     reticleEl.style.left = 'auto';
-    reticleEl.style.right = 'calc(18px + env(safe-area-inset-right, 0px))';
-    reticleEl.style.bottom = 'calc(95px + env(safe-area-inset-bottom, 0px))';
+    reticleEl.style.right = 'calc(10px + env(safe-area-inset-right, 0px))';
+    reticleEl.style.bottom = 'calc(90px + env(safe-area-inset-bottom, 0px))';
     reticleEl.style.transform = 'none';
-    reticleEl.style.fontSize = '56px';
-    reticleEl.style.color = 'rgba(255,68,68,0.35)';
-    reticleEl.style.textShadow = '0 0 8px rgba(255,0,0,0.15)';
+    reticleEl.style.fontSize = '80px';
+    reticleEl.style.color = 'rgba(255,68,68,0.55)';
+    reticleEl.style.textShadow = '0 0 15px rgba(255,0,0,0.3), 0 0 30px rgba(255,0,0,0.15)';
     reticleEl.style.animation = 'none';
     reticleEl.style.display = 'block';
 
@@ -14274,11 +14274,11 @@ function updateOniPlayerHUD(g, dt) {
       reticle.style.display = 'block';
       reticle.classList.toggle('locked', hasTarget);
       if (canAction) {
-        reticle.style.color = 'rgba(255,68,68,0.9)';
-        reticle.style.textShadow = '0 0 20px rgba(255,0,0,0.8), 0 0 40px rgba(255,0,0,0.4)';
+        reticle.style.color = '#ff2222';
+        reticle.style.textShadow = '0 0 25px rgba(255,0,0,0.9), 0 0 50px rgba(255,0,0,0.5), 0 0 80px rgba(255,0,0,0.2)';
       } else {
-        reticle.style.color = 'rgba(255,68,68,0.35)';
-        reticle.style.textShadow = '0 0 8px rgba(255,0,0,0.15)';
+        reticle.style.color = 'rgba(255,68,68,0.55)';
+        reticle.style.textShadow = '0 0 15px rgba(255,0,0,0.3), 0 0 30px rgba(255,0,0,0.15)';
       }
     } else {
       reticle.style.display = 'none';
