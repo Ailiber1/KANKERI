@@ -9373,19 +9373,23 @@ function createPlayerController(g) {
       crouchBtn.addEventListener('touchstart', (e) => { e.preventDefault(); ctrl.isCrouching = !ctrl.isCrouching; });
     }
     const mapBtn = document.getElementById('mob-map');
-    if (mapBtn && !mapBtn._mapInitDone) {
-      mapBtn._mapInitDone = true;
+    if (mapBtn) {
+      // ★再戦時の二重登録防止: 古いリスナーを解除してから新規登録
+      if (mapBtn._mapTouch) mapBtn.removeEventListener('touchstart', mapBtn._mapTouch);
+      if (mapBtn._mapClick) mapBtn.removeEventListener('click', mapBtn._mapClick);
       // touchstartとclickの二重発火防止：touchstartが来たらclickを無視
-      mapBtn.addEventListener('touchstart', (e) => {
+      mapBtn._mapTouch = function(e) {
         e.preventDefault();
         mapBtn._touchFired = true;
         if (G && !G._isOniPlayer) G.overheadView = !G.overheadView;
-      });
-      mapBtn.addEventListener('click', (e) => {
+      };
+      mapBtn._mapClick = function(e) {
         e.preventDefault();
         if (mapBtn._touchFired) { mapBtn._touchFired = false; return; }
         if (G && !G._isOniPlayer) G.overheadView = !G.overheadView;
-      });
+      };
+      mapBtn.addEventListener('touchstart', mapBtn._mapTouch);
+      mapBtn.addEventListener('click', mapBtn._mapClick);
     }
     // KICKボタン: ランナー→缶を蹴る / 鬼→缶を踏む・拾う
     const actionBtn = document.getElementById('mob-action');
@@ -14507,6 +14511,13 @@ function validateLockOn(g, oniIdx, targetIdx) {
     showOniSearchAlert(false);
     const targetName = targetIsLocal ? (multiState.players[targetIdx] ? multiState.players[targetIdx].username : 'Player') : (remoteTarget.username || 'Player');
     showCenterAlert('👁 見つけた！', targetName + '！', 2000);
+    SoundManager.playGameSE('found');
+  }
+  // ★ホストがランナーの場合: 自分がターゲットなら「見つかった」通知をローカル表示
+  // （ホストにはhandleLockNotifyが無いため、ここで直接処理する）
+  if (targetIsLocal && !g._isOniPlayer) {
+    var foundEl = document.getElementById('runner-found-alert');
+    if (foundEl) foundEl.style.display = 'block';
     SoundManager.playGameSE('found');
   }
 }
