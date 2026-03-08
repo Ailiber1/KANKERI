@@ -485,6 +485,7 @@ html, body {
 }
 .neon-select:focus { border-color: #5599ff; box-shadow: 0 0 10px rgba(85,153,255,0.4); }
 .neon-select option { background: #0a0a0f; color: #fff; }
+.neon-select option:disabled { color: #555; }
 
 /* Rules content */
 .rules-content {
@@ -1633,6 +1634,38 @@ function loadSavedUser() {
   }
   gameState.bgmEnabled = localStorage.getItem('kankeri_bgm') !== 'off';
   gameState.language = localStorage.getItem('kankeri_lang') || 'ja';
+  // ステージ解放状況を読み込み
+  const savedCleared = localStorage.getItem('kankeri_clearedStages');
+  if (savedCleared) {
+    try { gameState.clearedStages = JSON.parse(savedCleared); } catch(e) { gameState.clearedStages = [1]; }
+  }
+}
+
+/** ストーリーモードのステージ解放状況をUIに反映 */
+function updateStageSelectLock() {
+  const sel = document.getElementById('story-stage-select');
+  if (!sel) return;
+  const cleared = gameState.clearedStages || [1];
+  const maxUnlocked = Math.max(...cleared) + 1; // クリア済み最大+1まで選択可
+  Array.from(sel.options).forEach(opt => {
+    const v = parseInt(opt.value);
+    if (v > maxUnlocked) {
+      opt.disabled = true;
+      opt.textContent = opt.textContent.replace(/^🔓\s*/, '').replace(/^🔒\s*/, '');
+      opt.textContent = '🔒 ' + opt.textContent;
+    } else {
+      opt.disabled = false;
+      opt.textContent = opt.textContent.replace(/^🔓\s*/, '').replace(/^🔒\s*/, '');
+      if (cleared.includes(v)) {
+        opt.textContent = '✓ ' + opt.textContent;
+      }
+    }
+  });
+  // 現在選択中がロックされていたらStage1に戻す
+  if (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].disabled) {
+    sel.value = '1';
+    gameState.storySettings.stage = 1;
+  }
 }
 
 // ============================================================
@@ -3113,6 +3146,7 @@ function showScreen(id) {
 function openModal(id) {
   const modal = document.getElementById(id);
   if (modal) modal.classList.add('active');
+  if (id === 'story-modal') updateStageSelectLock();
 }
 
 function closeModal(id) {
@@ -3609,9 +3643,16 @@ function initButtonHandlers() {
 
   // Story start
   document.getElementById('btn-story-start').addEventListener('click', () => {
+    const stage = gameState.storySettings.stage;
+    const cleared = gameState.clearedStages || [1];
+    const maxUnlocked = Math.max(...cleared) + 1;
+    if (stage > maxUnlocked) {
+      showNotification('前のステージをクリアしてください');
+      return;
+    }
     closeModal('story-modal');
     resumeAudioContext();
-    startGame(gameState.storySettings.stage, 'story');
+    startGame(stage, 'story');
   });
 
   // Score attack start
@@ -13027,6 +13068,14 @@ function endGame(g, playerWon, reason) {
         title.style.textShadow = myWon
           ? '0 0 20px rgba(0,255,65,0.5)'
           : '0 0 20px rgba(255,68,68,0.5)';
+        // ストーリーモード: クリア時に次ステージ解放
+        if (myWon && g._gameMode === 'story') {
+          const sn = g._stageNum;
+          if (!gameState.clearedStages.includes(sn)) {
+            gameState.clearedStages.push(sn);
+          }
+          localStorage.setItem('kankeri_clearedStages', JSON.stringify(gameState.clearedStages));
+        }
       }
     }
   }
