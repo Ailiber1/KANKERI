@@ -11525,6 +11525,21 @@ function cpuPerformKick(g, ally) {
     oni.foundName = null;
   }
 
+  // Stage 5ミッション: CPU味方のキックもカウント（seekフェーズのみ）
+  if (g._stageNum === 5 && !g._isScoreAttack && g.gamePhase === 'seek') {
+    g._stage5KickCount = (g._stage5KickCount || 0) + 1;
+    updateStage5MissionHUD(g);
+    if (g._isMultiplayer && g._multiMode === 'coop' && multiState.roomId) {
+      db.ref('rooms/' + multiState.roomId + '/stage5Mission').set({
+        kickCount: g._stage5KickCount,
+        kickedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+    if (g._stage5KickCount === 3) {
+      showCenterAlert('ミッション達成！', '缶を3回蹴った！ 時間まで生き延びろ！', 3000);
+    }
+  }
+
   // Ally sneaks to a new hiding spot after kicking (don't run — stay quiet)
   ally.state = 'idle';
   ally.stateTimer = 0;
@@ -11554,9 +11569,13 @@ function updateCpuAlly(g, ally, dt) {
   ally.stateTimer += dt;
   ally.kickCheckTimer += dt;
 
+  // === Stage 5ミッション状態 ===
+  const missionNeeded = g._stageNum === 5 && !g._isScoreAttack && (g._stage5KickCount || 0) < 3;
+  const missionKicksLeft = missionNeeded ? 3 - (g._stage5KickCount || 0) : 0;
+
   // === 近接キック判定（全状態共通） ===
-  // 味方が捕まっていて、缶のすぐ近く(3m以内)を通過中 ＋ 鬼が遠い時のみ蹴る
-  if (capturedCount > 0 && canDist < 3.0 && g.can.isAtHome && !g.can.isFlying
+  // 缶のすぐ近く(3m以内)を通過中 ＋ 鬼が遠い → 蹴る（救出 or ミッション）
+  if ((capturedCount > 0 || missionNeeded) && canDist < 3.0 && g.can.isAtHome && !g.can.isFlying
     && ally.state !== 'tryKick' && oniDist > 8) {
     cpuPerformKick(g, ally);
     return;
@@ -11580,11 +11599,24 @@ function updateCpuAlly(g, ally, dt) {
   const endgameMode = remainingTime < 30;
   const criticalMode = remainingTime < 15;
   // 生存最優先: 捕まったら元も子もない
-  const shouldPrioritizeSurvival = endgameMode // 残り30秒は全レベル生存優先
-    || (uncapturedCount <= 1); // 最後の1人は絶対隠れる
+  // Stage 5ミッション未達成の場合: 生存優先を緩和（蹴らないとクリアにならない）
+  const shouldPrioritizeSurvival = missionNeeded
+    ? (uncapturedCount <= 1) // ミッション中は最後の1人だけ完全生存優先
+    : (endgameMode || uncapturedCount <= 1); // 通常: 残り30秒は全員生存優先
+  // Stage 5ミッション: 残り時間に応じた緊急度
+  const missionUrgent = missionNeeded && remainingTime < 90; // 残り90秒以下で焦り始める
+  const missionCritical = missionNeeded && remainingTime < 45; // 残り45秒以下で積極的に
 
   switch (ally.state) {
     case 'idle': {
+      // ミッション緊急時: 鬼が遠ければ缶キックを優先
+      if (missionUrgent && g.can.isAtHome && !g.can.isFlying && oniDist > 18 && !oniFacingAlly) {
+        ally.state = 'tryKick';
+        ally.stateTimer = 0;
+        ally.isCrouching = false;
+        ally.targetPos = canPos.clone();
+        break;
+      }
       // Find a hiding spot and start sneaking toward it
       ally.hideSpot = findHideSpot(g, ally);
       if (ally.hideSpot) {
@@ -11617,6 +11649,15 @@ function updateCpuAlly(g, ally, dt) {
         ally.moveSpeed = 0;
         ally.isCrouching = true;
         // Stay frozen until oni turns away or moves past
+        break;
+      }
+
+      // ミッション中: 缶の近くを通りかかったら安全ならキックに迂回
+      if (missionNeeded && g.can.isAtHome && !g.can.isFlying && canDist < 8 && oniDist > 15 && !oniFacingAlly) {
+        ally.state = 'tryKick';
+        ally.stateTimer = 0;
+        ally.isCrouching = false;
+        ally.targetPos = canPos.clone();
         break;
       }
 
@@ -11797,10 +11838,11 @@ function updateCpuAlly(g, ally, dt) {
         }
       }
 
-      // --- Rescue logic: if allies are captured, look for safe opportunity to kick ---
+      // --- Rescue / Mission kick logic ---
+      // 救出（capturedCount > 0）または Stage 5ミッション未達成時に缶を蹴りに行く
       // Strategic decision: should we risk rescue or prioritize survival?
-      if (shouldPrioritizeSurvival) {
-        // 生存優先モードでも味方が捕まっていれば救出を検討
+      if (shouldPrioritizeSurvival && !missionNeeded) {
+        // 生存優先モード（ミッション無し）でも味方が捕まっていれば救出を検討
         if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
           const safeD = canDist < 8 ? 8 : 14;
           if (canToOniDist > safeD && oniDist > safeD && !oniFacingAlly) {
@@ -11817,19 +11859,24 @@ function updateCpuAlly(g, ally, dt) {
         break;
       }
 
-      // --- 救出判断: 生存最優先。全鬼の隙を確実に見極めてから行動 ---
-      if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
-        const kickInterval = ally.level === 'strong' ? 2 : (ally.level === 'normal' ? 3 : 5);
-        // 安全距離: 全鬼が十分遠いことが条件
-        const safeOniFromCan = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 14 : 16);
-        const safeOniFromAlly = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 12 : 15);
+      // --- 缶キック判断: 救出 or Stage 5ミッション ---
+      // 条件: 誰かが捕まっている or ミッション未達成
+      if ((capturedCount > 0 || missionNeeded) && g.can.isAtHome && !g.can.isFlying) {
+        const kickInterval = missionCritical ? 1 : (missionUrgent ? 1.5 : (ally.level === 'strong' ? 2 : (ally.level === 'normal' ? 3 : 5)));
+        // 安全距離: 全鬼が十分遠いことが条件（ミッション緊急度で緩和）
+        let safeOniFromCan = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 14 : 16);
+        let safeOniFromAlly = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 12 : 15);
+        if (missionCritical) { safeOniFromCan *= 0.6; safeOniFromAlly *= 0.6; }
+        else if (missionUrgent) { safeOniFromCan *= 0.8; safeOniFromAlly *= 0.8; }
 
         // 到達時間: 鬼より十分早く缶に着けるか
         const allyTimeTocan = canDist / ally.sprintSpeed;
         const oniTimeToCan = canToOniDist / 5.5;
         const timeAdvantage = oniTimeToCan - allyTimeTocan;
         // 時間的余裕: 強は判断が正確なので少し薄い余裕でもOK、弱は大きな余裕が必要
-        const minAdvantage = ally.level === 'strong' ? 1.5 : (ally.level === 'normal' ? 2.0 : 2.5);
+        let minAdvantage = ally.level === 'strong' ? 1.5 : (ally.level === 'normal' ? 2.0 : 2.5);
+        if (missionCritical) minAdvantage *= 0.5;
+        else if (missionUrgent) minAdvantage *= 0.7;
 
         // 全鬼をチェック: こちらを向いている鬼がいないか
         let anyOniFacingAlly = false;
@@ -11868,10 +11915,16 @@ function updateCpuAlly(g, ally, dt) {
         const goldenChance = oniDistracted && !anyOniNearCan && oniFacingAwayCan
           && timeAdvantage > minAdvantage * 0.5 && !anyOniFacingAlly;
 
-        if (ally.kickCheckTimer > kickInterval && (safeEnough || goldenChance)) {
+        // ミッション専用チャンス: 安全距離は少し緩いが鬼が缶から離れていて背を向けている
+        const missionChance = missionNeeded && !anyOniNearCan && oniFacingAwayCan
+          && allOnisFarFromCan && timeAdvantage > minAdvantage * 0.7;
+
+        if (ally.kickCheckTimer > kickInterval && (safeEnough || goldenChance || missionChance)) {
           ally.kickCheckTimer = 0;
-          // 判断精度: 強は安全状況を正確に判断できるので実行率が高い
-          const kickChance = ally.level === 'strong' ? 0.9 : (ally.level === 'normal' ? 0.75 : 0.55);
+          // 判断精度: 強は安全状況を正確に判断できるので実行率が高い（ミッション緊急時は上昇）
+          let kickChance = ally.level === 'strong' ? 0.9 : (ally.level === 'normal' ? 0.75 : 0.55);
+          if (missionCritical) kickChance = Math.min(1.0, kickChance + 0.25);
+          else if (missionUrgent) kickChance = Math.min(1.0, kickChance + 0.15);
           if (Math.random() < kickChance) {
             ally.state = 'tryKick';
             ally.stateTimer = 0;
@@ -11963,8 +12016,9 @@ function updateCpuAlly(g, ally, dt) {
       // Abort check: 生存最優先。状況が変わったら即撤退
       const allyTimeToCan = canDist / ally.sprintSpeed;
       const oniTimeToAlly = oniDist / 5.5;
-      // 中止距離: 全レベルで十分な安全マージンを確保
-      const oniAbortDist = ally.level === 'strong' ? 6 : (ally.level === 'normal' ? 7 : 9);
+      // 中止距離: 全レベルで十分な安全マージンを確保（ミッション緊急時は少し縮小）
+      let oniAbortDist = ally.level === 'strong' ? 6 : (ally.level === 'normal' ? 7 : 9);
+      if (missionCritical) oniAbortDist *= 0.7;
 
       // 全鬼チェック: いずれかの鬼が接近してきたら中止を検討
       let anyOniThreat = false;
