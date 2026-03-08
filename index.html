@@ -794,6 +794,10 @@ html, body {
 #hud-ally-status .ally-entry { padding: 2px 8px; border-radius: 3px; background: rgba(0,0,0,0.5); white-space: nowrap; }
 #hud-ally-status .ally-alive { color: #44ffaa; }
 #hud-ally-status .ally-captured { color: #ff4444; text-decoration: line-through; }
+#hud-stage5-mission { position: absolute; top: 48px; right: 12px; font-family: 'Noto Sans JP', sans-serif; font-size: 14px; color: #ffd700; background: rgba(0,0,0,0.7); border: 2px solid rgba(255,215,0,0.6); padding: 8px 16px; border-radius: 8px; text-align: center; line-height: 1.6; text-shadow: 0 0 8px rgba(255,215,0,0.4); z-index: 15; }
+#hud-stage5-mission.completed { color: #00ff41; border-color: rgba(0,255,65,0.6); text-shadow: 0 0 8px rgba(0,255,65,0.4); animation: missionComplete 0.5s ease; }
+@keyframes missionComplete { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
+#hud-stage5-mission .mission-count { font-size: 22px; font-weight: bold; display: block; margin-top: 2px; }
 #hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
 @keyframes promptPulse { 0%,100% { box-shadow: 0 0 8px rgba(85,153,255,0.3); } 50% { box-shadow: 0 0 20px rgba(85,153,255,0.6); } }
 #hud-peek-prompt { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #00e5ff; background: rgba(0,0,0,0.6); border: 1px solid rgba(0,229,255,0.4); padding: 6px 16px; border-radius: 6px; text-align: center; white-space: nowrap; }
@@ -1357,6 +1361,7 @@ html, body {
       <div id="hud-can-dir"></div>
     </div>
     <div id="hud-ally-status" style="display:none;"></div>
+    <div id="hud-stage5-mission" style="display:none;"></div>
     <div id="hud-action-prompt" style="display:none;"></div>
     <div id="hud-peek-prompt" style="display:none;"></div>
     <div id="hud-captured-overlay" style="display:none;">
@@ -3219,6 +3224,22 @@ function showCenterAlert(mainText, subText, duration) {
     el.style.animation = 'centerAlertOut 0.5s ease forwards';
     setTimeout(() => el.remove(), 500);
   }, duration);
+}
+
+// Stage 5 ミッションHUD更新
+function updateStage5MissionHUD(g) {
+  const el = document.getElementById('hud-stage5-mission');
+  if (!el) return;
+  if (g._stageNum !== 5 || g._isScoreAttack) { el.style.display = 'none'; return; }
+  const count = g._stage5KickCount || 0;
+  const needed = 3;
+  const done = count >= needed;
+  el.style.display = 'block';
+  el.className = done ? 'completed' : '';
+  el.innerHTML = (done ? '✔ MISSION CLEAR' : '⚡ MISSION') +
+    '<span class="mission-count">' +
+    (done ? '缶キック ' + count + '/' + needed + ' 達成！' : '缶を' + needed + '回蹴れ！ ' + count + '/' + needed) +
+    '</span>';
 }
 
 // 停止感知の事前警告ラベル
@@ -12216,6 +12237,16 @@ function performCanKick(g, power, kickerName) {
     g._kickCount = (g._kickCount || 0) + 1;
   }
 
+  // Stage 5ミッション: プレイヤーの缶キック回数をカウント（全フェーズ対象）
+  if (g._stageNum === 5 && !g._isScoreAttack) {
+    g._stage5KickCount = (g._stage5KickCount || 0) + 1;
+    updateStage5MissionHUD(g);
+    // 3回達成時に特別演出
+    if (g._stage5KickCount === 3) {
+      showCenterAlert('ミッション達成！', '缶を3回蹴った！ 時間まで生き延びろ！', 3000);
+    }
+  }
+
   // Kick leg animation (足を振る演出)
   doKickLegAnim(g.playerFig);
 
@@ -12944,6 +12975,8 @@ function updateGamePhases(g, dt) {
         showOniWaitOverlay(null, false);
         if (g._isOniPlayer) {
           showCenterAlert('缶を拾いに行け！', null, 3000);
+        } else if (g._stageNum === 5 && !g._isScoreAttack) {
+          showCenterAlert('⚡ FINAL STAGE ⚡', '缶を3回蹴ってクリアせよ！', 4000);
         } else {
           showCenterAlert('鬼が動き出した！', null, 3000);
         }
@@ -13120,8 +13153,11 @@ function updateGamePhases(g, dt) {
         if (g.gameTimer <= 0) {
           const totalPlayers = getTotalPlayers(g);
           if (g.capturedCount < totalPlayers) {
+            // Stage 5ミッション: 缶を3回蹴っていなければクリア失敗
+            if (g._stageNum === 5 && !g._isScoreAttack && (g._stage5KickCount || 0) < 3) {
+              endGame(g, false, 'mission_failed');
             // Co-op: ステージクリア → 次ステージ自動遷移（Stage 5完了で最終勝利）
-            if (g._isMultiplayer && g._multiMode === 'coop' && g._stageNum < 5) {
+            } else if (g._isMultiplayer && g._multiMode === 'coop' && g._stageNum < 5) {
               coopStageClear(g);
             } else {
               endGame(g, true); // At least one survived (or Co-op all stages cleared)
@@ -13249,6 +13285,8 @@ function confirmCanPlacement(g) {
     showNotification(g.player.isMobile ? '缶を蹴ろ！ (KICKボタン)' : '缶を蹴ろ！ (F)');
     startKickGauge(g);
   }
+  // Stage 5: ミッションHUD初期表示
+  updateStage5MissionHUD(g);
 }
 
 function togglePause(g) {
@@ -13295,7 +13333,13 @@ function endGame(g, playerWon, reason) {
 
   if (title) {
     // プレイヤー離脱によるステージ終了
-    if (reason === 'abandoned') {
+    if (reason === 'mission_failed') {
+      // Stage 5ミッション未達成: 生き延びたが缶キック回数不足
+      const kicks = g._stage5KickCount || 0;
+      title.textContent = 'ミッション失敗…';
+      title.style.color = '#ff8800';
+      title.style.textShadow = '0 0 20px rgba(255,136,0,0.5)';
+    } else if (reason === 'abandoned') {
       title.textContent = 'ステージ終了';
       title.style.color = '#ffaa00';
       title.style.textShadow = '0 0 20px rgba(255,170,0,0.5)';
@@ -13356,7 +13400,20 @@ function endGame(g, playerWon, reason) {
   }
 
   if (stats) {
-    if (reason === 'abandoned') {
+    if (reason === 'mission_failed') {
+      const kicks = g._stage5KickCount || 0;
+      stats.innerHTML = `
+        <span style="font-size:20px;color:#ff8800">
+          ⚡ ミッション未達成
+        </span><br>
+        <span style="font-size:16px;color:#ffd700">
+          缶キック: ${kicks} / 3回
+        </span><br>
+        <span style="font-size:14px;color:var(--text-secondary)">
+          生き延びたが、缶を3回蹴れなかった…
+        </span>
+      `;
+    } else if (reason === 'abandoned') {
       stats.innerHTML = '<span style="font-size:16px;color:#ffaa00">他のプレイヤーが全員退出しました</span><br>' +
         '<span style="font-size:14px;color:var(--text-secondary)">残り1名のためマルチプレイ続行不可</span><br>' +
         '<span style="font-size:13px;color:var(--text-dim)">ゲーム続行不可のためステージを終了します</span>';
@@ -14130,6 +14187,7 @@ function startGame(stageNum, mode) {
   G.onis = [];
   G._stayTimer = 0; // キャンプ防止タイマー
   G._kickCount = 0; // Score Attack: 缶キック回数
+  G._stage5KickCount = 0; // Stage 5ミッション: プレイヤーの缶キック回数
   G._captureImmunity = 0; // 缶回収後の捕獲免疫タイマー
   // 鬼スポーンフラグをリセット
   for (let i = 0; i < (G.config.maxOni || 4); i++) G['_oniSpawned' + i] = false;
