@@ -1462,6 +1462,17 @@ html, body {
       <button id="btn-controls-back" class="btn btn-neon" style="width:100%;margin-top:16px;">戻る</button>
     </div>
   </div>
+  <div id="allclear-overlay" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:60;display:none;align-items:center;justify-content:center;">
+    <div class="ui-panel" style="max-width:420px;width:90%;padding:40px 30px;text-align:center;">
+      <div class="corner-bl"></div><div class="corner-br"></div>
+      <div style="font-size:48px;margin-bottom:16px;">🏆</div>
+      <h2 style="font-family:'Cinzel Decorative',serif;color:#ffd700;font-size:26px;text-shadow:0 0 30px rgba(255,215,0,0.7);margin-bottom:12px;">ALL STAGES CLEAR!</h2>
+      <p style="color:#00ff41;font-size:18px;text-shadow:0 0 15px rgba(0,255,65,0.5);margin-bottom:8px;">全ステージクリアおめでとう！</p>
+      <p style="color:#aaa;font-size:13px;margin-bottom:24px;">全5ステージを制覇しました</p>
+      <div id="allclear-stats" style="font-family:'Share Tech Mono',monospace;color:#ccc;line-height:2;margin-bottom:24px;"></div>
+      <button id="btn-allclear-title" class="btn btn-neon" style="width:100%;font-size:16px;padding:14px;">タイトルへ戻る</button>
+    </div>
+  </div>
   <div id="result-overlay" style="display:none;">
     <div class="result-panel ui-panel">
       <div class="corner-bl"></div><div class="corner-br"></div>
@@ -13245,7 +13256,29 @@ function endGame(g, playerWon, reason) {
   var nextStgBtn = document.getElementById('btn-next-stage');
   if (nextStgBtn) {
     nextStgBtn.style.display = 'none';
-    if (playerWon && g._gameMode === 'story' && g._stageNum < 5) {
+    if (playerWon && g._gameMode === 'story' && g._stageNum >= 5) {
+      // 全ステージクリア: 専用モーダル表示
+      nextStgBtn.style.display = 'none';
+      var allClearOvl = document.getElementById('allclear-overlay');
+      if (allClearOvl) {
+        allClearOvl.style.display = 'flex';
+        var allClearStats = document.getElementById('allclear-stats');
+        if (allClearStats) {
+          var survived = g.config.timeLimit - g.gameTimer;
+          var mm = Math.floor(survived / 60);
+          var ss = Math.floor(survived % 60);
+          allClearStats.innerHTML = 'Stage 5 生存時間: ' + mm + ':' + String(ss).padStart(2,'0');
+        }
+        var allClearBtn = document.getElementById('btn-allclear-title');
+        if (allClearBtn) {
+          allClearBtn.onclick = function() {
+            allClearOvl.style.display = 'none';
+            cleanupGame();
+            showScreen('title-screen');
+          };
+        }
+      }
+    } else if (playerWon && g._gameMode === 'story' && g._stageNum < 5) {
       var ns = g._stageNum + 1;
       var nsName = typeof STAGE_CONFIGS !== 'undefined' && STAGE_CONFIGS[ns] ? STAGE_CONFIGS[ns].name : '';
       nextStgBtn.textContent = '次のステージへ ▶ Stage ' + ns + (nsName ? ' — ' + nsName : '');
