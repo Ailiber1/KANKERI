@@ -811,6 +811,10 @@ html, body {
 #oni-reticle.locked {
   color: #ff2222; text-shadow: 0 0 30px rgba(255,0,0,0.8); font-size: 72px;
 }
+@keyframes oniReticleGlow {
+  0%, 100% { text-shadow: 0 0 20px rgba(255,0,0,0.6), 0 0 40px rgba(255,0,0,0.3); }
+  50% { text-shadow: 0 0 30px rgba(255,0,0,0.9), 0 0 60px rgba(255,0,0,0.5), 0 0 80px rgba(255,0,0,0.2); }
+}
 #oni-can-direction {
   position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
   font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #ff6666;
@@ -1403,7 +1407,7 @@ html, body {
     </div>
     <!-- Mobile controls -->
     <div id="mobile-joystick" class="mobile-only" style="display:none;"><div id="joystick-knob"></div></div>
-    <button id="mob-map" style="display:none;">全体を見る</button>
+    <button id="mob-map" tabindex="-1" style="display:none;">全体を見る</button>
     <div id="mobile-buttons" class="mobile-only" style="display:none;">
       <button id="mob-dash" data-i18n="MOB_DASH">ダッシュ</button>
       <button id="mob-crouch" data-i18n="MOB_CROUCH">しゃがむ</button>
@@ -14142,6 +14146,40 @@ function initOniPlayerControls(g) {
       }
     });
   }
+
+  // ★鬼スマホUI: レティクル(◎)を画面下中央に移動、発光させる
+  //   ダッシュボタンをその下に、しゃがむボタンは非表示
+  const isMobile = 'ontouchstart' in window;
+  if (isMobile && reticleEl) {
+    // レティクルを画面下部中央に再配置（ダッシュボタンの上）
+    reticleEl.style.position = 'absolute';
+    reticleEl.style.top = 'auto';
+    reticleEl.style.left = '50%';
+    reticleEl.style.bottom = 'calc(100px + env(safe-area-inset-bottom, 0px))';
+    reticleEl.style.transform = 'translateX(-50%)';
+    reticleEl.style.fontSize = '72px';
+    // 発光エフェクト
+    reticleEl.style.color = 'rgba(255,68,68,0.8)';
+    reticleEl.style.textShadow = '0 0 20px rgba(255,0,0,0.6), 0 0 40px rgba(255,0,0,0.3)';
+    reticleEl.style.animation = 'oniReticleGlow 1.5s ease-in-out infinite';
+
+    // ダッシュボタンをレティクルの下（画面下中央）に再配置
+    var dashBtn = document.getElementById('mob-dash');
+    if (dashBtn) {
+      dashBtn.style.position = 'fixed';
+      dashBtn.style.bottom = 'calc(30px + env(safe-area-inset-bottom, 0px))';
+      dashBtn.style.left = '50%';
+      dashBtn.style.transform = 'translateX(-50%)';
+      dashBtn.style.zIndex = '40';
+    }
+    // しゃがむボタンを非表示（鬼には不要）
+    var crouchBtn = document.getElementById('mob-crouch');
+    if (crouchBtn) crouchBtn.style.setProperty('display', 'none', 'important');
+
+    // mobile-buttonsコンテナを非表示（ダッシュは独立配置にしたため）
+    var mobBtns = document.getElementById('mobile-buttons');
+    if (mobBtns) mobBtns.style.setProperty('display', 'none', 'important');
+  }
 }
 
 /**
@@ -15806,6 +15844,23 @@ function cleanupGame() {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
+  // ★鬼スマホUI変更をリセット（再戦でランナーになった場合に元に戻す）
+  var reticleReset = document.getElementById('oni-reticle');
+  if (reticleReset) {
+    reticleReset.style.cssText = '';  // インラインスタイルを全クリア → CSSデフォルトに戻る
+  }
+  var dashReset = document.getElementById('mob-dash');
+  if (dashReset) {
+    dashReset.style.cssText = '';
+  }
+  var crouchReset = document.getElementById('mob-crouch');
+  if (crouchReset) {
+    crouchReset.style.display = '';
+  }
+  var mobBtnsReset = document.getElementById('mobile-buttons');
+  if (mobBtnsReset) {
+    mobBtnsReset.style.display = '';
+  }
 
   G = null;
 
