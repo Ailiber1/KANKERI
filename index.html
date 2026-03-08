@@ -12237,10 +12237,17 @@ function performCanKick(g, power, kickerName) {
     g._kickCount = (g._kickCount || 0) + 1;
   }
 
-  // Stage 5ミッション: プレイヤーの缶キック回数をカウント（全フェーズ対象）
-  if (g._stageNum === 5 && !g._isScoreAttack) {
+  // Stage 5ミッション: 缶キック回数をカウント（seekフェーズのみ — 初回kickフェーズは除外）
+  if (g._stageNum === 5 && !g._isScoreAttack && g.gamePhase === 'seek') {
     g._stage5KickCount = (g._stage5KickCount || 0) + 1;
     updateStage5MissionHUD(g);
+    // Co-op: キック回数をFirebaseに同期
+    if (g._isMultiplayer && g._multiMode === 'coop' && multiState.roomId) {
+      db.ref('rooms/' + multiState.roomId + '/stage5Mission').set({
+        kickCount: g._stage5KickCount,
+        kickedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
     // 3回達成時に特別演出
     if (g._stage5KickCount === 3) {
       showCenterAlert('ミッション達成！', '缶を3回蹴った！ 時間まで生き延びろ！', 3000);
@@ -15506,6 +15513,23 @@ function initMultiplayerSync(g) {
       });
       g._multiListeners.push({ ref: canRefHost, event: 'value', fn: onCanHost });
 
+      // Stage 5ミッション: Co-opキック回数同期（ホスト側）
+      if (g._stageNum === 5 && g._multiMode === 'coop') {
+        const missionRefHost = roomRef.child('stage5Mission');
+        const onMissionHost = missionRefHost.on('value', (snap) => {
+          const data = snap.val();
+          if (!data || !g || g.disposed) return;
+          if (data.kickCount > (g._stage5KickCount || 0)) {
+            g._stage5KickCount = data.kickCount;
+            updateStage5MissionHUD(g);
+            if (g._stage5KickCount === 3) {
+              showCenterAlert('ミッション達成！', '缶を3回蹴った！ 時間まで生き延びろ！', 3000);
+            }
+          }
+        });
+        g._multiListeners.push({ ref: missionRefHost, event: 'value', fn: onMissionHost });
+      }
+
       // ホスト（鬼）: ランナーが制御するフェーズ遷移(kick→hide→seek)を受信
       const stateRefHost = roomRef.child('gameState');
       const onStateHost = stateRefHost.on('value', (snap) => {
@@ -15820,6 +15844,23 @@ function initMultiplayerSync(g) {
       }
     });
     g._multiListeners.push({ ref: canRef, event: 'value', fn: onCan });
+
+    // Stage 5ミッション: Co-opキック回数同期（ランナー側）
+    if (g._stageNum === 5 && g._multiMode === 'coop') {
+      const missionRef = roomRef.child('stage5Mission');
+      const onMission = missionRef.on('value', (snap) => {
+        const data = snap.val();
+        if (!data || !g || g.disposed) return;
+        if (data.kickCount > (g._stage5KickCount || 0)) {
+          g._stage5KickCount = data.kickCount;
+          updateStage5MissionHUD(g);
+          if (g._stage5KickCount === 3) {
+            showCenterAlert('ミッション達成！', '缶を3回蹴った！ 時間まで生き延びろ！', 3000);
+          }
+        }
+      });
+      g._multiListeners.push({ ref: missionRef, event: 'value', fn: onMission });
+    }
 
     // 非ホスト鬼: ロックオン検証結果を受信
     // チーム戦: 全プレイヤーがlockOnを監視（通知 + 鬼の自ロックオン受信）
