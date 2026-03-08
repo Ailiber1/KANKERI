@@ -10429,7 +10429,7 @@ function updateOni(g, oni, dt) {
   if (g._stageNum === 4) {
     if ((oni.floor || 0) === 0) {
       oni._floorStayTimer = (oni._floorStayTimer || 0) + dt;
-      if (oni._floorStayTimer > 15) { // 15秒で強制2F巡回
+      if (oni._floorStayTimer > 10) { // 10秒で強制2F巡回
         const inSchool = oni.position.x > -19.5 && oni.position.x < 19.5 && oni.position.z > 24;
         oni.targetWaypoint = inSchool ? 33 : 24;
         oni._floorStayTimer = 0;
@@ -10442,8 +10442,15 @@ function updateOni(g, oni, dt) {
     } else {
       oni._floorStayTimer = 0;
     }
-    if (oni._forceFloorPatrol && (oni.floor || 0) === 0 && oni._floorStayTimer > 3) {
+    // _forceFloorPatrolは2Fに到達した時だけ解除（到達前に解除しない）
+    if (oni._forceFloorPatrol && (oni.floor || 0) === 1) {
+      // 2Fに到達 → 任務完了、フラグ解除
       oni._forceFloorPatrol = false;
+      oni._reachedFloor1 = true; // 2F到達記録
+    }
+    // 2Fから1Fに戻ったら_reachedFloor1もリセット
+    if (oni._reachedFloor1 && (oni.floor || 0) === 0) {
+      oni._reachedFloor1 = false;
     }
   }
   if (g._stageNum === 5) {
@@ -10536,7 +10543,8 @@ function updateOni(g, oni, dt) {
       }
 
       // --- Search behind covers: searcher role searches more often ---
-      if (!canSeeAny && !loudestFootTarget) {
+      // 強制フロア巡回中は壁裏探索しない（階段に向かい続ける）
+      if (!canSeeAny && !loudestFootTarget && !oni._forceFloorPatrol) {
         const searchInterval = oni.role === 'searcher' ? 5 : 8; // 探索頻度UP（searcher:6→5秒、patrol:12→8秒）
         if (oni.searchTimer > searchInterval) {
           // Find a nearby tall cover to search behind（範囲拡大: 25m）
@@ -11009,10 +11017,16 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
     // 0.5秒(30f) → WP+1スキップ
     // 1.0秒(60f) → WP+3スキップ（壁の反対側も同じ障害物の場合に対応）
     // 1.5秒(90f) → ランダムWPにジャンプ（完全にリセット）
-    if (oni._stuckCount > 90) {
+    // 強制フロア巡回中はWPスキップを控えめに（階段WPを飛ばさない）
+    if (oni._forceFloorPatrol) {
+      // 強制巡回中: +1スキップのみ（階段の順番を維持）
+      if (oni._stuckCount > 30) {
+        oni._stuckCount = 15;
+        oni._skipWaypoint = true;
+      }
+    } else if (oni._stuckCount > 90) {
       oni._stuckCount = 0;
       oni._stuckSide = 0;
-      oni._forceFloorPatrol = false; // 強制巡回も解除
       // 現在地から遠いWPにランダムジャンプ
       const wps = g.config.waypoints;
       let bestIdx = 0, bestDist = 0;
@@ -11022,12 +11036,10 @@ function moveOni(oni, targetX, targetZ, speed, dt, g) {
       }
       oni.targetWaypoint = bestIdx;
     } else if (oni._stuckCount > 60) {
-      oni._stuckCount = 30; // 壁スライド維持
-      // 3つ先のWPにスキップ
-      const skip = (g._stageNum === 4 || g._stageNum === 5) ? 3 : 3;
-      oni.targetWaypoint = (oni.targetWaypoint + skip) % g.config.waypoints.length;
+      oni._stuckCount = 30;
+      oni.targetWaypoint = (oni.targetWaypoint + 3) % g.config.waypoints.length;
     } else if (oni._stuckCount > 30) {
-      oni._stuckCount = 15; // 壁スライド維持
+      oni._stuckCount = 15;
       oni._skipWaypoint = true;
     }
     // 3秒以上(180f)の累積スタック → 鬼を少し後退させる（壁から離す）
