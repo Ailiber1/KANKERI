@@ -3961,10 +3961,14 @@ const STAGE_CONFIGS = {
       // 棟間通路（表→裏のショートカット）
       {x:-25,z:-15},{x:-25,z:15},
       {x:25,z:-15},{x:25,z:15},
-      // 階段室巡回（1棟: L=-34, R=-16、入口z=-4=南壁面）
-      {x:-34,z:-4},{x:-16,z:-4},
-      // 階段室巡回（2棟: L=16, R=34）
-      {x:16,z:-4},{x:34,z:-4},
+      // 階段室巡回（1棟L: 入口→3F→5F→降りる）
+      {x:-34,z:-4},{x:-34,z:-2},{x:-34,z:-1},{x:-34,z:0},{x:-34,z:1},{x:-34,z:-4},
+      // 階段室巡回（1棟R: 入口→3F→5F→降りる）
+      {x:-16,z:-4},{x:-16,z:-2},{x:-16,z:-1},{x:-16,z:0},{x:-16,z:1},{x:-16,z:-4},
+      // 階段室巡回（2棟L: 入口→3F→5F→降りる）
+      {x:16,z:-4},{x:16,z:-2},{x:16,z:-1},{x:16,z:0},{x:16,z:1},{x:16,z:-4},
+      // 階段室巡回（2棟R: 入口→3F→5F→降りる）
+      {x:34,z:-4},{x:34,z:-2},{x:34,z:-1},{x:34,z:0},{x:34,z:1},{x:34,z:-4},
       // 外周（size=100、フェンスは±50）
       {x:-48,z:-48},{x:48,z:-48},{x:48,z:48},{x:-48,z:48}
     ],
@@ -10425,19 +10429,37 @@ function updateOni(g, oni, dt) {
         if (g._stageNum === 4 && (oni.floor || 0) === 0) {
           oni._floorStayTimer = (oni._floorStayTimer || 0) + (oni._lastWpTime || 0);
           oni._lastWpTime = 0;
-          // 30秒以上1Fにいたら東階段ウェイポイント(32)へ強制誘導
           if (oni._floorStayTimer > 30) {
-            oni.targetWaypoint = 32; // 東階段入口
+            oni.targetWaypoint = 32;
             oni._floorStayTimer = 0;
           } else {
             oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
           }
         } else if (g._stageNum === 4 && (oni.floor || 0) === 1) {
-          // 2Fにいる間はフロアタイマーリセット
           oni._floorStayTimer = 0;
           oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
+        // Stage 5: 一定時間地上にいたら階段室へ強制誘導
+        } else if (g._stageNum === 5) {
+          const onGround = oni.position.y < 1.0; // 1F相当
+          if (onGround) {
+            oni._floorStayTimer = (oni._floorStayTimer || 0) + (oni._lastWpTime || 0);
+            oni._lastWpTime = 0;
+            // 25秒以上地上にいたら4つの階段室からランダムに1つ選んで登る
+            if (oni._floorStayTimer > 25) {
+              // 階段室WP開始: 1棟L=29, 1棟R=35, 2棟L=41, 2棟R=47
+              const stairStarts = [29, 35, 41, 47];
+              oni.targetWaypoint = stairStarts[Math.floor(Math.random() * stairStarts.length)];
+              oni._floorStayTimer = 0;
+            } else {
+              oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
+            }
+          } else {
+            // 階段を登っている間はタイマーリセット、順番通り巡回
+            oni._floorStayTimer = 0;
+            oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
+          }
         } else {
-          // Stage 4以外: 30%でランダムジャンプ
+          // その他: 30%でランダムジャンプ
           if (Math.random() < 0.3) {
             oni.targetWaypoint = Math.floor(Math.random() * g.config.waypoints.length);
           } else {
@@ -10445,8 +10467,8 @@ function updateOni(g, oni, dt) {
           }
         }
       }
-      // Stage 4: ウェイポイント間の経過時間を追跡
-      if (g._stageNum === 4) {
+      // Stage 4/5: ウェイポイント間の経過時間を追跡
+      if (g._stageNum === 4 || g._stageNum === 5) {
         oni._lastWpTime = (oni._lastWpTime || 0) + dt;
       }
 
