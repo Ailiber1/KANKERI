@@ -12782,32 +12782,38 @@ function updateGamePhases(g, dt) {
       if (g._captureImmunity > 0) g._captureImmunity -= dt;
       updateKickGauge(g, dt); // Rescue kick gauge update
 
-      // Score Attack: キャンプ防止 — 20秒間同じ場所にいると鬼に位置通知
-      if (g._isScoreAttack) {
-        const px = g.player.position.x, pz = g.player.position.z;
-        if (g._lastPlayerPos) {
-          const moveDist = Math.sqrt((px - g._lastPlayerPos.x) ** 2 + (pz - g._lastPlayerPos.z) ** 2);
-          if (moveDist < 2) {
-            g._stayTimer += dt;
-          } else {
-            g._stayTimer = 0;
-          }
-        }
-        g._lastPlayerPos = { x: px, z: pz };
-        if (g._stayTimer > 20) {
+      // キャンプ防止 — 20秒間同じ場所にいると鬼に位置通知（Score Attack + ストーリーモード）
+      if (g._isScoreAttack || g._gameMode === 'story') {
+        // 捕獲中はタイマーリセット（捕獲中に停止しているのは当然のため）
+        if (g.player.captured) {
           g._stayTimer = 0;
-          showCenterAlert('⚠ 位置が鬼に感知された！', '動かないと見つかるぞ！', 2500);
-          // 最寄り鬼がプレイヤー位置に直行
-          let closest = g.onis[0], minD = Infinity;
-          for (const o of g.onis) {
-            const d = (o.position.x - px) ** 2 + (o.position.z - pz) ** 2;
-            if (d < minD) { minD = d; closest = o; }
+          g._lastPlayerPos = null;
+        } else {
+          const px = g.player.position.x, pz = g.player.position.z;
+          if (g._lastPlayerPos) {
+            const moveDist = Math.sqrt((px - g._lastPlayerPos.x) ** 2 + (pz - g._lastPlayerPos.z) ** 2);
+            if (moveDist < 2) {
+              g._stayTimer += dt;
+            } else {
+              g._stayTimer = 0;
+            }
           }
-          if (closest) {
-            closest.state = 'chase';
-            closest.chaseTarget = 'player';
-            closest.chasedPlayer = g.player.position.clone();
-            closest.stateTimer = 0;
+          g._lastPlayerPos = { x: px, z: pz };
+          if (g._stayTimer > 20) {
+            g._stayTimer = 0;
+            showCenterAlert('⚠ 位置が鬼に感知された！', '動かないと見つかるぞ！', 2500);
+            // 最寄り鬼がプレイヤー位置に直行
+            let closest = g.onis[0], minD = Infinity;
+            for (const o of g.onis) {
+              const d = (o.position.x - px) ** 2 + (o.position.z - pz) ** 2;
+              if (d < minD) { minD = d; closest = o; }
+            }
+            if (closest) {
+              closest.state = 'chase';
+              closest.chaseTarget = 'player';
+              closest.chasedPlayer = g.player.position.clone();
+              closest.stateTimer = 0;
+            }
           }
         }
       }
