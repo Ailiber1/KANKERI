@@ -1546,7 +1546,7 @@ const gameState = {
     cpuCount: 0,
     cpuLevels: ['normal', 'normal', 'normal']
   },
-  clearedStages: [1],
+  clearedStages: [],
   audioResumed: false
 };
 
@@ -1637,7 +1637,7 @@ function loadSavedUser() {
   // ステージ解放状況を読み込み
   const savedCleared = localStorage.getItem('kankeri_clearedStages');
   if (savedCleared) {
-    try { gameState.clearedStages = JSON.parse(savedCleared); } catch(e) { gameState.clearedStages = [1]; }
+    try { gameState.clearedStages = JSON.parse(savedCleared); } catch(e) { gameState.clearedStages = []; }
   }
 }
 
@@ -1652,16 +1652,16 @@ const STAGE_ORIGINAL_NAMES = {
 function updateStageSelectLock() {
   const sel = document.getElementById('story-stage-select');
   if (!sel) return;
-  const cleared = gameState.clearedStages || [1];
-  const maxUnlocked = Math.max(...cleared); // クリア済みステージまで選択可
+  const cleared = gameState.clearedStages || [];
+  const maxCleared = cleared.length > 0 ? Math.max(...cleared) : 0; // 0=未クリア
   Array.from(sel.options).forEach(opt => {
     const v = parseInt(opt.value);
     const origName = STAGE_ORIGINAL_NAMES[v] || ('Stage ' + v);
-    if (v > maxUnlocked + 1) {
-      // 未解放（クリア済み+1より先）: ロック + ???
+    if (v > maxCleared + 1) {
+      // 未解放: ロック + ???
       opt.disabled = true;
       opt.textContent = '🔒 Stage ' + v + ' — ???';
-    } else if (v === maxUnlocked + 1) {
+    } else if (v === maxCleared + 1) {
       // 次の挑戦ステージ: 選択可能だが未クリア
       opt.disabled = false;
       opt.textContent = origName;
@@ -3654,9 +3654,9 @@ function initButtonHandlers() {
   // Story start
   document.getElementById('btn-story-start').addEventListener('click', () => {
     const stage = gameState.storySettings.stage;
-    const cleared = gameState.clearedStages || [1];
-    const maxUnlocked = Math.max(...cleared);
-    if (stage > maxUnlocked + 1) {
+    const cleared = gameState.clearedStages || [];
+    const maxCleared = cleared.length > 0 ? Math.max(...cleared) : 0;
+    if (stage > maxCleared + 1) {
       showNotification('前のステージをクリアしてください');
       return;
     }
