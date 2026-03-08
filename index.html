@@ -767,6 +767,14 @@ html, body {
   #hud-captured-sub { font-size: 10px; }
   .center-alert { font-size: 16px !important; padding: 12px 20px !important; max-width: 80vw; box-shadow: 0 0 20px rgba(255,51,102,0.4), inset 0 0 10px rgba(255,51,102,0.1) !important; }
   .center-alert .sub-text { font-size: 11px !important; }
+  /* Stage 5ミッション: スマホ縦向き */
+  #hud-stage5-mission { top: auto; bottom: calc(280px + env(safe-area-inset-bottom, 0px)); right: auto; left: 50%; transform: translateX(-50%); font-size: 11px; padding: 5px 12px; max-width: 60vw; }
+  #hud-stage5-mission .mission-count { font-size: 15px; }
+}
+/* スマホ横向き対応 */
+@media (max-height: 450px) and (orientation: landscape) {
+  #hud-stage5-mission { top: 6px; left: 50%; right: auto; bottom: auto; transform: translateX(-50%); font-size: 11px; padding: 3px 14px; }
+  #hud-stage5-mission .mission-count { font-size: 14px; display: inline; margin-left: 6px; }
 }
 
 /* ============================================================
@@ -794,10 +802,10 @@ html, body {
 #hud-ally-status .ally-entry { padding: 2px 8px; border-radius: 3px; background: rgba(0,0,0,0.5); white-space: nowrap; }
 #hud-ally-status .ally-alive { color: #44ffaa; }
 #hud-ally-status .ally-captured { color: #ff4444; text-decoration: line-through; }
-#hud-stage5-mission { position: absolute; top: 48px; right: 12px; font-family: 'Noto Sans JP', sans-serif; font-size: 14px; color: #ffd700; background: rgba(0,0,0,0.7); border: 2px solid rgba(255,215,0,0.6); padding: 8px 16px; border-radius: 8px; text-align: center; line-height: 1.6; text-shadow: 0 0 8px rgba(255,215,0,0.4); z-index: 15; }
+#hud-stage5-mission { position: absolute; top: 96px; right: 12px; font-family: 'Noto Sans JP', sans-serif; font-size: 13px; color: #ffd700; background: rgba(0,0,0,0.75); border: 2px solid rgba(255,215,0,0.6); padding: 6px 14px; border-radius: 8px; text-align: center; line-height: 1.4; text-shadow: 0 0 8px rgba(255,215,0,0.4); z-index: 15; }
 #hud-stage5-mission.completed { color: #00ff41; border-color: rgba(0,255,65,0.6); text-shadow: 0 0 8px rgba(0,255,65,0.4); animation: missionComplete 0.5s ease; }
 @keyframes missionComplete { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
-#hud-stage5-mission .mission-count { font-size: 22px; font-weight: bold; display: block; margin-top: 2px; }
+#hud-stage5-mission .mission-count { font-size: 18px; font-weight: bold; display: block; margin-top: 1px; }
 #hud-action-prompt { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; background: rgba(0,0,0,0.7); border: 1px solid rgba(85,153,255,0.5); padding: 8px 20px; border-radius: 6px; text-align: center; animation: promptPulse 1.5s ease-in-out infinite; }
 @keyframes promptPulse { 0%,100% { box-shadow: 0 0 8px rgba(85,153,255,0.3); } 50% { box-shadow: 0 0 20px rgba(85,153,255,0.6); } }
 #hud-peek-prompt { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #00e5ff; background: rgba(0,0,0,0.6); border: 1px solid rgba(0,229,255,0.4); padding: 6px 16px; border-radius: 6px; text-align: center; white-space: nowrap; }
