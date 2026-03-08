@@ -3246,7 +3246,7 @@ function updateStage5MissionHUD(g) {
   el.className = done ? 'completed' : '';
   el.innerHTML = (done ? '✔ MISSION CLEAR' : '⚡ MISSION') +
     '<span class="mission-count">' +
-    (done ? '缶キック ' + count + '/' + needed + ' 達成！' : '缶を' + needed + '回蹴って、時間まで逃げ切れよ！ ' + count + '/' + needed) +
+    (done ? '達成！ ' + count + '/' + needed : '缶を' + needed + '回蹴ろ！ ' + count + '/' + needed) +
     '</span>';
 }
 
