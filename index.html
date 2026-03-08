@@ -10425,39 +10425,9 @@ function updateOni(g, oni, dt) {
       const dist = Math.sqrt(dx*dx + dz*dz);
       if (dist < 1.5 || oni._skipWaypoint) {
         oni._skipWaypoint = false;
-        // Stage 4: 一定時間2Fに行っていなければ強制的に2F巡回開始
-        if (g._stageNum === 4 && (oni.floor || 0) === 0) {
-          oni._floorStayTimer = (oni._floorStayTimer || 0) + (oni._lastWpTime || 0);
-          oni._lastWpTime = 0;
-          if (oni._floorStayTimer > 30) {
-            oni.targetWaypoint = 32;
-            oni._floorStayTimer = 0;
-          } else {
-            oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
-          }
-        } else if (g._stageNum === 4 && (oni.floor || 0) === 1) {
-          oni._floorStayTimer = 0;
+        // Stage 4/5: 階段を飛ばさないよう順番通り巡回
+        if (g._stageNum === 4 || g._stageNum === 5) {
           oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
-        // Stage 5: 一定時間地上にいたら階段室へ強制誘導
-        } else if (g._stageNum === 5) {
-          const onGround = oni.position.y < 1.0; // 1F相当
-          if (onGround) {
-            oni._floorStayTimer = (oni._floorStayTimer || 0) + (oni._lastWpTime || 0);
-            oni._lastWpTime = 0;
-            // 25秒以上地上にいたら4つの階段室からランダムに1つ選んで登る
-            if (oni._floorStayTimer > 25) {
-              // 階段室WP開始: 1棟L=29, 1棟R=35, 2棟L=41, 2棟R=47
-              const stairStarts = [29, 35, 41, 47];
-              oni.targetWaypoint = stairStarts[Math.floor(Math.random() * stairStarts.length)];
-              oni._floorStayTimer = 0;
-            } else {
-              oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
-            }
-          } else {
-            // 階段を登っている間はタイマーリセット、順番通り巡回
-            oni._floorStayTimer = 0;
-            oni.targetWaypoint = (oni.targetWaypoint + 1) % g.config.waypoints.length;
-          }
         } else {
           // その他: 30%でランダムジャンプ
           if (Math.random() < 0.3) {
@@ -10467,13 +10437,50 @@ function updateOni(g, oni, dt) {
           }
         }
       }
-      // Stage 4/5: ウェイポイント間の経過時間を追跡
-      if (g._stageNum === 4 || g._stageNum === 5) {
-        oni._lastWpTime = (oni._lastWpTime || 0) + dt;
+
+      // Stage 4: 1Fに一定時間いたら強制的に2Fへ（毎フレーム判定）
+      if (g._stageNum === 4) {
+        if ((oni.floor || 0) === 0) {
+          oni._floorStayTimer = (oni._floorStayTimer || 0) + dt;
+          if (oni._floorStayTimer > 30) {
+            // 校舎内にいるかどうかで誘導先を分岐
+            const inSchool = oni.position.x > -19.5 && oni.position.x < 19.5 && oni.position.z > 24;
+            oni.targetWaypoint = inSchool ? 32 : 24; // 校舎外なら正面玄関(24)、校舎内なら東階段(32)
+            oni._floorStayTimer = 0;
+            oni._forceFloorPatrol = true; // canGuard制限を一時解除
+          }
+        } else {
+          // 2Fにいる → タイマーリセット
+          oni._floorStayTimer = 0;
+        }
+        // 1Fに戻ったらcanGuard制限を復活（2F巡回完了後）
+        if (oni._forceFloorPatrol && (oni.floor || 0) === 0 && oni._floorStayTimer > 3) {
+          oni._forceFloorPatrol = false;
+        }
+      }
+      // Stage 5: 地上に一定時間いたら階段室へ強制誘導（毎フレーム判定）
+      if (g._stageNum === 5) {
+        if (oni.position.y < 1.0) {
+          oni._floorStayTimer = (oni._floorStayTimer || 0) + dt;
+          if (oni._floorStayTimer > 25) {
+            const stairStarts = [29, 35, 41, 47];
+            oni.targetWaypoint = stairStarts[Math.floor(Math.random() * stairStarts.length)];
+            oni._floorStayTimer = 0;
+            oni._forceFloorPatrol = true;
+          }
+        } else {
+          oni._floorStayTimer = 0;
+          // 階段から降りたらcanGuard制限復活
+          if (oni._forceFloorPatrol && oni.position.y < 0.5) {
+            oni._forceFloorPatrol = false;
+          }
+        }
       }
 
       // canGuard role: stay within range of can
-      if (oni.role === 'canGuard') {
+      // ただしStage 4/5で強制2F巡回中（_floorStayTimerリセット直後）はcanGuard制限を解除
+      const forceFloorPatrol = (g._stageNum === 4 || g._stageNum === 5) && oni._forceFloorPatrol;
+      if (oni.role === 'canGuard' && !forceFloorPatrol) {
         const canPos = g.can.group.position;
         const cdx = oni.position.x - canPos.x, cdz = oni.position.z - canPos.z;
         const canDist = Math.sqrt(cdx*cdx + cdz*cdz); // 2D距離
