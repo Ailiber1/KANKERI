@@ -1403,7 +1403,7 @@ html, body {
     </div>
     <!-- Mobile controls -->
     <div id="mobile-joystick" class="mobile-only" style="display:none;"><div id="joystick-knob"></div></div>
-    <button id="mob-map" class="mobile-only" style="display:none;">全体を見る</button>
+    <button id="mob-map" style="display:none;">全体を見る</button>
     <div id="mobile-buttons" class="mobile-only" style="display:none;">
       <button id="mob-dash" data-i18n="MOB_DASH">ダッシュ</button>
       <button id="mob-crouch" data-i18n="MOB_CROUCH">しゃがむ</button>
@@ -9373,6 +9373,7 @@ function createPlayerController(g) {
     const mapBtn = document.getElementById('mob-map');
     if (mapBtn) {
       mapBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (G) G.overheadView = !G.overheadView; });
+      mapBtn.addEventListener('click', (e) => { e.preventDefault(); if (G) G.overheadView = !G.overheadView; });
     }
     // KICKボタン: ランナー→缶を蹴る / 鬼→缶を踏む・拾う
     const actionBtn = document.getElementById('mob-action');
@@ -9975,6 +9976,14 @@ function updateCamera(g, dt) {
     g.overheadView = !g.overheadView;
   }
   ctrl._mPrev = pKeys ? pKeys['KeyM'] : false;
+  // PC用: mob-mapボタンのクリックイベント初期化（一度だけ）
+  if (!g._mobMapClickInit) {
+    g._mobMapClickInit = true;
+    var _mapBtn = document.getElementById('mob-map');
+    if (_mapBtn) {
+      _mapBtn.addEventListener('click', function(e) { e.preventDefault(); if (G && !G._isOniPlayer) G.overheadView = !G.overheadView; });
+    }
+  }
 
   // --- Overhead (bird's eye) view ---
   if (g.overheadView) {
@@ -13410,12 +13419,12 @@ function updateHUD(g) {
     canDirEl.textContent = '缶 ' + arrows[idx] + ' ' + dist + 'm';
   }
 
-  // 鬼プレイヤーは「全体を見る」ボタンを非表示、ランナーはモバイルのみ表示
+  // 鬼プレイヤーは「全体を見る」ボタンを非表示、ランナーは常に表示
   var mobMapBtn = document.getElementById('mob-map');
   if (mobMapBtn) {
     if (g._isOniPlayer) {
       mobMapBtn.style.setProperty('display', 'none', 'important');
-    } else if (g.player.isMobile) {
+    } else {
       mobMapBtn.style.setProperty('display', 'block', 'important');
     }
   }
@@ -15168,6 +15177,17 @@ function initMultiplayerSync(g) {
       if (g._multiMode === 'ffa') {
         checkFFALastSurvivor(g);
       }
+      // ★チーム戦: capturedCountを同期し、全ランナー捕獲でゲーム終了
+      if (g._multiMode === 'team' && g.gamePhase !== 'result') {
+        var capCount = 0;
+        var teamB = g._teamB || [];
+        teamB.forEach(function(idx) { if (capData[idx]) capCount++; });
+        g.capturedCount = capCount;
+        if (capCount >= teamB.length && teamB.length > 0) {
+          // 鬼側勝利（全ランナー捕獲）
+          endGame(g, g._isOniPlayer);
+        }
+      }
     });
     g._multiListeners.push({ ref: capRef, event: 'value', fn: onCap });
 
@@ -15244,6 +15264,7 @@ function initMultiplayerSync(g) {
               g._oniPlayer.lockValidated = true;
             }
             showCenterAlert('👁 見つけた！', targetName + '！', 2000);
+            showOniSearchAlert(false); // ★ロックオン成功時にランナーを探せを非表示
           } else {
             // 仲間の鬼が発見した → 通知のみ（缶は踏めない）
             showCenterAlert('👁 ' + oniName + 'が発見', targetName, 2000);
