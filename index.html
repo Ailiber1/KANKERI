@@ -3215,6 +3215,34 @@ function showCenterAlert(mainText, subText, duration) {
   }, duration);
 }
 
+// 停止感知の事前警告ラベル
+function showStayWarningLabel(seconds) {
+  let el = document.getElementById('stay-warning-label');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'stay-warning-label';
+    el.style.cssText = 'position:fixed;top:18%;left:50%;transform:translateX(-50%);' +
+      'background:rgba(255,0,0,0.85);color:#fff;font-size:18px;font-weight:bold;' +
+      'padding:8px 24px;border-radius:8px;z-index:9999;pointer-events:none;' +
+      'text-align:center;animation:stayWarnPulse 0.8s infinite alternate;' +
+      'border:2px solid #ff6666;text-shadow:0 0 8px rgba(255,0,0,0.8);';
+    document.body.appendChild(el);
+    // パルスアニメーション追加
+    if (!document.getElementById('stay-warn-style')) {
+      const style = document.createElement('style');
+      style.id = 'stay-warn-style';
+      style.textContent = '@keyframes stayWarnPulse{from{opacity:0.7;transform:translateX(-50%) scale(0.95)}to{opacity:1;transform:translateX(-50%) scale(1.05)}}';
+      document.head.appendChild(style);
+    }
+  }
+  el.textContent = '⚠ 感知まで ' + seconds + '秒！移動しろ！';
+  el.style.display = 'block';
+}
+function hideStayWarningLabel() {
+  const el = document.getElementById('stay-warning-label');
+  if (el) el.style.display = 'none';
+}
+
 // ============================================================
 // SECTION: SPLASH SEQUENCE
 // ============================================================
@@ -12782,12 +12810,16 @@ function updateGamePhases(g, dt) {
       if (g._captureImmunity > 0) g._captureImmunity -= dt;
       updateKickGauge(g, dt); // Rescue kick gauge update
 
-      // キャンプ防止 — 20秒間同じ場所にいると鬼に位置通知（Score Attack + ストーリーモード）
-      if (g._isScoreAttack || g._gameMode === 'story') {
+      // キャンプ防止 — 一定時間同じ場所にいると鬼に位置通知（Score Attack + ストーリーモード + マルチプレイ）
+      // チーム戦の鬼プレイヤーは対象外
+      if (!g._isOniPlayer) {
+        const STAY_LIMIT = 20; // 秒
+        const STAY_WARN = 15; // 警告開始（残り5秒）
         // 捕獲中はタイマーリセット（捕獲中に停止しているのは当然のため）
         if (g.player.captured) {
           g._stayTimer = 0;
           g._lastPlayerPos = null;
+          hideStayWarningLabel();
         } else {
           const px = g.player.position.x, pz = g.player.position.z;
           if (g._lastPlayerPos) {
@@ -12796,11 +12828,18 @@ function updateGamePhases(g, dt) {
               g._stayTimer += dt;
             } else {
               g._stayTimer = 0;
+              hideStayWarningLabel();
             }
           }
           g._lastPlayerPos = { x: px, z: pz };
-          if (g._stayTimer > 20) {
+          // 事前警告ラベル表示（残り5秒から）
+          if (g._stayTimer >= STAY_WARN && g._stayTimer < STAY_LIMIT) {
+            const remaining = Math.ceil(STAY_LIMIT - g._stayTimer);
+            showStayWarningLabel(remaining);
+          }
+          if (g._stayTimer >= STAY_LIMIT) {
             g._stayTimer = 0;
+            hideStayWarningLabel();
             showCenterAlert('⚠ 位置が鬼に感知された！', '動かないと見つかるぞ！', 2500);
             // 最寄り鬼がプレイヤー位置に直行
             let closest = g.onis[0], minD = Infinity;
@@ -13016,6 +13055,7 @@ function endGame(g, playerWon, reason) {
   if (g._gameEnded) return; // ★二重実行防止（専用フラグ）
   g._gameEnded = true;
   g.gamePhase = 'result';
+  hideStayWarningLabel(); // 停止感知ラベルを消去
   stopBGM();
   if (document.pointerLockElement) document.exitPointerLock();
   // ★center-alertを即座にクリア（「缶を拾いに行け！」等がリザルト画面に残るのを防止）
@@ -15928,6 +15968,7 @@ function cleanupMultiplayer(g) {
 function cleanupGame() {
   if (!G) return;
   G.disposed = true;
+  hideStayWarningLabel(); // 停止感知ラベルを消去
 
   // マルチプレイのクリーンアップ（ゲームリソースのみ。プレイヤーデータはleaveLobbyで管理）
   if (G._isMultiplayer) {
