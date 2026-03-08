@@ -9373,9 +9373,10 @@ function createPlayerController(g) {
       crouchBtn.addEventListener('touchstart', (e) => { e.preventDefault(); ctrl.isCrouching = !ctrl.isCrouching; });
     }
     const mapBtn = document.getElementById('mob-map');
-    if (mapBtn) {
-      mapBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (G) G.overheadView = !G.overheadView; });
-      mapBtn.addEventListener('click', (e) => { e.preventDefault(); if (G) G.overheadView = !G.overheadView; });
+    if (mapBtn && !mapBtn._mapInitDone) {
+      mapBtn._mapInitDone = true;
+      mapBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (G && !G._isOniPlayer) G.overheadView = !G.overheadView; });
+      mapBtn.addEventListener('click', (e) => { e.preventDefault(); if (G && !G._isOniPlayer) G.overheadView = !G.overheadView; });
     }
     // KICKボタン: ランナー→缶を蹴る / 鬼→缶を踏む・拾う
     const actionBtn = document.getElementById('mob-action');
@@ -9978,14 +9979,7 @@ function updateCamera(g, dt) {
     g.overheadView = !g.overheadView;
   }
   ctrl._mPrev = pKeys ? pKeys['KeyM'] : false;
-  // PC用: mob-mapボタンのクリックイベント初期化（一度だけ）
-  if (!g._mobMapClickInit) {
-    g._mobMapClickInit = true;
-    var _mapBtn = document.getElementById('mob-map');
-    if (_mapBtn) {
-      _mapBtn.addEventListener('click', function(e) { e.preventDefault(); if (G && !G._isOniPlayer) G.overheadView = !G.overheadView; });
-    }
-  }
+  // PC用: mob-mapボタンのクリックイベントはcreatePlayerController内で一度だけ初期化済み
 
   // --- Overhead (bird's eye) view ---
   if (g.overheadView) {
