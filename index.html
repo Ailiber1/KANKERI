@@ -9996,7 +9996,16 @@ function updateCamera(g, dt) {
     g.overheadView = !g.overheadView;
   }
   ctrl._mPrev = pKeys ? pKeys['KeyM'] : false;
-  // PC用: mob-mapボタンのクリックイベントはcreatePlayerController内で一度だけ初期化済み
+
+  // ★overheadView中にSpace/F/Escを押したら通常視点に戻す
+  if (g.overheadView && pKeys) {
+    if ((pKeys['Space'] && !ctrl._spacePrevMap) || (pKeys['KeyF'] && !ctrl._fPrevMap) || (pKeys['Escape'] && !ctrl._escPrevMap)) {
+      g.overheadView = false;
+    }
+  }
+  ctrl._spacePrevMap = pKeys ? pKeys['Space'] : false;
+  ctrl._fPrevMap = pKeys ? pKeys['KeyF'] : false;
+  ctrl._escPrevMap = pKeys ? pKeys['Escape'] : false;
 
   // --- Overhead (bird's eye) view ---
   if (g.overheadView) {
@@ -14155,7 +14164,7 @@ function initOniPlayerControls(g) {
     reticleEl.style.position = 'absolute';
     reticleEl.style.top = 'auto';
     reticleEl.style.left = '50%';
-    reticleEl.style.bottom = 'calc(100px + env(safe-area-inset-bottom, 0px))';
+    reticleEl.style.bottom = 'calc(110px + env(safe-area-inset-bottom, 0px))';
     reticleEl.style.transform = 'translateX(-50%)';
     reticleEl.style.fontSize = '72px';
     // 発光エフェクト
@@ -14163,22 +14172,20 @@ function initOniPlayerControls(g) {
     reticleEl.style.textShadow = '0 0 20px rgba(255,0,0,0.6), 0 0 40px rgba(255,0,0,0.3)';
     reticleEl.style.animation = 'oniReticleGlow 1.5s ease-in-out infinite';
 
-    // ダッシュボタンをレティクルの下（画面下中央）に再配置
-    var dashBtn = document.getElementById('mob-dash');
-    if (dashBtn) {
-      dashBtn.style.position = 'fixed';
-      dashBtn.style.bottom = 'calc(30px + env(safe-area-inset-bottom, 0px))';
-      dashBtn.style.left = '50%';
-      dashBtn.style.transform = 'translateX(-50%)';
-      dashBtn.style.zIndex = '40';
+    // mobile-buttonsコンテナを画面下中央に再配置（レティクルの下）
+    var mobBtns = document.getElementById('mobile-buttons');
+    if (mobBtns) {
+      mobBtns.style.position = 'absolute';
+      mobBtns.style.bottom = 'calc(30px + env(safe-area-inset-bottom, 0px))';
+      mobBtns.style.right = 'auto';
+      mobBtns.style.left = '50%';
+      mobBtns.style.transform = 'translateX(-50%)';
+      mobBtns.style.flexDirection = 'row';
+      mobBtns.style.justifyContent = 'center';
     }
     // しゃがむボタンを非表示（鬼には不要）
     var crouchBtn = document.getElementById('mob-crouch');
     if (crouchBtn) crouchBtn.style.setProperty('display', 'none', 'important');
-
-    // mobile-buttonsコンテナを非表示（ダッシュは独立配置にしたため）
-    var mobBtns = document.getElementById('mobile-buttons');
-    if (mobBtns) mobBtns.style.setProperty('display', 'none', 'important');
   }
 }
 
@@ -15859,7 +15866,7 @@ function cleanupGame() {
   }
   var mobBtnsReset = document.getElementById('mobile-buttons');
   if (mobBtnsReset) {
-    mobBtnsReset.style.display = '';
+    mobBtnsReset.style.cssText = '';  // position/left/transform等のインラインスタイルを全クリア
   }
 
   G = null;
