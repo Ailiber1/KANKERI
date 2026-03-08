@@ -3887,8 +3887,8 @@ const STAGE_CONFIGS = {
       {x:15,z:-16},{x:25,z:-11},{x:28,z:-22},{x:18,z:-25},
       // 校庭中央
       {x:0,z:5},{x:8,z:-5},{x:-8,z:-8},
-      // ★正面玄関から校舎に入る（入口 x:-2~2 を通過）
-      {x:0,z:23},{x:0,z:25.5},
+      // ★正面玄関から校舎に入る（入口中央を確実に通過）
+      {x:0,z:20},{x:0,z:23},{x:0,z:25.5},
       // 校舎内巡回（1F廊下）
       {x:-10,z:25.5},{x:0,z:25.5},{x:10,z:25.5},
       // 1F教室内偵察
@@ -6230,11 +6230,11 @@ function buildSchoolObjects(g) {
   const schoolDirtyMat = makePBRMat(plasterPBR, { roughness: 0.95, emissive: 0x020204, emissiveIntensity: 0.05 });
 
   // --- 外壁 ---
-  // 南壁（正面玄関 x:-2~2 に開口部）
-  addBox(-11, 24, 9, WT, 8, schoolMat);    // 左: x:-20 ~ -2
-  addBox(11, 24, 9, WT, 8, schoolMat);     // 右: x:2 ~ 20
+  // 南壁（正面玄関 x:-3.5~3.5 に開口部 — 鬼AIが確実に通過できる幅）
+  addBox(-11.75, 24, 8.25, WT, 8, schoolMat);    // 左: x:-20 ~ -3.5
+  addBox(11.75, 24, 8.25, WT, 8, schoolMat);     // 右: x:3.5 ~ 20
   // まぐさ（入口上部 y:3~8）
-  const lintelGeo = new THREE.BoxGeometry(4, 5, WT * 2);
+  const lintelGeo = new THREE.BoxGeometry(7, 5, WT * 2);
   lintelGeo.setAttribute('uv2', lintelGeo.attributes.uv);
   const lintelMesh = new THREE.Mesh(lintelGeo, schoolMat);
   lintelMesh.position.set(0, gH(0, 24) + 5.5, 24);
@@ -6247,12 +6247,12 @@ function buildSchoolObjects(g) {
   // 東壁
   addBox(20, 28, WT, 4, 8, schoolMat);
 
-  // --- 廊下・教室仕切り壁 z=27（ドア開口部付き）---
-  // ドア: ClassA x:-8±0.75, ClassB x:0±0.75, ClassC x:10±0.75, 階段室 x:14+
-  addBox(-11.35, 27, 2.65, WT, 8, schoolDirtyMat);  // x:-14 ~ -8.7（西階段室を除く）
-  addBox(-4, 27, 3.25, WT, 8, schoolDirtyMat);      // x:-7.25 ~ -0.75
-  addBox(5, 27, 4.25, WT, 8, schoolDirtyMat);       // x:0.75 ~ 9.25
-  addBox(12.4, 27, 1.6, WT, 8, schoolDirtyMat);     // x:10.8 ~ 14
+  // --- 廊下・教室仕切り壁 z=27（ドア開口部付き — 鬼AI通過可能な幅）---
+  // ドア開口部: ClassA x:-9.5~-6.5, ClassB x:-1.5~1.5, ClassC x:8.5~11.5, 階段室 x:14+
+  addBox(-11.75, 27, 2.25, WT, 8, schoolDirtyMat);  // x:-14 ~ -9.5
+  addBox(-4, 27, 2.5, WT, 8, schoolDirtyMat);       // x:-6.5 ~ -1.5
+  addBox(5, 27, 3.5, WT, 8, schoolDirtyMat);        // x:1.5 ~ 8.5
+  addBox(12.75, 27, 1.25, WT, 8, schoolDirtyMat);   // x:11.5 ~ 14
 
   // --- 教室仕切り壁（南北方向）---
   addBox(-6.5, 29.5, WT, 2.5, 8, schoolDirtyMat);  // A / B 間
@@ -10445,7 +10445,7 @@ function updateOni(g, oni, dt) {
           if (oni._floorStayTimer > 30) {
             // 校舎内にいるかどうかで誘導先を分岐
             const inSchool = oni.position.x > -19.5 && oni.position.x < 19.5 && oni.position.z > 24;
-            oni.targetWaypoint = inSchool ? 32 : 24; // 校舎外なら正面玄関(24)、校舎内なら東階段(32)
+            oni.targetWaypoint = inSchool ? 33 : 24; // 校舎外なら正面玄関(24)、校舎内なら東階段(33)
             oni._floorStayTimer = 0;
             oni._forceFloorPatrol = true; // canGuard制限を一時解除
           }
