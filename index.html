@@ -14489,15 +14489,15 @@ function validateLockOn(g, oniIdx, targetIdx) {
   if (multiState.roomId) {
     db.ref('rooms/' + multiState.roomId + '/lockOn/' + oniIdx + '/validated').set(true);
   }
-  // 通知
-  showOniSearchAlert(false);
-  const targetName = targetIsLocal ? (multiState.players[targetIdx] ? multiState.players[targetIdx].username : 'Player') : (remoteTarget.username || 'Player');
-  showCenterAlert('👁 見つけた！', targetName + '！', 2000);
-  SoundManager.playGameSE('found');
-
-  if (oniIdx === multiState.playerIndex) {
+  // ★通知はhandleLockNotifyで各クライアントに配信されるため、
+  // validateLockOn内では自分が鬼の場合のみローカル処理（即時反映用）
+  if (oniIdx === multiState.playerIndex && g._isOniPlayer) {
     g._oniPlayer.lockedTarget = targetIdx;
     g._oniPlayer.lockValidated = true;
+    showOniSearchAlert(false);
+    const targetName = targetIsLocal ? (multiState.players[targetIdx] ? multiState.players[targetIdx].username : 'Player') : (remoteTarget.username || 'Player');
+    showCenterAlert('👁 見つけた！', targetName + '！', 2000);
+    SoundManager.playGameSE('found');
   }
 }
 
