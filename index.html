@@ -9372,25 +9372,6 @@ function createPlayerController(g) {
     if (crouchBtn) {
       crouchBtn.addEventListener('touchstart', (e) => { e.preventDefault(); ctrl.isCrouching = !ctrl.isCrouching; });
     }
-    const mapBtn = document.getElementById('mob-map');
-    if (mapBtn) {
-      // ★再戦時の二重登録防止: 古いリスナーを解除してから新規登録
-      if (mapBtn._mapTouch) mapBtn.removeEventListener('touchstart', mapBtn._mapTouch);
-      if (mapBtn._mapClick) mapBtn.removeEventListener('click', mapBtn._mapClick);
-      // touchstartとclickの二重発火防止：touchstartが来たらclickを無視
-      mapBtn._mapTouch = function(e) {
-        e.preventDefault();
-        mapBtn._touchFired = true;
-        if (G && !G._isOniPlayer) G.overheadView = !G.overheadView;
-      };
-      mapBtn._mapClick = function(e) {
-        e.preventDefault();
-        if (mapBtn._touchFired) { mapBtn._touchFired = false; return; }
-        if (G && !G._isOniPlayer) G.overheadView = !G.overheadView;
-      };
-      mapBtn.addEventListener('touchstart', mapBtn._mapTouch);
-      mapBtn.addEventListener('click', mapBtn._mapClick);
-    }
     // KICKボタン: ランナー→缶を蹴る / 鬼→缶を踏む・拾う
     const actionBtn = document.getElementById('mob-action');
     if (actionBtn) {
@@ -9416,6 +9397,25 @@ function createPlayerController(g) {
         }
       });
     }
+  }
+
+  // ★mob-mapボタン: PC/スマホ両対応（isMobileブロック外で登録）
+  const mapBtn = document.getElementById('mob-map');
+  if (mapBtn) {
+    if (mapBtn._mapTouch) mapBtn.removeEventListener('touchstart', mapBtn._mapTouch);
+    if (mapBtn._mapClick) mapBtn.removeEventListener('click', mapBtn._mapClick);
+    mapBtn._mapTouch = function(e) {
+      e.preventDefault();
+      mapBtn._touchFired = true;
+      if (G && !G._isOniPlayer) G.overheadView = !G.overheadView;
+    };
+    mapBtn._mapClick = function(e) {
+      e.preventDefault();
+      if (mapBtn._touchFired) { mapBtn._touchFired = false; return; }
+      if (G && !G._isOniPlayer) G.overheadView = !G.overheadView;
+    };
+    mapBtn.addEventListener('touchstart', mapBtn._mapTouch);
+    mapBtn.addEventListener('click', mapBtn._mapClick);
   }
 
   return ctrl;
@@ -15045,6 +15045,64 @@ function initMultiplayerSync(g) {
         if (state.gameTimer !== undefined) g.gameTimer = state.gameTimer;
       });
       g._multiListeners.push({ ref: stateRefHost, event: 'value', fn: onStateHost });
+    }
+
+    // ★ホスト（ランナー）: チーム戦で自分が捕獲された場合のUI + ゲーム終了判定
+    if (g._multiMode === 'team' && !g._isOniPlayer) {
+      const capRefHost = roomRef.child('capturedPlayers');
+      const onCapHost = capRefHost.on('value', (snap) => {
+        const capData = snap.val() || {};
+        // 自分が捕まったか
+        if (capData[multiState.playerIndex] && !g._playerCaptured) {
+          g._playerCaptured = true;
+          showCapturedOverlay(g);
+        } else if (!capData[multiState.playerIndex] && g._playerCaptured) {
+          g._playerCaptured = false;
+          hideCapturedOverlay(g);
+        }
+        // 他プレイヤーの捕獲状態を更新
+        Object.keys(multiState.remotePlayers).forEach(function(k) {
+          multiState.remotePlayers[k].captured = !!capData[k];
+        });
+        g.player.captured = !!capData[multiState.playerIndex];
+        // 全ランナー捕獲でゲーム終了
+        if (g.gamePhase !== 'result') {
+          var capCount = 0;
+          var teamB = g._teamB || [];
+          teamB.forEach(function(idx) { if (capData[idx]) capCount++; });
+          g.capturedCount = capCount;
+          if (capCount >= teamB.length && teamB.length > 0) {
+            endGame(g, false); // ランナー側: 敗北
+          }
+        }
+      });
+      g._multiListeners.push({ ref: capRefHost, event: 'value', fn: onCapHost });
+
+      // ★ホスト（ランナー）: lockOn通知（味方が見つかった等）
+      const lockAllRefHost = roomRef.child('lockOn');
+      g._notifiedLocks = g._notifiedLocks || {};
+      const handleLockNotifyHost = function(snap) {
+        const oniIdx = parseInt(snap.key);
+        const lockData = snap.val();
+        if (!lockData || !lockData.validated || !g || g.disposed) return;
+        if (g.gamePhase !== 'seek') return;
+        const targetIdx = lockData.targetIndex;
+        const lockKey = oniIdx + '_' + targetIdx;
+        if (g._notifiedLocks[lockKey]) return;
+        g._notifiedLocks[lockKey] = true;
+        setTimeout(function() { delete g._notifiedLocks[lockKey]; }, 5000);
+        // 自分が見つかった場合はvalidateLockOn内で処理済み。味方が見つかった場合のみ通知
+        if (targetIdx !== multiState.playerIndex) {
+          var rp = multiState.remotePlayers[targetIdx];
+          var targetName = rp ? (rp.username || 'Player') : 'Player';
+          showCenterAlert('👁 ' + targetName + 'が発見された', '', 2000);
+          SoundManager.playGameSE('found');
+        }
+      };
+      lockAllRefHost.on('child_added', handleLockNotifyHost);
+      lockAllRefHost.on('child_changed', handleLockNotifyHost);
+      g._multiListeners.push({ ref: lockAllRefHost, event: 'child_added', fn: handleLockNotifyHost });
+      g._multiListeners.push({ ref: lockAllRefHost, event: 'child_changed', fn: handleLockNotifyHost });
     }
 
     // ホスト: Co-opリトライ信号を受信（非ホストがリトライボタンを押した場合）
