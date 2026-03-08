@@ -797,7 +797,7 @@ html, body {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
   font-size: 64px; color: rgba(255,68,68,0.5); text-shadow: 0 0 15px rgba(255,0,0,0.3);
   transition: color 0.15s, text-shadow 0.15s, font-size 0.15s;
-  pointer-events: auto; cursor: pointer; user-select: none;
+  pointer-events: auto; cursor: pointer; user-select: none; touch-action: manipulation;
 }
 #oni-status-label {
   position: absolute; top: 28%; left: 50%; transform: translate(-50%, -50%);
@@ -14140,7 +14140,8 @@ function initOniPlayerControls(g) {
   // レティクル(◎)をタップで缶踏む/缶拾うアクション実行
   const reticleEl = document.getElementById('oni-reticle');
   if (reticleEl) {
-    reticleEl.addEventListener('click', () => {
+    var oniReticleAction = function(e) {
+      if (e) e.preventDefault();
       if (!g._oniPlayer) return;
       const op = g._oniPlayer;
       if (g.can) {
@@ -14153,6 +14154,16 @@ function initOniPlayerControls(g) {
           }
         }
       }
+    };
+    // touchstartで即反応（スマホ）、clickはPC用フォールバック
+    reticleEl.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      reticleEl._touchFired = true;
+      oniReticleAction(e);
+    });
+    reticleEl.addEventListener('click', function(e) {
+      if (reticleEl._touchFired) { reticleEl._touchFired = false; return; }
+      oniReticleAction(e);
     });
   }
 
