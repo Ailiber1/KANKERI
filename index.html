@@ -10460,14 +10460,20 @@ function updateOni(g, oni, dt) {
     }
   }
   if (g._stageNum === 5) {
-    // クールダウン減算（階段巡回後の地上巡回時間を確保）
+    // クールダウン減算
     if (oni._stairCooldown > 0) oni._stairCooldown -= dt;
     if (oni.position.y < 1.0) {
-      // 地上レベル — 強制巡回中でなく、クールダウンも完了している場合のみタイマー加算
+      // 地上レベル
+      // 2段階解除: 上った後に地上に戻ったら完了（完全巡回を保証）
+      if (oni._forceFloorPatrol && oni._reachedUp) {
+        oni._forceFloorPatrol = false;
+        oni._reachedUp = false;
+        oni._stairCooldown = 25; // 25秒クールダウン後に次の階段巡回
+      }
+      // 強制巡回中でなく、クールダウンも完了 → 地上タイマー加算
       if (!oni._forceFloorPatrol && (oni._stairCooldown || 0) <= 0) {
         oni._floorStayTimer = (oni._floorStayTimer || 0) + dt;
-        if (oni._floorStayTimer > 50) { // 50秒で強制階段巡回（十分な地上巡回時間確保）
-          // 4箇所の階段を順番に巡回（WPインデックス: 南面経由→階段室）
+        if (oni._floorStayTimer > 25) { // 25秒で強制階段巡回（活発な巡回サイクル）
           const stairStarts = [44, 53, 62, 71];
           const idx = (oni._nextStairIdx || 0) % 4;
           oni.targetWaypoint = stairStarts[idx];
@@ -10481,12 +10487,9 @@ function updateOni(g, oni, dt) {
       }
     } else {
       oni._floorStayTimer = 0;
-      // 上層階に到達(y > 3.0) → 階段巡回任務完了
+      // 上層階に到達(y > 3.0) → 上った記録（まだフラグは解除しない — 降りてきてから解除）
       if (oni._forceFloorPatrol && oni.position.y > 3.0) {
-        oni._forceFloorPatrol = false;
-        oni._stairCooldown = 50; // 50秒クールダウン（地上を十分巡回してから次の階段へ）
-        // 地上巡回WPにリセット（ランダムな地上WPから再開）
-        oni.targetWaypoint = Math.floor(Math.random() * 44);
+        oni._reachedUp = true;
       }
     }
   }
@@ -10521,12 +10524,13 @@ function updateOni(g, oni, dt) {
         const canPos = g.can.group.position;
         const cdx = oni.position.x - canPos.x, cdz = oni.position.z - canPos.z;
         const canDist = Math.sqrt(cdx*cdx + cdz*cdz); // 2D距離
-        // If too far from can (>12m), head back toward can area
-        if (canDist > 12 && g.can.isAtHome) {
+        // Stage 5: 広大なマップなのでcanGuard範囲を拡大（缶周辺だけでなくマップ全体を巡回可能に）
+        const guardRange = g._stageNum === 5 ? 30 : 12;
+        const guardRadius = g._stageNum === 5 ? 12 : 7;
+        if (canDist > guardRange && g.can.isAtHome) {
           const backAngle = Math.atan2(canPos.x - oni.position.x, canPos.z - oni.position.z);
-          // Patrol in a circle around the can (radius ~6-8m)
-          const guardX = canPos.x + Math.sin(backAngle + Math.PI * 0.3) * 7;
-          const guardZ = canPos.z + Math.cos(backAngle + Math.PI * 0.3) * 7;
+          const guardX = canPos.x + Math.sin(backAngle + Math.PI * 0.3) * guardRadius;
+          const guardZ = canPos.z + Math.cos(backAngle + Math.PI * 0.3) * guardRadius;
           moveOni(oni, guardX, guardZ, oni.speed * nightSpeedMult * fatigueMult, dt, g);
         } else {
           const speed = oni.speed * nightSpeedMult * fatigueMult;
