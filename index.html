@@ -10542,41 +10542,54 @@ function updateOni(g, oni, dt) {
         oni.stateTimer = 0;
       }
 
-      // --- Search behind covers: searcher role searches more often ---
-      // 強制フロア巡回中は壁裏探索しない（階段に向かい続ける）
+      // --- Search behind covers: 壁裏・遮蔽物の裏を積極的に調べる ---
+      // 強制フロア巡回中のみブロック（階段に向かい続けるため）
       if (!canSeeAny && !loudestFootTarget && !oni._forceFloorPatrol) {
-        const searchInterval = oni.role === 'searcher' ? 5 : 8; // 探索頻度UP（searcher:6→5秒、patrol:12→8秒）
+        // 探索頻度: searcher=3秒、canGuard=5秒、patrol=4秒（全体的にUP）
+        const searchInterval = oni.role === 'searcher' ? 3 : (oni.role === 'canGuard' ? 5 : 4);
         if (oni.searchTimer > searchInterval) {
-          // Find a nearby tall cover to search behind（範囲拡大: 25m）
+          // 範囲: searcher=35m（ステージの隅々まで）、他=25m
+          const searchRange = oni.role === 'searcher' ? 35 : 25;
           const coverCandidates = g.colliders.filter(c => {
-            if (c.h < 1.0) return false;
+            if (c.h < 0.8) return false; // 低い障害物(0.8m未満)は除外
             const cd = Math.sqrt((c.x - oni.position.x)**2 + (c.z - oni.position.z)**2);
-            if (cd > 25 || cd < 2) return false;
-            // Skip recently searched covers
-            if (oni.searchedCovers.some(sc => sc.x === c.x && sc.z === c.z)) return false;
+            if (cd > searchRange || cd < 2) return false;
+            // Stage 4: 異なるフロアのコライダーは除外
+            if (g._stageNum === 4 && c.floor !== undefined && oni.floor !== undefined && c.floor !== oni.floor) return false;
+            // 最近調べた場所は除外
+            if (oni.searchedCovers.some(sc => Math.abs(sc.x - c.x) < 1 && Math.abs(sc.z - c.z) < 1)) return false;
             return true;
           });
-          // 大きい構造物（本殿など）を優先的に覗きに行く
-          coverCandidates.sort((a, b) => {
-            const sizeA = a.type === 'box' ? a.hw * a.hd : a.r * a.r;
-            const sizeB = b.type === 'box' ? b.hw * b.hd : b.r * b.r;
-            return sizeB - sizeA; // 大きい順
-          });
           if (coverCandidates.length > 0) {
-            // 大きい構造物を50%の確率で選び、それ以外はランダム
+            // 選択方式: 距離順に3分割して均等に調べる（近場ばかり/遠方ばかりにならない）
+            coverCandidates.sort((a, b) => {
+              const da = Math.sqrt((a.x - oni.position.x)**2 + (a.z - oni.position.z)**2);
+              const db = Math.sqrt((b.x - oni.position.x)**2 + (b.z - oni.position.z)**2);
+              return da - db; // 近い順
+            });
             let pick;
-            if (coverCandidates.length > 1 && Math.random() < 0.5) {
-              pick = coverCandidates[0]; // 最大の構造物
+            const third = Math.ceil(coverCandidates.length / 3);
+            const r = Math.random();
+            if (r < 0.4) {
+              // 40%: 近距離（素早く確認）
+              pick = coverCandidates[Math.floor(Math.random() * Math.min(third, coverCandidates.length))];
+            } else if (r < 0.75) {
+              // 35%: 中距離
+              const start = Math.min(third, coverCandidates.length - 1);
+              const end = Math.min(third * 2, coverCandidates.length);
+              pick = coverCandidates[start + Math.floor(Math.random() * (end - start))];
             } else {
-              pick = coverCandidates[Math.floor(Math.random() * Math.min(4, coverCandidates.length))];
+              // 25%: 遠距離（隅々まで調べる）
+              const start = Math.min(third * 2, coverCandidates.length - 1);
+              pick = coverCandidates[start + Math.floor(Math.random() * (coverCandidates.length - start))];
             }
             oni.searchTarget = pick;
             oni.state = 'search';
             oni.stateTimer = 0;
             oni.searchTimer = 0;
-            // Remember this cover (forget after 8 searches to allow re-visits)
+            // 記憶: 最近調べた場所を覚える（12箇所まで → 全体をカバーしやすい）
             oni.searchedCovers.push({ x: pick.x, z: pick.z });
-            if (oni.searchedCovers.length > 8) oni.searchedCovers.shift();
+            if (oni.searchedCovers.length > 12) oni.searchedCovers.shift();
           }
         }
       }
@@ -10848,13 +10861,13 @@ function updateOni(g, oni, dt) {
           oni.searchTarget = null;
           break;
         }
-        moveOni(oni, oni._searchDest.x, oni._searchDest.z, oni.speed * 1.1 * nightSpeedMult * fatigueMult, dt, g);
+        moveOni(oni, oni._searchDest.x, oni._searchDest.z, oni.speed * 1.2 * nightSpeedMult * fatigueMult, dt, g);
         // 2D距離で到着判定（高低差があっても正しく判定）
         const sDx = oni.position.x - oni._searchDest.x, sDz = oni.position.z - oni._searchDest.z;
         const sDist = Math.sqrt(sDx*sDx + sDz*sDz);
         if (sDist < 1.5) {
-          // Arrived at peek position — look around briefly
-          if (oni.stateTimer > 1.5) { // 探索到着後の待機短縮（元2.5秒→1.5秒）
+          // Arrived at peek position — look around briefly（素早く確認して次へ）
+          if (oni.stateTimer > 1.0) {
             oni.state = 'patrol';
             oni.stateTimer = 0;
             oni._searchDest = null;
@@ -10881,8 +10894,8 @@ function updateOni(g, oni, dt) {
         oni.searchTarget = null;
       }
 
-      // Timeout（大きな構造物は到達に時間がかかるため12秒）
-      if (oni.stateTimer > 12) {
+      // Timeout（遠距離の探索は到達に時間がかかるため15秒）
+      if (oni.stateTimer > 15) {
         oni.state = 'patrol';
         oni.stateTimer = 0;
         oni._searchDest = null;
