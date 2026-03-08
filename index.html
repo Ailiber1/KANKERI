@@ -12810,28 +12810,33 @@ function updateGamePhases(g, dt) {
       if (g._captureImmunity > 0) g._captureImmunity -= dt;
       updateKickGauge(g, dt); // Rescue kick gauge update
 
-      // キャンプ防止 — 一定時間同じ場所にいると鬼に位置通知（Score Attack + ストーリーモード + マルチプレイ）
+      // キャンプ防止 — 一定時間同じ場所（半径3m以内）にいると鬼に位置通知
       // チーム戦の鬼プレイヤーは対象外
       if (!g._isOniPlayer) {
-        const STAY_LIMIT = 10; // 秒
-        const STAY_WARN = 5; // 警告開始（残り5秒）
+        const STAY_LIMIT = 10; // 感知までの秒数
+        const STAY_WARN = 5;   // 警告開始（残り5秒）
+        const STAY_RADIUS = 3; // この距離以上移動でリセット
         // 捕獲中はタイマーリセット（捕獲中に停止しているのは当然のため）
         if (g.player.captured) {
           g._stayTimer = 0;
-          g._lastPlayerPos = null;
+          g._stayOrigin = null;
           hideStayWarningLabel();
         } else {
           const px = g.player.position.x, pz = g.player.position.z;
-          if (g._lastPlayerPos) {
-            const moveDist = Math.sqrt((px - g._lastPlayerPos.x) ** 2 + (pz - g._lastPlayerPos.z) ** 2);
-            if (moveDist < 2) {
-              g._stayTimer += dt;
-            } else {
-              g._stayTimer = 0;
-              hideStayWarningLabel();
-            }
+          if (!g._stayOrigin) {
+            // 基準点が未設定 → 現在地を基準点にする
+            g._stayOrigin = { x: px, z: pz };
           }
-          g._lastPlayerPos = { x: px, z: pz };
+          const moveDist = Math.sqrt((px - g._stayOrigin.x) ** 2 + (pz - g._stayOrigin.z) ** 2);
+          if (moveDist >= STAY_RADIUS) {
+            // 基準点から3m以上離れた → リセット
+            g._stayTimer = 0;
+            g._stayOrigin = { x: px, z: pz };
+            hideStayWarningLabel();
+          } else {
+            // 基準点の近くに留まっている → タイマー加算
+            g._stayTimer += dt;
+          }
           // 事前警告ラベル表示（残り5秒から）
           if (g._stayTimer >= STAY_WARN && g._stayTimer < STAY_LIMIT) {
             const remaining = Math.ceil(STAY_LIMIT - g._stayTimer);
@@ -12839,6 +12844,7 @@ function updateGamePhases(g, dt) {
           }
           if (g._stayTimer >= STAY_LIMIT) {
             g._stayTimer = 0;
+            g._stayOrigin = { x: px, z: pz };
             hideStayWarningLabel();
             showCenterAlert('⚠ 位置が鬼に感知された！', '動かないと見つかるぞ！', 2500);
             // 最寄り鬼がプレイヤー位置に直行
@@ -13905,9 +13911,9 @@ function startGame(stageNum, mode) {
   G.cpuAllies = [];
   G.onis = [];
   G._stayTimer = 0; // キャンプ防止タイマー
+  G._stayOrigin = null; // キャンプ防止の基準点
   G._kickCount = 0; // Score Attack: 缶キック回数
   G._captureImmunity = 0; // 缶回収後の捕獲免疫タイマー
-  G._lastPlayerPos = null;
   // 鬼スポーンフラグをリセット
   for (let i = 0; i < (G.config.maxOni || 4); i++) G['_oniSpawned' + i] = false;
   G._hitCooldown = false;
