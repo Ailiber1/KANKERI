@@ -12924,7 +12924,8 @@ function togglePause(g) {
 }
 
 function endGame(g, playerWon, reason) {
-  if (g.gamePhase === 'result') return; // ★二重実行防止
+  if (g._gameEnded) return; // ★二重実行防止（専用フラグ）
+  g._gameEnded = true;
   g.gamePhase = 'result';
   stopBGM();
   if (document.pointerLockElement) document.exitPointerLock();
@@ -15157,7 +15158,12 @@ function initMultiplayerSync(g) {
         if (state.gamePhase === 'result' && prevPhase !== 'result') {
           roomRef.child('result').once('value').then(snap => {
             const r = snap.val();
-            endGame(g, r ? r.playerWon : false);
+            // ★チーム戦: runnersWonフィールドを使用（endTeamBattleが書き込む）
+            if (g._multiMode === 'team' && r && r.runnersWon !== undefined) {
+              endGame(g, r.runnersWon);
+            } else {
+              endGame(g, r ? r.playerWon : false);
+            }
           });
         }
       }
@@ -15224,6 +15230,16 @@ function initMultiplayerSync(g) {
           }
           if (remaining2 > 0.1) {
             g._canKickCooldown = remaining2;
+          }
+        }
+        // ★非ホスト鬼: 缶が蹴られた通知
+        if (g._isOniPlayer && canData.status === 'kicked' && canData.kickedBy && canData.kickedAt) {
+          var kickTS2 = canData.kickedAt;
+          if (!g._lastKickTS || kickTS2 > g._lastKickTS) {
+            g._lastKickTS = kickTS2;
+            showCenterAlert(canData.kickedBy + ' に缶を蹴られた！', '急いで缶を拾え！', 3000);
+            showOniSearchAlert(false);
+            SoundManager.playGameSE('notify');
           }
         }
       }
