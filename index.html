@@ -12813,8 +12813,8 @@ function updateGamePhases(g, dt) {
       // キャンプ防止 — 一定時間同じ場所にいると鬼に位置通知（Score Attack + ストーリーモード + マルチプレイ）
       // チーム戦の鬼プレイヤーは対象外
       if (!g._isOniPlayer) {
-        const STAY_LIMIT = 20; // 秒
-        const STAY_WARN = 15; // 警告開始（残り5秒）
+        const STAY_LIMIT = 10; // 秒
+        const STAY_WARN = 5; // 警告開始（残り5秒）
         // 捕獲中はタイマーリセット（捕獲中に停止しているのは当然のため）
         if (g.player.captured) {
           g._stayTimer = 0;
