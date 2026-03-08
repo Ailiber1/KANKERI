@@ -11482,9 +11482,9 @@ function updateCpuAlly(g, ally, dt) {
   ally.kickCheckTimer += dt;
 
   // === 近接キック判定（全状態共通） ===
-  // 味方が捕まっていて、缶の近く(3.5m以内)を通過中なら即座に蹴る
-  if (capturedCount > 0 && canDist < 3.5 && g.can.isAtHome && !g.can.isFlying
-    && ally.state !== 'tryKick') {
+  // 味方が捕まっていて、缶のすぐ近く(3m以内)を通過中 ＋ 鬼が遠い時のみ蹴る
+  if (capturedCount > 0 && canDist < 3.0 && g.can.isAtHome && !g.can.isFlying
+    && ally.state !== 'tryKick' && oniDist > 8) {
     cpuPerformKick(g, ally);
     return;
   }
@@ -11506,10 +11506,9 @@ function updateCpuAlly(g, ally, dt) {
   // If time is running out and we're not captured, prioritize survival
   const endgameMode = remainingTime < 30;
   const criticalMode = remainingTime < 15;
-  // Strong allies understand: if we survive, we WIN — don't take unnecessary risks
-  const shouldPrioritizeSurvival = (ally.level === 'strong' && endgameMode)
-    || (ally.level === 'normal' && criticalMode)
-    || (uncapturedCount <= 1); // last survivor must hide
+  // 生存最優先: 捕まったら元も子もない
+  const shouldPrioritizeSurvival = endgameMode // 残り30秒は全レベル生存優先
+    || (uncapturedCount <= 1); // 最後の1人は絶対隠れる
 
   switch (ally.state) {
     case 'idle': {
@@ -11745,54 +11744,36 @@ function updateCpuAlly(g, ally, dt) {
         break;
       }
 
-      // --- 強い味方の積極的救出: 味方が捕まっているなら缶に向かって前進 ---
-      if (ally.level === 'strong' && capturedCount > 0 && g.can.isAtHome && !g.can.isFlying
-        && canDist > 6 && ally.stateTimer > 3) {
-        // 缶から遠い(6m+)なら、遮蔽物を利用しながら缶の方向へ接近
-        // 鬼が缶から離れている間に距離を詰める
-        if (canToOniDist > 10 && !oniFacingAlly) {
-          // 缶の方向にある遮蔽物を中間地点として利用
-          let bestApproachCover = null, bestScore = Infinity;
-          for (const col of g.colliders) {
-            if (col.h < 1.0) continue;
-            const cx = col.x, cz = col.z;
-            const colToCanDist = Math.sqrt((cx - canPos.x) ** 2 + (cz - canPos.z) ** 2);
-            const colToAllyDist = Math.sqrt((cx - ally.position.x) ** 2 + (cz - ally.position.z) ** 2);
-            // 味方と缶の間にある遮蔽物（味方より缶に近い）
-            if (colToCanDist < canDist - 2 && colToAllyDist > 2 && colToAllyDist < 15) {
-              const score = colToCanDist + colToAllyDist * 0.3;
-              if (score < bestScore) { bestScore = score; bestApproachCover = col; }
-            }
-          }
-          if (bestApproachCover) {
-            const hideAngle = Math.atan2(bestApproachCover.x - closestOni.position.x,
-              bestApproachCover.z - closestOni.position.z);
-            const half = g.config.size / 2 - 2;
-            ally.targetPos = new THREE.Vector3(
-              Math.max(-half, Math.min(half, bestApproachCover.x + Math.sin(hideAngle) * 1.5)),
-              0,
-              Math.max(-half, Math.min(half, bestApproachCover.z + Math.cos(hideAngle) * 1.5))
-            );
-            ally.state = 'sneak';
-            ally.stateTimer = 0;
-            break;
-          }
-        }
-      }
-
+      // --- 救出判断: 生存最優先。全鬼の隙を確実に見極めてから行動 ---
       if (capturedCount > 0 && g.can.isAtHome && !g.can.isFlying) {
-        const kickInterval = ally.level === 'strong' ? 1 : (ally.level === 'normal' ? 2 : 4);
-        const safeOniFromCan = ally.level === 'strong' ? 5 : (ally.level === 'normal' ? 8 : 11);
-        const safeOniFromAlly = ally.level === 'strong' ? 5 : (ally.level === 'normal' ? 8 : 11);
+        const kickInterval = ally.level === 'strong' ? 2 : (ally.level === 'normal' ? 3 : 5);
+        // 安全距離: 全鬼が十分遠いことが条件
+        const safeOniFromCan = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 14 : 16);
+        const safeOniFromAlly = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 12 : 15);
 
-        // Key insight: can ally reach the can BEFORE oni does?
+        // 到達時間: 鬼より十分早く缶に着けるか
         const allyTimeTocan = canDist / ally.sprintSpeed;
         const oniTimeToCan = canToOniDist / 5.5;
         const timeAdvantage = oniTimeToCan - allyTimeTocan;
-        // Need time advantage to kick safely
-        const minAdvantage = ally.level === 'strong' ? 0.1 : (ally.level === 'normal' ? 0.5 : 1.0);
+        // 時間的余裕: 強は判断が正確なので少し薄い余裕でもOK、弱は大きな余裕が必要
+        const minAdvantage = ally.level === 'strong' ? 1.5 : (ally.level === 'normal' ? 2.0 : 2.5);
 
-        // Also check: is oni facing AWAY from can? (extra safe)
+        // 全鬼をチェック: こちらを向いている鬼がいないか
+        let anyOniFacingAlly = false;
+        let anyOniNearCan = false;
+        let allOnisFarFromCan = true;
+        for (const o of g.onis) {
+          const oToAlly = Math.atan2(ally.position.x - o.position.x, ally.position.z - o.position.z);
+          let aDiff = oToAlly - o.rotation;
+          while (aDiff > Math.PI) aDiff -= Math.PI * 2;
+          while (aDiff < -Math.PI) aDiff += Math.PI * 2;
+          if (Math.abs(aDiff) < o.viewAngle / 2) anyOniFacingAlly = true;
+          const oDist = canPos.distanceTo(o.position);
+          if (oDist < 6) anyOniNearCan = true;
+          if (oDist < safeOniFromCan) allOnisFarFromCan = false;
+        }
+
+        // 鬼が缶から背を向けているか
         let oniFacingAwayCan = false;
         if (closestOni) {
           const toCanAngle = Math.atan2(canPos.x - closestOni.position.x, canPos.z - closestOni.position.z);
@@ -11802,22 +11783,22 @@ function updateCpuAlly(g, ally, dt) {
           oniFacingAwayCan = Math.abs(canAngleDiff) > Math.PI * 0.6;
         }
 
-        // Check ALL onis (not just closest) — is any oni guarding the can?
-        let anyOniNearCan = false;
-        for (const o of g.onis) {
-          if (canPos.distanceTo(o.position) < 6) { anyOniNearCan = true; break; }
-        }
-        const guardBonus = anyOniNearCan ? 1.3 : 1.0;
+        // 鬼が他のターゲットを追いかけている = 大きなチャンス
+        const oniDistracted = closestOni && (closestOni.state === 'chase' || closestOni.state === 'canTouch')
+          && closestOni.chaseTarget !== null;
 
-        const safeEnough = (canToOniDist > safeOniFromCan * guardBonus && oniDist > safeOniFromAlly)
-          || (oniFacingAwayCan && canToOniDist > safeOniFromCan * 0.5 && !anyOniNearCan);
+        // 安全条件: 全鬼が缶から遠い ＋ こちらを見ている鬼がいない ＋ 時間的余裕
+        const safeEnough = allOnisFarFromCan && !anyOniNearCan && oniDist > safeOniFromAlly
+          && !anyOniFacingAlly && timeAdvantage > minAdvantage;
 
-        if (ally.kickCheckTimer > kickInterval
-          && safeEnough
-          && !oniFacingAlly
-          && timeAdvantage > minAdvantage) {
+        // 絶好のチャンス: 鬼が他を追いかけ中 ＋ 缶の番をしている鬼がいない
+        const goldenChance = oniDistracted && !anyOniNearCan && oniFacingAwayCan
+          && timeAdvantage > minAdvantage * 0.5 && !anyOniFacingAlly;
+
+        if (ally.kickCheckTimer > kickInterval && (safeEnough || goldenChance)) {
           ally.kickCheckTimer = 0;
-          const kickChance = ally.level === 'strong' ? 0.98 : (ally.level === 'normal' ? 0.85 : 0.65);
+          // 判断精度: 強は安全状況を正確に判断できるので実行率が高い
+          const kickChance = ally.level === 'strong' ? 0.9 : (ally.level === 'normal' ? 0.75 : 0.55);
           if (Math.random() < kickChance) {
             ally.state = 'tryKick';
             ally.stateTimer = 0;
@@ -11906,16 +11887,26 @@ function updateCpuAlly(g, ally, dt) {
         break;
       }
 
-      // Abort check: smarter — consider if we can still make it
+      // Abort check: 生存最優先。状況が変わったら即撤退
       const allyTimeToCan = canDist / ally.sprintSpeed;
       const oniTimeToAlly = oniDist / 5.5;
-      const oniAbortDist = ally.level === 'strong' ? 2.5 : (ally.level === 'normal' ? 4.5 : 6);
+      // 中止距離: 全レベルで十分な安全マージンを確保
+      const oniAbortDist = ally.level === 'strong' ? 6 : (ally.level === 'normal' ? 7 : 9);
 
-      // Only abort if: oni is very close AND facing us AND will catch us before kick
-      // Strong allies are more committed — they only abort in extreme danger
-      const shouldAbort = oniDist < oniAbortDist && oniFacingAlly && oniTimeToAlly < allyTimeToCan + 0.3;
-      // If almost at the can, DON'T abort — commit to the kick
-      const almostThere = canDist < 4;
+      // 全鬼チェック: いずれかの鬼が接近してきたら中止を検討
+      let anyOniThreat = false;
+      for (const o of g.onis) {
+        const od = Math.sqrt((o.position.x - ally.position.x) ** 2 + (o.position.z - ally.position.z) ** 2);
+        const oToAlly = Math.atan2(ally.position.x - o.position.x, ally.position.z - o.position.z);
+        let aDiff = oToAlly - o.rotation;
+        while (aDiff > Math.PI) aDiff -= Math.PI * 2;
+        while (aDiff < -Math.PI) aDiff += Math.PI * 2;
+        const facing = Math.abs(aDiff) < o.viewAngle / 2;
+        if (od < oniAbortDist && facing) { anyOniThreat = true; break; }
+      }
+      const shouldAbort = anyOniThreat && oniTimeToAlly < allyTimeToCan + 0.5;
+      // 缶がもう目の前(2.5m以内)なら蹴り切る — それ以外は安全撤退
+      const almostThere = canDist < 2.5;
       if (shouldAbort && !almostThere) {
         ally.state = 'idle';
         ally.stateTimer = 0;
@@ -11932,8 +11923,8 @@ function updateCpuAlly(g, ally, dt) {
         cpuPerformKick(g, ally);
       }
 
-      // Timeout（強い味方はより長く粘る）
-      const kickTimeout = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 9 : 7);
+      // Timeout（短めに — 長時間走り続けると発見リスクが上がる）
+      const kickTimeout = ally.level === 'strong' ? 8 : (ally.level === 'normal' ? 7 : 6);
       if (ally.stateTimer > kickTimeout) {
         ally.state = 'idle';
         ally.stateTimer = 0;
