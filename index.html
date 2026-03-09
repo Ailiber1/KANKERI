@@ -10815,6 +10815,11 @@ function updateOni(g, oni, dt) {
       break;
     }
     case 'recovery': {
+      // キック後フリーズ: 5秒間その場から動けない
+      if (oni._kickFreezeTimer > 0) {
+        oni._kickFreezeTimer -= dt;
+        break;
+      }
       // 缶回収を最優先 — 缶に向かって走る（通常より速い）
       const canPos = g.can.group.position;
       var recTargetX = canPos.x, recTargetZ = canPos.z;
@@ -11521,12 +11526,14 @@ function cpuPerformKick(g, ally) {
     freeAllCaptured(g);
   }
 
-  // Reset oni to recovery mode — 全鬼が缶回収を最優先
+  // 全鬼をrecoveryに → seekフェーズ中は5秒間フリーズ（隠れる猶予）
+  const cpuKickFreeze = (g.gamePhase === 'seek') ? 5 : 0;
   for (const oni of g.onis) {
     oni.state = 'recovery';
     oni.stateTimer = 0;
     oni.foundTarget = null;
     oni.foundName = null;
+    oni._kickFreezeTimer = cpuKickFreeze;
   }
 
   // Stage 5ミッション: CPU味方のキックもカウント（seekフェーズのみ）
@@ -12284,12 +12291,14 @@ function performCanKick(g, power, kickerName) {
     showCenterAlert(kicker + ' が缶を蹴った！', '捕虜が全員解放された！', 3000);
   }
 
-  // Reset oni to recovery mode — 全鬼が缶回収を最優先
+  // 全鬼をrecoveryに → seekフェーズ中は5秒間フリーズ（隠れる猶予）
+  const kickFreeze = (g.gamePhase === 'seek') ? 5 : 0;
   for (const oni of g.onis) {
     oni.state = 'recovery';
     oni.stateTimer = 0;
     oni.foundTarget = null;
     oni.chaseTarget = null;
+    oni._kickFreezeTimer = kickFreeze;
   }
 
   // If initial kick phase, transition to hide phase
