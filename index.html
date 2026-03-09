@@ -10664,7 +10664,9 @@ function updateOni(g, oni, dt) {
         }
       }
 
-      if (canSeeChaseTarget || canSeeAny) {
+      // seeTimerはchase対象自体が見えている時のみ蓄積
+      // 別ターゲットが見えているだけでは蓄積しない（壁裏捕獲バグ修正）
+      if (canSeeChaseTarget) {
         oni.seeTimer = (oni.seeTimer || 0) + dt;
       } else {
         oni.seeTimer = 0;
@@ -10680,9 +10682,11 @@ function updateOni(g, oni, dt) {
         chaseTargetDist = Math.sqrt(ctdx*ctdx + ctdz*ctdz); // 2D距離
       }
 
-      // If continuously seeing for 1.5s and close enough → go to can touch
+      // If continuously seeing the ACTUAL chase target for 1.5s and close enough → go to can touch
       // ただし缶が未回収の場合は捕獲できない（缶を先に回収する必要がある）
-      if ((canSeeChaseTarget || canSeeAny) && oni.seeTimer > 1.5 && chaseTargetDist < viewDist) {
+      // ※ canSeeAnyだけでは不可 — chase対象自体が見えている必要がある（壁裏捕獲バグ修正）
+      // canSeeAnyで別ターゲットが見えている場合はターゲット切り替えで対応（10655行）
+      if (canSeeChaseTarget && oni.seeTimer > 1.5 && chaseTargetDist < viewDist) {
         if (!g.can.isAtHome) {
           // 缶未回収 → 捕獲不可、回収を優先
           oni.state = 'recovery';
