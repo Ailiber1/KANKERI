@@ -13108,17 +13108,18 @@ function updateGamePhases(g, dt) {
       if (g._captureImmunity > 0) g._captureImmunity -= dt;
       updateKickGauge(g, dt); // Rescue kick gauge update
 
-      // キャンプ防止 — 移動していない時間が一定以上で鬼に位置通知
+      // キャンプ防止 — 移動していない時間が一定以上で鬼が付近を捜索
       // プレイヤーのmoveSpeedで判定（実際に動いているかどうか）
       // チーム戦の鬼プレイヤーは対象外
+      // ※ 直接chaseではなくsearchに遷移（壁裏でも即捕まる問題を修正）
       if (!g._isOniPlayer) {
-        const STAY_LIMIT = 10; // 感知までの秒数
+        const STAY_LIMIT = 20; // 感知までの秒数（10→20秒に延長）
         const STAY_WARN = 5;   // 警告開始（残り5秒）
         if (g.player.captured) {
           g._stayTimer = 0;
           hideStayWarningLabel();
         } else {
-          // moveSpeedが0.3以上なら「動いている」と判定
+          // moveSpeedが0.3以上 or しゃがみ移動中なら「動いている」と判定
           if (g.player.moveSpeed > 0.3) {
             g._stayTimer = 0;
             hideStayWarningLabel();
@@ -13126,7 +13127,7 @@ function updateGamePhases(g, dt) {
             g._stayTimer += dt;
           }
           // 事前警告ラベル表示（残り5秒から）
-          if (g._stayTimer >= STAY_WARN && g._stayTimer < STAY_LIMIT) {
+          if (g._stayTimer >= STAY_LIMIT - STAY_WARN && g._stayTimer < STAY_LIMIT) {
             const remaining = Math.ceil(STAY_LIMIT - g._stayTimer);
             showStayWarningLabel(remaining);
           }
@@ -13135,7 +13136,7 @@ function updateGamePhases(g, dt) {
             hideStayWarningLabel();
             showCenterAlert('⚠ 位置が鬼に感知された！', '動かないと見つかるぞ！', 2500);
             const px = g.player.position.x, pz = g.player.position.z;
-            // 最寄り鬼がプレイヤー位置に直行
+            // 最寄り鬼がプレイヤー付近をsearchに行く（直接chaseではなく捜索）
             let closest = g.onis[0], minD = Infinity;
             for (const o of g.onis) {
               const d = (o.position.x - px) ** 2 + (o.position.z - pz) ** 2;
@@ -13145,21 +13146,24 @@ function updateGamePhases(g, dt) {
               // Stage 4: 鬼とプレイヤーが異なるフロアの場合、階段へ誘導
               const diffFloor4 = g._stageNum === 4 && (closest.floor || 0) !== (g.playerFloor || 0);
               if (diffFloor4) {
-                // 1Fの鬼 → 2Fへ階段誘導
                 const inSchool = closest.position.x > -19.5 && closest.position.x < 19.5 && closest.position.z > 24;
                 closest.targetWaypoint = inSchool ? 33 : 24;
                 closest.state = 'patrol';
                 closest._forceFloorPatrol = true;
                 closest._floorStayTimer = 0;
               } else {
-                closest.state = 'chase';
-                closest.chaseTarget = 'player';
-                closest.chasedPlayer = g.player.position.clone();
+                // search状態に遷移（chaseではない）→ 壁裏にいれば視野判定で見つからない
+                closest.state = 'search';
+                closest._searchDest = {
+                  x: px + (Math.random() - 0.5) * 12,
+                  z: pz + (Math.random() - 0.5) * 12
+                };
+                closest.chaseTarget = null;
               }
               closest.stateTimer = 0;
-              closest.restTimer = 0; // 休憩中でも強制的に動かす
-              closest.fatigue = Math.min(closest.fatigue, 50); // 疲労をリセットして即停止を防ぐ
-              closest._stuckCount = 0; // スタック状態もリセット
+              closest.restTimer = 0;
+              closest.fatigue = Math.min(closest.fatigue, 50);
+              closest._stuckCount = 0;
               closest._skipWaypoint = false;
             }
           }
