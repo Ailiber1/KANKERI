@@ -1,0 +1,24 @@
+{
+  "rules": {
+    "users": {
+      "$deviceId": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "rankings": {
+      "scoreAttack": {
+        ".read": true,
+        "$deviceId": {
+          ".write": true
+        }
+      }
+    },
+    "rooms": {
+      "$roomId": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}
