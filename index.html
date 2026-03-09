@@ -11634,15 +11634,18 @@ function updateCpuAlly(g, ally, dt) {
         ally.state = 'sneak';
         ally.targetPos = ally.hideSpot;
         // hideフェーズ or 鬼が遠い → 立って走る、鬼が近い → しゃがむ
-        ally.isCrouching = (g.gamePhase === 'seek' && oniDist < 18);
+        // 強は広い範囲でしゃがみを選択（慎重）
+        const crouchDist = ally.level === 'strong' ? 25 : (ally.level === 'normal' ? 20 : 15);
+        ally.isCrouching = (g.gamePhase === 'seek' && oniDist < crouchDist);
       }
       break;
     }
 
     case 'sneak': {
       // 鬼との距離に応じて立ち/しゃがみを動的に切り替え（レベル別判断距離）
-      const standDistFar = ally.level === 'strong' ? 15 : (ally.level === 'normal' ? 18 : 22);
-      const standDistMid = ally.level === 'strong' ? 8 : (ally.level === 'normal' ? 10 : 12);
+      // 強は鬼が遠くてもしゃがみ移動を選ぶ（慎重＝賢い）
+      const standDistFar = ally.level === 'strong' ? 25 : (ally.level === 'normal' ? 20 : 18);
+      const standDistMid = ally.level === 'strong' ? 15 : (ally.level === 'normal' ? 10 : 8);
       if (g.gamePhase !== 'seek') {
         ally.isCrouching = false;
       } else if (oniDist > standDistFar) {
@@ -11654,8 +11657,8 @@ function updateCpuAlly(g, ally, dt) {
       }
 
       // FREEZE if oni is very close and facing us — don't move, don't make sound
-      // 強い味方はより近い距離まで動き続ける（大胆）
-      const freezeDist = ally.level === 'strong' ? 4 : (ally.level === 'normal' ? 5 : 6);
+      // 強は早めにフリーズ（賢い判断 = 見つかるリスクを事前に回避）
+      const freezeDist = ally.level === 'strong' ? 8 : (ally.level === 'normal' ? 6 : 5);
       if (oniDist < freezeDist && oniFacingAlly && g.gamePhase === 'seek') {
         ally.moveSpeed = 0;
         ally.isCrouching = true;
@@ -11673,19 +11676,18 @@ function updateCpuAlly(g, ally, dt) {
       }
 
       if (ally.targetPos) {
-        // 移動速度も距離に応じて調整（強い味方はより速く動く）
+        // 移動速度: seekフェーズ中は全レベル慎重に移動
         let sneakMoveSpeed;
         if (!ally.isCrouching) {
-          // 立っている → ダッシュ or 通常走り
-          if (g.gamePhase !== 'seek' || oniDist > 25) {
+          // 立っている → seek中は控えめ、hide中は速く
+          if (g.gamePhase !== 'seek' || oniDist > 30) {
             sneakMoveSpeed = ally.sprintSpeed * 0.9;
-          } else if (ally.level === 'strong' && oniDist > 15) {
-            sneakMoveSpeed = ally.sprintSpeed * 0.8; // 強: 遠ければスプリント
           } else {
-            sneakMoveSpeed = ally.sneakSpeed * 1.8;
+            sneakMoveSpeed = ally.sneakSpeed * 1.5; // 走りすぎない
           }
         } else {
-          sneakMoveSpeed = ally.level === 'strong' ? ally.sneakSpeed * 1.3 : ally.sneakSpeed;
+          // しゃがみ: 強は効率的に移動
+          sneakMoveSpeed = ally.level === 'strong' ? ally.sneakSpeed * 1.2 : ally.sneakSpeed;
         }
         moveCpuAlly(ally, ally.targetPos.x, ally.targetPos.z, sneakMoveSpeed, dt, g);
         const dist = ally.position.distanceTo(ally.targetPos);
@@ -11694,8 +11696,8 @@ function updateCpuAlly(g, ally, dt) {
           ally.state = 'hiding';
           ally.stateTimer = 0;
         }
-        // Stuck detection: if no progress, pick new spot（強い味方は素早く判断）
-        const stuckTimeout = ally.level === 'strong' ? 4 : (ally.level === 'normal' ? 6 : 8);
+        // Stuck detection: if no progress, pick new spot
+        const stuckTimeout = ally.level === 'strong' ? 8 : (ally.level === 'normal' ? 6 : 5);
         if (ally.stateTimer > stuckTimeout && dist > 2) {
           ally.state = 'idle';
           ally.stateTimer = 0;
@@ -11782,8 +11784,9 @@ function updateCpuAlly(g, ally, dt) {
       }
 
       // --- Proactive relocation: oni approaching before it gets too close ---
-      const proactiveThresh = ally.level === 'strong' ? 16 : (ally.level === 'normal' ? 12 : 9);
-      if (oniApproaching && oniDist < proactiveThresh && oniApproachETA < 4 && !hasCoverFromOni) {
+      // 強は遮蔽物がある限りじっとしている（不必要な移動を避ける）
+      const proactiveThresh = ally.level === 'strong' ? 10 : (ally.level === 'normal' ? 12 : 14);
+      if (oniApproaching && oniDist < proactiveThresh && oniApproachETA < 3 && !hasCoverFromOni) {
         // Oni is heading our way and we have no cover — relocate NOW before detected
         ally.state = 'relocate';
         ally.stateTimer = 0;
@@ -11831,8 +11834,9 @@ function updateCpuAlly(g, ally, dt) {
       }
 
       // --- Periodic re-evaluation: is current spot still safe? ---
-      const reevalTime = ally.level === 'strong' ? 5 : (ally.level === 'normal' ? 7 : 9);
-      const reevalOniDist = ally.level === 'strong' ? 20 : (ally.level === 'normal' ? 17 : 15);
+      // 強はじっとしている時間が長い（無駄に動かない＝賢い）
+      const reevalTime = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 8 : 6);
+      const reevalOniDist = ally.level === 'strong' ? 12 : (ally.level === 'normal' ? 15 : 17);
       if (ally.stateTimer > reevalTime && !hasCoverFromOni && oniDist < reevalOniDist) {
         // We've been hiding for 8+ sec, no cover, and oni is somewhat close
         // Find a better spot with actual cover
